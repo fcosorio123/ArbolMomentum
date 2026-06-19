@@ -1,0 +1,249 @@
+Daily-to-Weekly Task System for Favio
+(Tailored to his Personal Health, Performance, and Balance Plan)
+
+App Structure Overview (Mobile UI Flow)
+1. Home Dashboard (Top of App)
+Current Streak: 🔥 7 days (Best 🏆 12) — same as mockup
+Primary Goal Progress (Big Card)
+Lose 20 lbs this Summer — 0% (with weight trend graph)
+Subtitle: “Healthy, strong & sharp for family + startup”
+2. Your Goals Section (Like the Travel goal in mockup)
+Four main goal cards, each with progress % and quick milestones:
+Goal
+Progress
+Key Milestones
+Lose 20 lbs
+0%
+• Hit protein target daily
+• Weekly avg weight ↓1–1.5 lb
+Founder Performance
+0%
+• 7+ hrs sleep (5+ nights)
+• Energy & focus score
+Longevity & Durability
+0%
+• 2 Strength sessions
+• 150+ min cardio/week
+Neck Pain Reduction + Balance
+0%
+• Daily 5-min reset
+• Quality wife/friend time
+
+
+3. Daily Tasks Screen (Main Hub – Inspired by your second mockup)
+Overall Today: 0/8
+Color-coded: 0 In Progress • 0 Done • 8 Not Started
+Morning | Evening tabs (like mockup)
+Morning Tab – Daily Habits (Tied to Goals)
+Healthy Living (0/3)
+Protein at breakfast → Goal: Lose 20 lbs + Performance
+5-min Neck Reset (Chin tucks + shoulder blade squeezes) → Goal: Reduce neck pain
+20–30 min Walk → Goal: Longevity + Mental Balance
+Fitness & Health (0/3)
+Strength Session 1 (Mon/Thu) or Easy Run (Tue/Fri) → Goal: Longevity
+Warm-up before any lifting/running/tennis → Goal: Neck Pain Prevention
+Hydration target (tracked via quick log) → Goal: All goals
+Daily Reset (0/2)
+Review weight trend (weekly average) → Goal: Lose 20 lbs
+10–20 min Reading before bed → Goal: Founder Performance + Balance
+
+Evening Tab – Recovery & Balance
+Mental Balance & Relationships (0/4)
+Intentional time with wife (touchpoint or deeper block) → Goal: Mental Balance
+No intense work 1 hour before bed → Goal: Founder Performance
+Optional: Comedy / Drums / Friend chat → Goal: Stress Resilience
+Log sleep routine (wind-down) → Goal: Performance
+
+4. Weekly Plan View (New Screen – “View Weekly Plan” button)
+Week of May 25 – 31, 2026
+Day
+Focus
+Key Tasks (Tied to Goals)
+Status
+Mon
+Strength + Structure
+Strength Session 1, Neck reset, Wife time, Reading
+0/6
+Tue
+Run + Mental Stimulation
+Easy Run, 30-min personal project, Neck reset
+0/5
+Wed
+Recovery + Wife/Home
+Mobility, Home task, Meaningful wife time
+0/5
+Thu
+Strength + Drums
+Strength Session 2, 20–30 min Drums, Neck reset
+0/5
+Fri
+Easy Run/Long Walk + Comedy
+Easy run or long walk, Comedy night
+0/5
+Sat
+Tennis + Relationships
+Tennis + warm-up, Protein meal, Social time
+0/5
+Sun
+Long Walk + Reset
+Long walk, Weekly review, Meal prep, Wife time
+0/6
+
+Weekly Scoreboard (at bottom, like PDF)
+Sleep: 0/5 nights
+Walking: 0/7 days
+Strength: 0/2
+Running: 0/2
+Tennis: 0/1
+Neck Reset: 0/5
+Protein at meals: 0/21
+
+Task Design Rules (UI/UX Best Practices Applied)
+Every task shows its goal tag (small colored pill)
+Example: Protein at breakfast → Lose 20 lbs • Performance
+Micro-milestones with confidence boosters
+Checkmark → celebratory animation + “+10xp toward 20 lb goal”
+Smart Suggestions
+If neck pain logged → auto-suggest reset + mobility
+If low sleep streak → prioritize evening wind-down tasks
+Progress Psychology
+Visual progress rings on goal cards
+Streak fire grows bigger
+“You’re building durability for your family” motivational copy
+
+
+
+
+3-5 Month Health, Performance & Fat Loss Routine for Favio
+Main Goal: Lose 20 pounds this summer (by end of August/early September) while building sustainable strength, energy, neck resilience, and life balance.
+Total Timeline: 16–20 weeks (4–5 months)
+Approach: Progressive, realistic, and sustainable. 1–1.5 lb average loss per week.
+
+Program Overview
+Phases:
+Phase 1 (Weeks 1–4): Build Habits & Foundation
+Phase 2 (Weeks 5–8): Intensify & Accelerate
+Phase 3 (Weeks 9–12): Peak Fat Loss & Performance
+Phase 4 (Weeks 13–16/20): Refine & Sustain
+Tracking:
+Weekly average weight (every Monday morning)
+Body measurements + photos (every 2 weeks)
+Sleep & energy score (1–10)
+Neck pain level (1–10)
+
+Core Daily Habits (Every Day – All Phases)
+These are non-negotiable and tied directly to goals:
+Habit
+Frequency
+Goal Tied To
+Notes
+Protein at every meal
+3x/day
+Weight Loss + Muscle Preservation
+~30–40g per meal
+5-min Neck Reset
+5–6x/week
+Neck Pain Reduction
+Chin tucks, shoulder blade squeezes, doorway stretch
+Daily Walk
+20–45 min
+Longevity + Mental Reset
+Morning or lunch preferred
+Sleep Routine
+7+ hrs, 5+ nights
+Founder Performance
+No intense work 60 min before bed
+Hydration
+3–4 liters
+All goals
+Track in app
+
+
+Weekly Training Schedule (Progressive)
+Phase 1 (Weeks 1–4) – Foundation
+Focus: Form, consistency, recovery.
+Monday: Strength Session 1 (45–55 min) + Walk
+Tuesday: Easy Run (20–25 min) + Mental Project (30 min)
+Wednesday: Recovery + Wife/Home Night (Mobility 10–15 min)
+Thursday: Strength Session 2 + Drums (20–30 min)
+Friday: Easy Run or Long Walk (25–40 min) + Comedy
+Saturday: Tennis + Social
+Sunday: Long Walk (40–60 min) + Weekly Review + Meal Prep
+Strength Sessions (2x/week): Full body, moderate weights
+Bench Press (balanced with rows/pulls)
+Squats or Goblet Squats
+Hip Hinge (Romanian Deadlift or Good Mornings)
+Core (Planks, Dead Bugs)
+Shoulder & Neck mobility finishers
+
+Phase 2 (Weeks 5–8) – Intensification
+Increase volume and intensity slightly.
+Add 1 more run (now 2 runs/week)
+Strength sessions: Add 1 set per exercise or 5–10% more weight if form is good
+Walking: Aim for 8,000–10,000 steps daily
+Introduce 1 optional HIIT-style finisher once per week (short, neck-safe)
+Nutrition: Tighten slightly (reduce late-night eating further)
+
+Phase 3 (Weeks 9–12) – Peak Fat Loss
+Strength: Move to 3–4 sets per exercise
+Cardio: 2–3 runs/week (mix easy + 1 slightly longer)
+Tennis: Keep as fun + cardio
+Add 1 weekly conditioning circuit (bodyweight or light)
+Weekly Check-in: Adjust calories if weight loss stalls (see Nutrition below)
+
+Phase 4 (Weeks 13–20) – Refine & Sustain
+Maintain strength 2–3x/week
+Focus more on performance metrics (energy, strength numbers, mood)
+Reassess neck pain – consider PT if needed
+Transition toward maintenance calories if 20 lb goal is reached
+Emphasize enjoyment and flexibility
+
+Nutrition Framework (All Phases)
+Main Rules:
+Protein priority (target 160–200g/day depending on body weight)
+Vegetables/fruit at 2 meals
+Calorie deficit: Moderate (aim 500–700 kcal below maintenance)
+Flexible on weekends but no full cheat days
+Progression:
+Phase 1: Focus on consistency, not perfection
+Phase 2–3: Reduce ultra-processed foods and alcohol
+Phase 4: Find sustainable maintenance level
+Advisor Note Needed: Exact calorie/protein target once current weight is known.
+
+Balance & Recovery (Protected Time)
+Activity
+Target
+Goal
+Wife time
+Daily touchpoint + 2 deeper sessions/week
+Mental Balance
+Friends/Social
+1–2 blocks/week
+Stress Resilience
+Reading / Comedy
+3x reading, 1–2 comedy
+Recovery
+Drums
+1–2 sessions
+Creative outlet
+Home tasks
+2–4 small tasks
+Life order
+
+
+Weekly Scoreboard (Track in App)
+Sleep: 5+ nights of 7+ hrs
+Strength: 2 sessions
+Running/Walks: 5–7 days active
+Tennis: 1 session
+Neck Reset: 5+ days
+Protein goal: 80%+ of meals
+Weight trend: -1 to -1.5 lb/week average
+
+Milestones (3–5 Months)
+End of Month 1: Habits locked in, 4–6 lbs down, neck pain noticeably better
+End of Month 2: 8–10 lbs total, strength increasing, better daily energy
+End of Month 3: 12–15 lbs down, visible changes, strong routines
+End of Month 4–5: 18–22+ lbs down, sustainable system in place, ready for maintenance or next level
+
+

@@ -1,0 +1,41 @@
+{
+  "name": "Arbol Momentum",
+  "short_name": "Momentum",
+  "description": "Track habits, streaks, and daily tasks with Arbol Momentum.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f0f4f8",
+  "theme_color": "#094067",
+  "lang": "en",
+  "categories": ["productivity", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Today's Tasks",
+      "short_name": "Tasks",
+      "url": "/?tab=tasks",
+      "description": "Jump straight to your daily tasks"
+    },
+    {
+      "name": "My Streak",
+      "short_name": "Streak",
+      "url": "/?tab=home",
+      "description": "Check your current streak"
+    }
+  ]
+}

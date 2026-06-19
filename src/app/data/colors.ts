@@ -1,0 +1,17 @@
+export const C = {
+  bg: '#fffffe',
+  bgCard: '#ffffff',
+  bgAlt: '#f0f7ff',
+  bgAlt2: '#e8f2ff',
+  headline: '#094067',
+  body: '#5f6c7b',
+  primary: '#3da9fc',
+  primaryDark: '#1a87e0',
+  secondary: '#90b4ce',
+  tertiary: '#ef4565',
+  streak: '#f5a623',
+  border: 'rgba(9,64,103,0.1)',
+  borderStrong: 'rgba(9,64,103,0.18)',
+  shadow: '0 2px 16px rgba(9,64,103,0.08)',
+  shadowMd: '0 4px 24px rgba(9,64,103,0.12)',
+} as const;
