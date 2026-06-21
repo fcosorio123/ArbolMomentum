@@ -1982,7 +1982,7 @@ function SettingsTab() {
           <div>
             <div style={{ fontWeight: 600, fontSize: 14, color: C.headline }}>Enabled</div>
             <div style={{ color: C.body, fontSize: 12, marginTop: 4 }}>
-              Shows report buttons and the live feedback card on the Tasks page.
+              Shows the live check-in card on the Tasks page when tasks are marked Done.
             </div>
           </div>
           <Switch
