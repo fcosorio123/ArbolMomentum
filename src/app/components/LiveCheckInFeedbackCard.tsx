@@ -1,9 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { SoundOutlined, CaretDownOutlined, CaretUpOutlined } from '@ant-design/icons';
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+} from 'recharts';
 import {
   type ReportEntry,
   getLatestReport,
   getRecentReports,
+  getTodayChartData,
   LOADER_MESSAGES,
 } from '../data/liveCheckInFeedback';
 import { isVoicePlaybackEnabled } from '../data/liveCheckInSettings';
@@ -42,12 +46,14 @@ function speakText(text: string) {
 export function LiveCheckInFeedbackCard({ profileId, isProcessing, processingMessage }: Props) {
   const [latest, setLatest] = useState<ReportEntry | null>(() => getLatestReport(profileId));
   const [ledger, setLedger] = useState<ReportEntry[]>(() => getRecentReports(profileId, 5));
+  const [chartData, setChartData] = useState(() => getTodayChartData(profileId));
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [speaking, setSpeaking] = useState(false);
 
   const refresh = useCallback(() => {
     setLatest(getLatestReport(profileId));
     setLedger(getRecentReports(profileId, 5));
+    setChartData(getTodayChartData(profileId));
   }, [profileId]);
 
   useEffect(() => {
@@ -67,6 +73,12 @@ export function LiveCheckInFeedbackCard({ profileId, isProcessing, processingMes
     isVoicePlaybackEnabled();
 
   const showUrgent = latest?.warningType === 'urgent_safety' && !isProcessing;
+
+  const chartHasData = chartData.length > 0;
+  const displayChart = useMemo(
+    () => (chartHasData ? chartData : [{ label: '—', progress: 0, momentum: 0 }]),
+    [chartData, chartHasData],
+  );
 
   const cardStyle = {
     background: C.bgCard,
@@ -103,8 +115,42 @@ export function LiveCheckInFeedbackCard({ profileId, isProcessing, processingMes
           )}
         </div>
 
+        {/* Today's progress chart */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: C.secondary, marginBottom: 6 }}>
+            Today&apos;s momentum
+          </div>
+          <div style={{ width: '100%', height: 120 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={displayChart} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: C.secondary }} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: C.secondary }} width={28} />
+                <Tooltip
+                  contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${C.border}` }}
+                  formatter={(value: number, name: string) => [
+                    value,
+                    name === 'progress' ? 'Progress %' : 'Momentum',
+                  ]}
+                />
+                {chartHasData && (
+                  <>
+                    <Line type="monotone" dataKey="progress" stroke={C.primary} strokeWidth={2} dot={{ r: 3 }} name="progress" />
+                    <Line type="monotone" dataKey="momentum" stroke={C.headline} strokeWidth={2} dot={{ r: 3 }} name="momentum" strokeDasharray="4 2" />
+                  </>
+                )}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          {!chartHasData && !isProcessing && (
+            <div style={{ fontSize: 11, color: C.secondary, textAlign: 'center', marginTop: -8 }}>
+              Complete a task to start the chart.
+            </div>
+          )}
+        </div>
+
         {isProcessing ? (
-          <div style={{ textAlign: 'center', padding: '20px 8px' }}>
+          <div style={{ textAlign: 'center', padding: '12px 8px' }}>
             <div style={{
               width: 28, height: 28, borderRadius: '50%',
               border: `3px solid ${C.border}`, borderTopColor: C.primary,
@@ -117,7 +163,7 @@ export function LiveCheckInFeedbackCard({ profileId, isProcessing, processingMes
           </div>
         ) : !latest ? (
           <div style={{ fontSize: 13, color: C.secondary, lineHeight: 1.5, padding: '8px 0' }}>
-            Report your first update to start the ledger.
+            Mark a task Done to get your live check-in feedback.
           </div>
         ) : (
           <>
@@ -188,7 +234,7 @@ export function LiveCheckInFeedbackCard({ profileId, isProcessing, processingMes
                 fontWeight: 600, color: C.secondary,
               }}
             >
-              Recent updates ({ledger.length})
+              Recent completions ({ledger.length})
               {ledgerOpen ? <CaretUpOutlined /> : <CaretDownOutlined />}
             </button>
             {ledgerOpen && (

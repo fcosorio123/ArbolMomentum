@@ -23,7 +23,6 @@ import { trackActivity } from '../data/feedback';
 import { PageTour, PageTourButton, TOUR_KEYS } from './AppTour';
 import { CongratModal } from './CongratModal';
 import { LiveCheckInFeedbackCard } from './LiveCheckInFeedbackCard';
-import { ReportUpdateSheet, type ReportTask } from './ReportUpdateSheet';
 import {
   submitReportUpdate, LOADER_MESSAGES, randomProcessingDelayMs,
 } from '../data/liveCheckInFeedback';
@@ -58,13 +57,11 @@ const STATUS_META = {
 
 // ── Task item
 function TaskItem({
-  task, catColor, status, onCycle, onDelete, onEdit, onReport, reportDisabled,
+  task, catColor, status, onCycle, onDelete, onEdit,
 }: {
   task: UserTask_; catColor: string; status: TaskStatus | null;
   onCycle: () => void; onDelete: () => void;
   onEdit?: () => void;
-  onReport?: () => void;
-  reportDisabled?: boolean;
 }) {
   const meta = status ? STATUS_META[status] : null;
 
@@ -116,20 +113,6 @@ function TaskItem({
       </div>
 
       <div style={{ display: 'flex', gap: 2, flexShrink: 0, alignItems: 'center' }}>
-        {onReport && (
-          <button
-            onClick={onReport}
-            disabled={reportDisabled}
-            style={{
-              background: 'none', border: 'none', cursor: reportDisabled ? 'default' : 'pointer',
-              color: reportDisabled ? C.borderStrong : C.primary,
-              fontSize: 11, fontWeight: 600, padding: '8px 6px', borderRadius: 6,
-              opacity: reportDisabled ? 0.5 : 1, whiteSpace: 'nowrap',
-            }}
-          >
-            Report update
-          </button>
-        )}
         {onEdit && (
           <button onClick={onEdit} style={{
             background: 'none', border: 'none', cursor: 'pointer', color: C.secondary,
@@ -264,7 +247,7 @@ function goalAccentColor(goalId: string) {
 // ── Goal group: goal header + flat task list
 function GoalGroup({
   goal, tasks, statuses, deleted, onCycle, onDelete, timeFilter,
-  onEditTask, onAddSuggestedTask, isFirst, onReport, reportDisabled, liveCheckInEnabled,
+  onEditTask, onAddSuggestedTask, isFirst,
 }: {
   goal: PersonalGoal; tasks: UserTask_[];
   statuses: StatusMap; deleted: DeletedMap;
@@ -273,9 +256,6 @@ function GoalGroup({
   onEditTask: (t: UserTask_) => void;
   onAddSuggestedTask: (label: string, goalId: string) => void;
   isFirst?: boolean;
-  onReport?: (t: UserTask_) => void;
-  reportDisabled?: boolean;
-  liveCheckInEnabled?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(!isFirst);
   const accentColor = goalAccentColor(goal.id);
@@ -369,8 +349,6 @@ function GoalGroup({
               status={statuses[task.id] ?? null}
               onCycle={() => onCycle(task)} onDelete={() => onDelete(task)}
               onEdit={() => onEditTask(task)}
-              onReport={liveCheckInEnabled && onReport ? () => onReport(task) : undefined}
-              reportDisabled={reportDisabled}
             />
           ))}
         </div>
@@ -495,7 +473,6 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     try { return new Set(JSON.parse(localStorage.getItem(`arbol-hidden-seed-${profile.id}`) || '[]')); } catch { return new Set(); }
   });
   const [liveCheckInEnabled, setLiveCheckInEnabled] = useState(() => isLiveCheckInEnabled());
-  const [reportTask, setReportTask] = useState<ReportTask | null>(null);
   const [isReportProcessing, setIsReportProcessing] = useState(false);
   const [processingMessage, setProcessingMessage] = useState(LOADER_MESSAGES[0]);
 
@@ -571,17 +548,6 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
       document.getElementById('live-check-in-card')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, delay);
   }, [profile.id, liveCheckInEnabled, isReportProcessing, loadState]);
-
-  const openReportSheet = (task: Task) => {
-    setReportTask({ id: task.id, label: task.label });
-  };
-
-  const handleReportSubmit = ({ status, note }: { status: TaskStatus | null; note: string }) => {
-    if (!reportTask || isReportProcessing) return;
-    const { id, label } = reportTask;
-    setReportTask(null);
-    runLiveFeedback({ taskId: id, taskTitle: label, status, note });
-  };
 
   // Auto-start tasks tour on first visit
   useEffect(() => {
@@ -897,9 +863,6 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                 isFirst={idx === 0}
                 onEditTask={t => handleEditAnyTask(t, goal.id)}
                 onAddSuggestedTask={handleAddSuggestedTask}
-                liveCheckInEnabled={liveCheckInEnabled}
-                onReport={openReportSheet}
-                reportDisabled={isReportProcessing}
               />
             </div>
           ))}
@@ -923,8 +886,6 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                     onCycle={() => cycleStatus(task)}
                     onDelete={() => task.isUserCreated ? openDeleteUserTask(task as UserTask) : (setSeedDeleteMode('permanent'), setPendingDelete(task))}
                     onEdit={() => handleEditAnyTask(task, undefined)}
-                    onReport={liveCheckInEnabled ? () => openReportSheet(task) : undefined}
-                    reportDisabled={isReportProcessing}
                   />
                 ))}
             </div>
@@ -951,17 +912,6 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
 
 
       {/* ── Manage Modals ── */}
-
-      {liveCheckInEnabled && (
-        <ReportUpdateSheet
-          open={!!reportTask}
-          task={reportTask}
-          profileId={profile.id}
-          disabled={isReportProcessing}
-          onClose={() => setReportTask(null)}
-          onSubmit={handleReportSubmit}
-        />
-      )}
 
       <ManageTaskModal
         open={manageTaskOpen}

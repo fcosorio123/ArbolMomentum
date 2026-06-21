@@ -1,48 +1,33 @@
-# Production URLs and Figma Make sync
+# Publish to Figma Make (`sound-press-69397091.figma.site`)
 
-## Canonical production (auto-updates)
+GitHub is the source of truth. Figma Make **cannot** pull from GitHub automatically.
 
-**https://fcosorio123.github.io/ArbolMomentum/**
+## Do NOT use "Push to GitHub" in Figma
 
-Every push to `main` deploys here via GitHub Actions (`.github/workflows/deploy-frontend.yml`).
+That sends **old Figma code → GitHub** and removes features. Build in Cursor; deploy via GitHub Pages.
 
-## Legacy Figma Make URL
+## Restore your Figma URL (2 minutes)
 
-**https://sound-press-69397091.figma.site**
-
-Figma Make publishes to `*.figma.site` from the Figma editor only. There is **no API or GitHub Action** that can push builds to Figma Make hosting.
-
-### What we did instead
-
-1. **Redirect** — The app includes a small script (`public/scripts/figma-redirect-snippet.js`) that sends visitors from the Figma URL to GitHub Pages. After this is live on Figma, the old link always shows the latest build.
-
-2. **`npm run build:figma`** — Builds a root-path bundle (`VITE_BASE_PATH=/`) suitable for a one-time Figma Make republish.
-
-3. **GitHub Actions artifact** — Each deploy also uploads a `figma-publish-bundle` you can download if needed.
-
-## One-time: activate redirect on Figma Make
-
-Do this once so `sound-press-69397091.figma.site` forwards to GitHub Pages:
+Your Figma Make file has a **Publish** button (top-right). Use it after a one-line fix so the Figma link always shows the latest app:
 
 1. Open your [Figma Make file](https://www.figma.com/design/d8cDh8DPdqXBqJbzLPlWRo/Arbol-Momentum).
-2. **Sync code from GitHub** (recommended):
-   - Connect the Make file to `fcosorio123/ArbolMomentum` if not already linked, **or**
-   - Pull / merge latest `main` into the Make project.
-3. Click **Publish** (upper-right) and republish to the same `figma.site` URL.
+2. Open the **Code** panel and edit **`index.html`**.
+3. Inside `<head>`, paste this script (or copy the whole `index.html` from GitHub):
 
-After that, anyone using the Figma link is redirected to GitHub Pages, which stays in sync with `main`.
+```html
+<script>
+(function () {
+  var LEGACY = 'https://sound-press-69397091.figma.site';
+  var CANONICAL = 'https://fcosorio123.github.io/ArbolMomentum/';
+  if (location.origin === LEGACY) location.replace(CANONICAL + location.search + location.hash);
+})();
+</script>
+```
 
-### Alternative: download CI artifact
+4. Click **Publish** → **Update** (top-right, not Settings → GitHub).
 
-1. Open **Actions** → latest **Deploy frontend to GitHub Pages** run.
-2. Download **figma-publish-bundle**.
-3. In Figma Make, update code from the bundle and **Publish**.
+After that, `https://sound-press-69397091.figma.site` opens the same latest build as GitHub Pages.
 
-## Debug
+## Direct production URL
 
-- Append `?stay=1` to the Figma URL to skip redirect (e.g. testing the old host).
-- Use GitHub Pages directly for day-to-day testing and sharing.
-
-## Email / Supabase
-
-Set `APP_BASE_URL` to `https://fcosorio123.github.io/ArbolMomentum` (see `supabase/.secrets.env.example`).
+**https://fcosorio123.github.io/ArbolMomentum/** — always current after every push to `main`.

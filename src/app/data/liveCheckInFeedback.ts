@@ -387,6 +387,27 @@ export function getRecentReports(profileId: string, limit = 5): ReportEntry[] {
   return readReports(profileId).slice(0, limit);
 }
 
+export interface TodayChartPoint {
+  label: string;
+  progress: number;
+  momentum: number;
+}
+
+/** Today's completion history for the live check-in chart (oldest → newest). */
+export function getTodayChartData(profileId: string, dateKey?: string): TodayChartPoint[] {
+  const today = dateKey ?? getTodayKey();
+  const reports = readReports(profileId)
+    .filter(r => r.dateKey === today)
+    .slice()
+    .reverse();
+  if (reports.length === 0) return [];
+  return reports.map((r, i) => ({
+    label: i === 0 ? 'Start' : `${i + 1}`,
+    progress: r.progressAtTime,
+    momentum: r.momentumScore,
+  }));
+}
+
 export function dispatchFeedbackUpdated() {
   try {
     window.dispatchEvent(new CustomEvent('arbol-live-feedback-updated'));

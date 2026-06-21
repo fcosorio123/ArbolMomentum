@@ -9,7 +9,16 @@
       <meta name="description" content="This web application helps users manage home alerts efficiently, offering responsive design and push notifications for timely updates." />
       <meta name="robots" content="noindex, nofollow" />
       <style>html, body { height: 100%; margin: 0; } #root { height: 100%; }</style>
-      <!-- Legacy Figma Make URL → GitHub Pages (canonical production, auto-deploys from main) -->
+      <!-- Figma Make URL → GitHub Pages (latest build). Copy this block into Make index.html then Publish. -->
+      <script>
+        (function () {
+          var LEGACY = 'https://sound-press-69397091.figma.site';
+          var CANONICAL = 'https://fcosorio123.github.io/ArbolMomentum/';
+          try {
+            if (location.origin === LEGACY) location.replace(CANONICAL + location.search + location.hash);
+          } catch (e) {}
+        })();
+      </script>
       <script src="%BASE_URL%scripts/figma-redirect-snippet.js"></script>
       
     </head>
