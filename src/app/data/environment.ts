@@ -2,17 +2,22 @@
 // Environment Detection & Data Management
 // ──────────────────────────────────────────────
 
-/** Legacy Figma Make hosted URL (may still be in use during transition) */
+/** Legacy Figma Make hosted URL (redirects to canonical production; see scripts/figma-redirect-snippet.js) */
 export const LEGACY_FIGMA_PUBLISHED_ORIGIN = 'https://sound-press-69397091.figma.site';
 
 /** GitHub Pages production URL (deployed from main via GitHub Actions) */
 export const GITHUB_PAGES_ORIGIN = 'https://fcosorio123.github.io';
 export const GITHUB_PAGES_BASE_PATH = '/ArbolMomentum';
 
-/** Primary production URL shown in admin/debug (GitHub Pages when built with VITE_PUBLISHED) */
-export const PUBLISHED_URL = import.meta.env.VITE_PUBLISHED === 'true'
-  ? `${GITHUB_PAGES_ORIGIN}${GITHUB_PAGES_BASE_PATH}`
-  : LEGACY_FIGMA_PUBLISHED_ORIGIN;
+/** Canonical production URL — always GitHub Pages (auto-deploys on push to main) */
+export const CANONICAL_PRODUCTION_URL = `${GITHUB_PAGES_ORIGIN}${GITHUB_PAGES_BASE_PATH}`;
+
+/** @deprecated Use CANONICAL_PRODUCTION_URL */
+export const PUBLISHED_URL = CANONICAL_PRODUCTION_URL;
+
+export function getCanonicalProductionUrl(): string {
+  return CANONICAL_PRODUCTION_URL;
+}
 
 export const DATA_COLLECTION_START_DATE = '2026-05-14'; // May 14, 2026
 

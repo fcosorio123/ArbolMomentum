@@ -12,7 +12,7 @@ export function getEmailConfig() {
     fromAddress: Deno.env.get("EMAIL_FROM_ADDRESS") ?? "onboarding@resend.dev",
     fromName: Deno.env.get("EMAIL_FROM_NAME") ?? "Arbol Momentum",
     replyTo: Deno.env.get("EMAIL_REPLY_TO") ?? "",
-    appBaseUrl: Deno.env.get("APP_BASE_URL") ?? "https://sound-press-69397091.figma.site",
+    appBaseUrl: Deno.env.get("APP_BASE_URL") ?? "https://fcosorio123.github.io/ArbolMomentum",
   };
 }
 

@@ -38,3 +38,29 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
           cname: false
+
+  figma-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build for Figma Make (root base path + redirect)
+        run: npm run build:figma
+        env:
+          VITE_BASE_PATH: /
+          VITE_PUBLISHED: 'true'
+
+      - name: Upload Figma publish bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: figma-publish-bundle
+          path: dist/
+          retention-days: 30
