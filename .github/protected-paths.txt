@@ -1,0 +1,14 @@
+# Files that must exist on main. Used by protect-main and deploy workflows.
+# If Figma Make "Push to GitHub" removes these, the push is reverted automatically.
+
+src/app/data/liveCheckInFeedback.ts
+src/app/data/liveCheckInSettings.ts
+src/app/components/LiveCheckInFeedbackCard.tsx
+src/app/components/TaskList.tsx
+src/app/components/AdminView.tsx
+src/app/App.tsx
+.github/workflows/deploy-frontend.yml
+.github/workflows/protect-main.yml
+.figma/make/dev
+FIGMA_SYNC.md
+scripts/figma-make-sync-prompt.txt

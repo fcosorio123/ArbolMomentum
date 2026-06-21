@@ -2,6 +2,17 @@
 
 GitHub (`main`) is the source of truth. **Do not use Push to GitHub in Figma** — that overwrites newer GitHub code with stale Make code.
 
+## Protection if you accidentally Push to GitHub from Figma
+
+This repo has an automatic guard on `main`:
+
+1. **`.github/workflows/protect-main.yml`** — if a push looks like Figma Make (commit message) or removes protected feature files, GitHub Actions **reverts that commit automatically** within about a minute.
+2. **Deploy gate** — GitHub Pages will not deploy if protected files are missing.
+
+Protected file list: `.github/protected-paths.txt`
+
+Optional stronger lock (one-time, in GitHub): see **`.github/BRANCH_PROTECTION.md`**.
+
 Production URLs:
 
 - **GitHub Pages (always current after push):** https://fcosorio123.github.io/ArbolMomentum/

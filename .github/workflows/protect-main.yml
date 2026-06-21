@@ -1,0 +1,82 @@
+name: Protect main from Figma Make overwrites
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: protect-main
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    if: github.event.head_commit != null
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check for unsafe push
+        id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+          MSG="${{ github.event.head_commit.message }}"
+          AUTHOR="${{ github.event.head_commit.author.username }}"
+
+          # Skip revert commits (avoid loops when we auto-revert a Figma push)
+          if [[ "$MSG" =~ ^Revert ]]; then
+            echo "block=false" >> "$GITHUB_OUTPUT"
+            echo "reason=skipped revert commit" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          FIGMA=false
+          if echo "$MSG" | grep -qiE 'update files from figma make|from figma make|figma make update'; then
+            FIGMA=true
+            REASON="Figma Make push commit message detected"
+          fi
+
+          MISSING=false
+          MISSING_LIST=""
+          while IFS= read -r path || [[ -n "$path" ]]; do
+            [[ -z "$path" || "$path" =~ ^# ]] && continue
+            if [[ ! -f "$path" ]]; then
+              MISSING=true
+              MISSING_LIST="${MISSING_LIST}${path}, "
+              echo "Missing protected file: $path"
+            fi
+          done < .github/protected-paths.txt
+
+          if [[ "$MISSING" == true ]]; then
+            REASON="Protected files removed (${MISSING_LIST%, })"
+          fi
+
+          if [[ "$FIGMA" == true || "$MISSING" == true ]]; then
+            echo "block=true" >> "$GITHUB_OUTPUT"
+            echo "reason=${REASON:-unsafe push}" >> "$GITHUB_OUTPUT"
+          else
+            echo "block=false" >> "$GITHUB_OUTPUT"
+            echo "reason=ok" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Revert unsafe push
+        if: steps.check.outputs.block == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git revert HEAD --no-edit
+          git push origin main
+
+      - name: Block summary
+        if: steps.check.outputs.block == 'true'
+        run: |
+          echo "::error::Blocked and reverted an unsafe push to main (${{ steps.check.outputs.reason }})."
+          echo "If you pushed from Figma Make, use Make chat sync + Publish instead — never Push to GitHub."
+          exit 1
