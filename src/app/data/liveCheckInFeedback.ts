@@ -185,6 +185,14 @@ function getPreviousProgressBeforeToday(profileId: string, todayKey: string): nu
   return prior[0]?.progress ?? 0;
 }
 
+/** Baseline for movement: last report today, else last snapshot before today. */
+function getBaselineProgress(profileId: string, dateKey: string): number {
+  const reports = readReports(profileId);
+  const lastToday = reports.find(r => r.dateKey === dateKey);
+  if (lastToday) return lastToday.progressAtTime;
+  return getPreviousProgressBeforeToday(profileId, dateKey);
+}
+
 export function computeMovementState(current: number, previous: number): MovementState {
   if (current > previous) return 'up';
   if (current < previous) return 'down';
@@ -326,6 +334,13 @@ export function generateReportText(opts: {
     return `You have ${inProgressCount} tasks in progress, which shows activity but also creates drag. Progress is at ${progress}% and Momentum Score is ${momentumScore}. Close one loop next by working on ${next}.`;
   }
 
+  if (status === 'done' && !statusChanged) {
+    if (movementState === 'up') {
+      return `You completed "${taskTitle}," bringing progress to ${progress}% from ${previousProgress}%. Momentum Score is ${momentumScore}. Your next move is to ${next}.`;
+    }
+    return `You completed "${taskTitle}." Overall progress is at ${progress}%, and Momentum Score is ${momentumScore}. Your next move is to ${next}.`;
+  }
+
   if (movementState === 'flat' && !statusChanged) {
     return `You updated "${taskTitle}," but progress is still flat at ${progress}%. That means activity happened, but the task list did not move forward yet. Your next move is to ${next}.`;
   }
@@ -404,7 +419,7 @@ export function submitReportUpdate(params: SubmitReportParams): ReportEntry {
   const note = (params.note ?? '').trim();
   saveTaskNote(profileId, taskId, dateKey, note);
 
-  const previousProgress = getPreviousProgressBeforeToday(profileId, dateKey);
+  const previousProgress = getBaselineProgress(profileId, dateKey);
   const scope = calculateScopeProgress(profileId, dateKey);
   const { blocker, urgentSafety } = detectKeywords(note);
 

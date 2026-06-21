@@ -57,6 +57,10 @@ export function LiveCheckInFeedbackCard({ profileId, isProcessing, processingMes
     return () => window.removeEventListener('arbol-live-feedback-updated', handler);
   }, [refresh]);
 
+  useEffect(() => {
+    if (!isProcessing) refresh();
+  }, [isProcessing, refresh]);
+
   const voiceSupported =
     typeof window !== 'undefined' &&
     'speechSynthesis' in window &&
@@ -91,7 +95,7 @@ export function LiveCheckInFeedbackCard({ profileId, isProcessing, processingMes
         </div>
       )}
 
-      <div style={cardStyle}>
+      <div style={cardStyle} id="live-check-in-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <span style={{ fontWeight: 700, fontSize: 14, color: C.headline }}>Live check-in</span>
           {latest && !isProcessing && (

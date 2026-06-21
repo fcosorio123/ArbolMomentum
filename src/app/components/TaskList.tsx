@@ -552,28 +552,35 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     return () => clearInterval(interval);
   }, [isReportProcessing]);
 
+  const runLiveFeedback = useCallback((params: {
+    taskId: string; taskTitle: string; status?: TaskStatus | null; note?: string;
+  }) => {
+    if (!liveCheckInEnabled || isReportProcessing) return;
+    setIsReportProcessing(true);
+    const delay = randomProcessingDelayMs();
+    setTimeout(() => {
+      submitReportUpdate({
+        profileId: profile.id,
+        taskId: params.taskId,
+        taskTitle: params.taskTitle,
+        status: params.status,
+        note: params.note,
+      });
+      loadState();
+      setIsReportProcessing(false);
+      document.getElementById('live-check-in-card')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, delay);
+  }, [profile.id, liveCheckInEnabled, isReportProcessing, loadState]);
+
   const openReportSheet = (task: Task) => {
     setReportTask({ id: task.id, label: task.label });
   };
 
   const handleReportSubmit = ({ status, note }: { status: TaskStatus | null; note: string }) => {
     if (!reportTask || isReportProcessing) return;
+    const { id, label } = reportTask;
     setReportTask(null);
-    setIsReportProcessing(true);
-    const taskId = reportTask.id;
-    const taskTitle = reportTask.label;
-    const delay = randomProcessingDelayMs();
-    setTimeout(() => {
-      submitReportUpdate({
-        profileId: profile.id,
-        taskId,
-        taskTitle,
-        status,
-        note,
-      });
-      loadState();
-      setIsReportProcessing(false);
-    }, delay);
+    runLiveFeedback({ taskId: id, taskTitle: label, status, note });
   };
 
   // Auto-start tasks tour on first visit
@@ -616,6 +623,10 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
         localStorage.setItem(seenKey, JSON.stringify([...seen]));
         if (onPerfectDay) onPerfectDay(newBadges);
         else message.success({ content: '🎉 All tasks done! Streak extended!', duration: 3 });
+      }
+
+      if (liveCheckInEnabled) {
+        runLiveFeedback({ taskId: task.id, taskTitle: task.label, status: 'done' });
       }
     }
   };
