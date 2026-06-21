@@ -126,7 +126,7 @@ export function trackEvent(
   event: EventType,
   data?: Record<string, string | number | boolean>,
 ) {
-  const date = new Date().toISOString().split('T')[0];
+  const date = localDateKey();
   const key = eventKey(profileId, date);
   const logs: EventLog[] = JSON.parse(localStorage.getItem(key) || '[]');
   logs.push({ profileId, event, timestamp: Date.now(), data });
@@ -144,7 +144,7 @@ export function getEventLogs(profileId: string, days = 7): EventLog[] {
   for (let i = 0; i < days; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    const date = d.toISOString().split('T')[0];
+    const date = localDateKey(d);
     const raw = localStorage.getItem(eventKey(profileId, date));
     if (raw) {
       try { result.push(...JSON.parse(raw)); } catch {}
@@ -174,8 +174,15 @@ export interface ScheduledNotif {
   atMs: number; // absolute timestamp to fire
 }
 
+function localDateKey(date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 function scheduleKey(profileId: string) {
-  return `arbol-sched-${profileId}-${new Date().toISOString().split('T')[0]}`;
+  return `arbol-sched-${profileId}-${localDateKey()}`;
 }
 
 export function saveSchedule(profileId: string, notifs: ScheduledNotif[]) {

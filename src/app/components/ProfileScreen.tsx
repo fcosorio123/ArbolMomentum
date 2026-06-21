@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Button, Progress } from 'antd';
-import { LogoutOutlined, SettingOutlined, FireOutlined, TrophyOutlined, ThunderboltOutlined, HomeOutlined, BellOutlined, ArrowRightOutlined } from '@ant-design/icons';
+import { Button, Progress, Input } from 'antd';
+import { LogoutOutlined, SettingOutlined, FireOutlined, TrophyOutlined, ThunderboltOutlined, HomeOutlined, BellOutlined, ArrowRightOutlined, MailOutlined } from '@ant-design/icons';
 import { type Profile, PROFILES, getEarnedBadges, computeLiveStreak } from '../data/profiles';
+import { getProfileEmail, saveProfileEmail } from '../data/profileContact';
 import { BadgesSection } from './BadgesSection';
 import { C } from '../data/colors';
 
@@ -9,19 +10,23 @@ interface Props { profile: Profile; onSwitch: () => void; onAdmin: () => void; o
 
 export function ProfileScreen({ profile, onSwitch, onAdmin, onAlerts }: Props) {
   const [tab, setTab] = useState<'stats' | 'badges'>('stats');
+  const [email, setEmail] = useState(() => getProfileEmail(profile.id));
+  const [emailMsg, setEmailMsg] = useState<string | null>(null);
   const rank = [...PROFILES].sort((a, b) => b.streak - a.streak).findIndex(p => p.id === profile.id) + 1;
   const earned = getEarnedBadges(profile);
   const liveStreak = computeLiveStreak(profile.id);
 
+  const dayLabel = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
+
   const stats = [
-    { icon: <FireOutlined style={{ color: C.streak }} />, label: 'Current Streak', value: `${liveStreak} days` },
-    { icon: <TrophyOutlined style={{ color: C.streak }} />, label: 'Best Streak', value: `${profile.bestStreak} days` },
+    { icon: <FireOutlined style={{ color: C.streak }} />, label: 'Current Streak', value: dayLabel(liveStreak) },
+    { icon: <TrophyOutlined style={{ color: C.streak }} />, label: 'Best Streak', value: dayLabel(profile.bestStreak) },
     { icon: <ThunderboltOutlined style={{ color: C.primary }} />, label: 'Avg. Completion', value: `${profile.completionRate}%` },
     { icon: <HomeOutlined style={{ color: C.primary }} />, label: 'Week on Program', value: `Week ${profile.joinedWeek}` },
   ];
 
   return (
-    <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 16px', background: C.bg, minHeight: '100dvh' }}>
+    <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 32px', background: C.bg, minHeight: '100dvh' }}>
       {/* Hero */}
       <div style={{
         background: `linear-gradient(160deg, ${C.headline} 0%, #1a6da8 100%)`,
@@ -38,7 +43,7 @@ export function ProfileScreen({ profile, onSwitch, onAdmin, onAlerts }: Props) {
         <h2 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, color: '#fff' }}>{profile.name}</h2>
         <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>{profile.role}</div>
         <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12, margin: '8px 0 12px', lineHeight: 1.5 }}>{profile.bio}</p>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '3px 10px', color: '#fff', fontSize: 12 }}>
             🌿 Arbol Momentum
           </span>
@@ -85,6 +90,30 @@ export function ProfileScreen({ profile, onSwitch, onAdmin, onAlerts }: Props) {
                 <div style={{ fontSize: 11, color: C.secondary, marginTop: 2 }}>{item.label}</div>
               </div>
             ))}
+          </div>
+
+          <div style={{ background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16, padding: '16px 18px', boxShadow: C.shadow, marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <MailOutlined style={{ color: C.primary }} />
+              <span style={{ fontWeight: 600, fontSize: 14, color: C.headline }}>Email for reminders</span>
+            </div>
+            <Input
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              style={{ borderRadius: 10, marginBottom: 8 }}
+            />
+            <Button block onClick={() => {
+              const result = saveProfileEmail(profile.id, email, { profileName: profile.name });
+              setEmailMsg(result.ok ? 'Email saved' : (result.error ?? 'Could not save'));
+              setTimeout(() => setEmailMsg(null), 2500);
+            }} style={{ borderRadius: 10, height: 40 }}>
+              Save email
+            </Button>
+            {emailMsg && <div style={{ fontSize: 12, color: C.body, marginTop: 8 }}>{emailMsg}</div>}
+            <div style={{ fontSize: 11, color: C.secondary, marginTop: 8 }}>
+              Optional. Used for welcome and reminder emails when enabled by admin.
+            </div>
           </div>
 
           <div style={{ background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16, padding: '16px 18px', boxShadow: C.shadow, marginBottom: 12 }}>

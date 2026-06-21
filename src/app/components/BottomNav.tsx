@@ -117,6 +117,8 @@ export function BottomNav({ activeTab, onChange, pendingCount = 0, isDesktop = f
       display: 'flex',
       zIndex: 100,
       paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      paddingLeft: 'env(safe-area-inset-left, 0px)',
+      paddingRight: 'env(safe-area-inset-right, 0px)',
       boxShadow: '0 -4px 20px rgba(9,64,103,0.06)',
     }}>
       {TABS.map((tab) => {

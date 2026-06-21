@@ -271,7 +271,7 @@ export function ManageTaskModal({ open, task, defaultGoalId, goals, currentDate,
             ))}
           </div>
 
-          {/* Weekly — weekday picker */}
+          {/* Weekly - weekday picker */}
           {recType === 'weekly' && (
             <div>
               <div style={{ fontSize: 11, color: C.secondary, marginBottom: 8 }}>Select days</div>
@@ -282,7 +282,7 @@ export function ManageTaskModal({ open, task, defaultGoalId, goals, currentDate,
             </div>
           )}
 
-          {/* Monthly — date picker */}
+          {/* Monthly - date picker */}
           {recType === 'monthly' && (
             <div>
               <div style={{ fontSize: 11, color: C.secondary, marginBottom: 8 }}>Select dates of month</div>
@@ -296,7 +296,7 @@ export function ManageTaskModal({ open, task, defaultGoalId, goals, currentDate,
             </div>
           )}
 
-          {/* One-time — date input */}
+          {/* One-time - date input */}
           {recType === 'one-time' && (
             <div>
               <div style={{ fontSize: 11, color: C.secondary, marginBottom: 8 }}>Date</div>
@@ -317,7 +317,7 @@ export function ManageTaskModal({ open, task, defaultGoalId, goals, currentDate,
           )}
         </div>
 
-        {/* Apply to — only shown when editing a weekly/monthly task */}
+        {/* Apply to - only shown when editing a weekly/monthly task */}
         {editingRecurring && (
           <div style={{
             background: `${C.primary}08`, border: `1px solid ${C.primary}25`,

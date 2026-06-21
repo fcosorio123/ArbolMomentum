@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Button, Progress } from 'antd';
+import { Button, Progress, Switch, Input, Select } from 'antd';
 import { ArrowLeftOutlined, FireOutlined, ReloadOutlined, DownloadOutlined, InfoCircleOutlined, UploadOutlined } from '@ant-design/icons';
 import { DataMigration } from './DataMigration';
 import {
   BarChart, Bar, LineChart, Line,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
-import { PROFILES, getTaskCategoriesForProfile, isTaskDeleted, getTaskStatus, computeLiveStreak } from '../data/profiles';
+import { PROFILES, getTaskCategoriesForProfile, isTaskDeleted, getTaskStatus, computeLiveStreak, getTodayKey, getDateKey } from '../data/profiles';
 import {
   getAllFeedbackAll, getActivityChartData, getWeeklyEngagement,
   generateInsight, RATING_EMOJIS, type FeedbackEntry,
@@ -27,18 +27,25 @@ import {
 } from '../data/supabaseSync';
 import { getUserTasks, type UserTask } from '../data/userTasks';
 import { C } from '../data/colors';
+import {
+  fetchAppSettings, saveAppSettings, getAppNotificationSettings,
+  type AppNotificationSettings, type NotificationChannel,
+} from '../data/appSettings';
+import {
+  fetchEmailSettings, saveEmailSettings, getEmailSettings,
+  sendTestEmail, sendManualNudge,
+  type EmailSettings, type EmailTriggerMode,
+} from '../data/emailSettings';
 
 interface Props { onBack: () => void }
 
 const DAYS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const WEEK_DAYS_INDEXED = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-function getTodayKey() { return new Date().toISOString().split('T')[0]; }
-
 function getDateForOffset(offset: number) {
   const d = new Date();
   d.setDate(d.getDate() + offset);
-  return d.toISOString().split('T')[0];
+  return getDateKey(d);
 }
 
 function getDateForWeekday(dayName: string) {
@@ -46,7 +53,7 @@ function getDateForWeekday(dayName: string) {
   const ci = today.getDay() === 0 ? 6 : today.getDay() - 1;
   const t = new Date(today);
   t.setDate(today.getDate() + (DAYS_SHORT.indexOf(dayName) - ci));
-  return t.toISOString().split('T')[0];
+  return getDateKey(t);
 }
 
 function computeCompletion(profileId: string, date: string): number {
@@ -79,9 +86,10 @@ function TabBar({ tab, onChange }: { tab: string; onChange: (t: string) => void 
     { id: 'feedback', label: '💬' },
     { id: 'goals', label: '🌟' },
     { id: 'devices', label: '📱' },
+    { id: 'settings', label: '⚙️' },
   ];
   return (
-    <div style={{ display: 'flex', background: C.bgAlt, borderRadius: 14, padding: 4, margin: '0 16px 16px', border: `1px solid ${C.border}` }}>
+    <div style={{ display: 'flex', background: C.bgAlt, borderRadius: 14, padding: 4, margin: '0 16px 16px', border: `1px solid ${C.border}`, overflowX: 'auto' }}>
       {tabs.map(t => (
         <button key={t.id} onClick={() => onChange(t.id)} style={{
           flex: 1, padding: '9px 4px', borderRadius: 11, border: 'none', cursor: 'pointer',
@@ -170,7 +178,7 @@ function OverviewTab() {
           const prevWeekDays = DAYS_SHORT.map((day, idx) => {
             const d = new Date();
             d.setDate(d.getDate() - (6 - idx) - 7); // Go back 7 more days
-            const date = d.toISOString().split('T')[0];
+            const date = getDateKey(d);
             const stats = calculateDayStats(date);
             return { day, date, done: stats.done, total: stats.total, pct: stats.pct };
           });
@@ -212,7 +220,7 @@ function OverviewTab() {
       const prevWeekDays = DAYS_SHORT.map((day, idx) => {
         const d = new Date();
         d.setDate(d.getDate() - (6 - idx) - 7);
-        const date = d.toISOString().split('T')[0];
+        const date = getDateKey(d);
         const detail = computeDayDetail(p.id, date);
         return { day, date, ...detail };
       });
@@ -460,7 +468,7 @@ function AnalyticsTab() {
   // Get date range based on selected time period
   const getDateRange = (): { startDate: string; endDate: string; days: number } => {
     const end = new Date();
-    const endDate = end.toISOString().split('T')[0];
+    const endDate = getDateKey(end);
     let startDate: string;
     let days: number;
 
@@ -498,7 +506,7 @@ function AnalyticsTab() {
 
     const start = new Date(end);
     start.setDate(end.getDate() - (days - 1));
-    startDate = start.toISOString().split('T')[0];
+    startDate = getDateKey(start);
 
     return { startDate, endDate, days };
   };
@@ -554,7 +562,7 @@ function AnalyticsTab() {
     const end = new Date(endDate);
 
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = getDateKey(d);
       const cats = getTaskCategoriesForProfile(selectedId);
       const allTasks = cats.flatMap(c => c.tasks);
 
@@ -592,8 +600,8 @@ function AnalyticsTab() {
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekStart.getDate() + 6);
 
-      const weekStartStr = weekStart.toISOString().split('T')[0];
-      const weekEndStr = weekEnd <= end ? weekEnd.toISOString().split('T')[0] : end.toISOString().split('T')[0];
+      const weekStartStr = getDateKey(weekStart);
+      const weekEndStr = getDateKey(weekEnd <= end ? weekEnd : end);
 
       // Calculate average completion for the week
       let totalPct = 0;
@@ -602,7 +610,7 @@ function AnalyticsTab() {
       let weekTotal = 0;
 
       for (let d = new Date(weekStart); d <= new Date(weekEndStr); d.setDate(d.getDate() + 1)) {
-        const dateStr = d.toISOString().split('T')[0];
+        const dateStr = getDateKey(d);
         const cats = getTaskCategoriesForProfile(selectedId);
         const allTasks = cats.flatMap(c => c.tasks);
 
@@ -645,7 +653,7 @@ function AnalyticsTab() {
     const end = new Date(endDate);
 
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = getDateKey(d);
       const detail = computeDayDetail(selectedId, dateStr);
 
       data.push({
@@ -671,7 +679,7 @@ function AnalyticsTab() {
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekStart.getDate() + 6);
 
-      const weekEndStr = weekEnd <= end ? weekEnd.toISOString().split('T')[0] : end.toISOString().split('T')[0];
+      const weekEndStr = getDateKey(weekEnd <= end ? weekEnd : end);
 
       let totalPct = 0;
       let dayCount = 0;
@@ -679,7 +687,7 @@ function AnalyticsTab() {
       let weekTotal = 0;
 
       for (let d = new Date(weekStart); d <= new Date(weekEndStr); d.setDate(d.getDate() + 1)) {
-        const dateStr = d.toISOString().split('T')[0];
+        const dateStr = getDateKey(d);
         const detail = computeDayDetail(selectedId, dateStr);
 
         totalPct += detail.pct;
@@ -691,7 +699,7 @@ function AnalyticsTab() {
       const avgPct = dayCount > 0 ? Math.round(totalPct / dayCount) : 0;
 
       data.push({
-        date: weekStart.toISOString().split('T')[0],
+        date: getDateKey(weekStart),
         label: weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         pct: avgPct,
         done: weekDone,
@@ -845,7 +853,7 @@ function AnalyticsTab() {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `engagement-${selectedId}-${timePeriod}-${new Date().toISOString().split('T')[0]}.csv`;
+                a.download = `engagement-${selectedId}-${timePeriod}-${getTodayKey()}.csv`;
                 a.click();
               }}
               style={{ fontSize: 11 }}
@@ -1572,7 +1580,7 @@ function PersonalGoalsTab() {
 
   // Group by date
   const grouped = filtered.reduce<Record<string, GoalProgressLog[]>>((acc, log) => {
-    const date = new Date(log.timestamp).toISOString().split('T')[0];
+    const date = getDateKey(new Date(log.timestamp));
     acc[date] = [...(acc[date] || []), log];
     return acc;
   }, {});
@@ -1816,7 +1824,271 @@ function PersonalGoalsTab() {
   );
 }
 
-// ── Main AdminView ────────────────────────────
+// ── Settings Tab ────────────────────────────────
+
+function SettingsTab() {
+  const [settings, setSettings] = useState<AppNotificationSettings>(() => getAppNotificationSettings());
+  const [emailSettings, setEmailSettings] = useState<EmailSettings>(() => getEmailSettings());
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailSaved, setEmailSaved] = useState(false);
+  const [testSending, setTestSending] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+  const [manualProfileId, setManualProfileId] = useState(PROFILES[0]?.id ?? '');
+  const [manualType, setManualType] = useState<'smart_nudge' | 'welcome' | 'check_in_confirmation'>('smart_nudge');
+  const [manualSending, setManualSending] = useState(false);
+  const [manualResult, setManualResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([fetchAppSettings(), fetchEmailSettings()]).then(([s, e]) => {
+      setSettings(s);
+      setEmailSettings(e);
+      setLoading(false);
+    });
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaved(false);
+    const next = await saveAppSettings(settings);
+    setSettings(next);
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  const handleEmailSave = async () => {
+    setEmailSaving(true);
+    setEmailSaved(false);
+    const next = await saveEmailSettings(emailSettings);
+    setEmailSettings(next);
+    setEmailSaving(false);
+    setEmailSaved(true);
+    setTimeout(() => setEmailSaved(false), 2500);
+  };
+
+  const handleTestEmail = async () => {
+    setTestSending(true);
+    setTestResult(null);
+    const result = await sendTestEmail(emailSettings.testRecipient || undefined);
+    setTestSending(false);
+    setTestResult(result.ok ? 'Test email sent ✓' : `Failed: ${result.reason ?? 'unknown'}`);
+  };
+
+  const handleManualNudge = async () => {
+    const profile = PROFILES.find(p => p.id === manualProfileId);
+    setManualSending(true);
+    setManualResult(null);
+    const result = await sendManualNudge({
+      profileId: manualProfileId,
+      type: manualType,
+      profileName: profile?.name,
+      tag: manualType === 'smart_nudge' ? 'manual-nudge' : undefined,
+      title: manualType === 'smart_nudge' ? 'Manual nudge from admin' : undefined,
+      body: manualType === 'smart_nudge' ? 'This is a manual email nudge triggered from admin settings.' : undefined,
+    });
+    setManualSending(false);
+    setManualResult(result.ok ? 'Email sent ✓' : `Skipped/failed: ${result.reason ?? 'unknown'}`);
+  };
+
+  const updateProfileEmail = (profileId: string, email: string) => {
+    setEmailSettings(s => ({
+      ...s,
+      profileEmails: { ...s.profileEmails, [profileId]: email },
+    }));
+  };
+
+  const cardStyle = { background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16, padding: '16px 18px', marginBottom: 14, boxShadow: C.shadow };
+  const inputStyle = { borderRadius: 10, marginTop: 6 };
+  const labelStyle = { color: C.secondary, fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 4 };
+
+  if (loading) {
+    return <div style={{ padding: '0 16px 24px', color: C.secondary, fontSize: 13 }}>Loading settings...</div>;
+  }
+
+  return (
+    <div style={{ padding: '0 16px 24px' }}>
+      <div style={{ ...labelStyle, marginBottom: 10 }}>Browser notifications</div>
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14, color: C.headline }}>Global notifications</div>
+            <div style={{ color: C.body, fontSize: 12, marginTop: 4 }}>
+              When off, the app will not request permission or send notifications.
+            </div>
+          </div>
+          <Switch
+            checked={settings.enabled}
+            onChange={enabled => setSettings(s => ({ ...s, enabled }))}
+            style={{ background: settings.enabled ? C.primary : undefined }}
+          />
+        </div>
+      </div>
+
+      <div style={cardStyle}>
+        <div style={labelStyle}>Channel</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {(['browser'] as NotificationChannel[]).map(ch => (
+            <button key={ch} onClick={() => setSettings(s => ({ ...s, channel: ch }))} style={{
+              padding: '8px 14px', borderRadius: 10, cursor: 'pointer', fontSize: 12,
+              border: `1.5px solid ${settings.channel === ch ? C.primary : C.border}`,
+              background: settings.channel === ch ? `${C.primary}15` : C.bgAlt,
+              color: settings.channel === ch ? C.primary : C.body,
+              fontWeight: settings.channel === ch ? 700 : 400,
+            }}>
+              Browser notifications
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ ...cardStyle, background: C.bgAlt }}>
+        <div style={{ fontSize: 12, color: C.body }}>
+          Current: <strong style={{ color: C.headline }}>{settings.enabled ? 'Enabled' : 'Disabled'}</strong>
+          {' · '}Channel: <strong style={{ color: C.headline }}>{settings.channel}</strong>
+          {settings.updatedAt ? <> · Saved {new Date(settings.updatedAt).toLocaleString()}</> : null}
+        </div>
+      </div>
+
+      <Button type="primary" loading={saving} onClick={handleSave}
+        style={{ width: '100%', background: C.primary, border: 'none', borderRadius: 12, height: 44, fontWeight: 600, marginBottom: 24 }}>
+        {saved ? 'Browser settings saved ✓' : 'Save browser settings'}
+      </Button>
+
+      <div style={{ ...labelStyle, marginBottom: 10 }}>Email notifications (Resend)</div>
+
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14, color: C.headline }}>Global email</div>
+            <div style={{ color: C.body, fontSize: 12, marginTop: 4 }}>
+              Independent from browser notifications. Requires Resend API key on server.
+            </div>
+          </div>
+          <Switch
+            checked={emailSettings.enabled}
+            onChange={enabled => setEmailSettings(s => ({ ...s, enabled }))}
+            style={{ background: emailSettings.enabled ? C.primary : undefined }}
+          />
+        </div>
+      </div>
+
+      <div style={cardStyle}>
+        <div style={labelStyle}>Email types</div>
+        {([
+          ['welcomeEnabled', 'Welcome email'],
+          ['smartNudgeEnabled', 'Smart nudge (morning/midday/evening)'],
+          ['taskCompletionEnabled', 'Task completion (default off)'],
+          ['checkInConfirmationEnabled', 'Check-in confirmation'],
+        ] as const).map(([key, label]) => (
+          <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 10 }}>
+            <span style={{ fontSize: 13, color: C.headline }}>{label}</span>
+            <Switch
+              checked={emailSettings[key]}
+              onChange={v => setEmailSettings(s => ({ ...s, [key]: v }))}
+              style={{ background: emailSettings[key] ? C.primary : undefined }}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div style={cardStyle}>
+        <div style={labelStyle}>Trigger mode</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+          {([
+            ['browser_aligned', 'Browser-aligned + events'],
+            ['event_only', 'Events only'],
+            ['manual', 'Manual only'],
+          ] as [EmailTriggerMode, string][]).map(([mode, label]) => (
+            <button key={mode} onClick={() => setEmailSettings(s => ({ ...s, triggerMode: mode }))} style={{
+              padding: '8px 14px', borderRadius: 10, cursor: 'pointer', fontSize: 12,
+              border: `1.5px solid ${emailSettings.triggerMode === mode ? C.primary : C.border}`,
+              background: emailSettings.triggerMode === mode ? `${C.primary}15` : C.bgAlt,
+              color: emailSettings.triggerMode === mode ? C.primary : C.body,
+              fontWeight: emailSettings.triggerMode === mode ? 700 : 400,
+            }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={cardStyle}>
+        <div style={labelStyle}>Sender &amp; test</div>
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 12, color: C.body, marginBottom: 4 }}>From name</div>
+          <Input value={emailSettings.fromName} onChange={e => setEmailSettings(s => ({ ...s, fromName: e.target.value }))} style={inputStyle} />
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 12, color: C.body, marginBottom: 4 }}>Reply-to</div>
+          <Input value={emailSettings.replyTo} onChange={e => setEmailSettings(s => ({ ...s, replyTo: e.target.value }))} placeholder="optional@example.com" style={inputStyle} />
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 12, color: C.body, marginBottom: 4 }}>Test recipient</div>
+          <Input value={emailSettings.testRecipient} onChange={e => setEmailSettings(s => ({ ...s, testRecipient: e.target.value }))} placeholder="admin@example.com" style={inputStyle} />
+        </div>
+        <Button loading={testSending} onClick={handleTestEmail} style={{ marginTop: 12, borderRadius: 10 }}>
+          Send test email
+        </Button>
+        {testResult && <div style={{ fontSize: 12, color: C.body, marginTop: 8 }}>{testResult}</div>}
+      </div>
+
+      <div style={cardStyle}>
+        <div style={labelStyle}>Profile emails (admin override)</div>
+        {PROFILES.map(p => (
+          <div key={p.id} style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 12, color: C.body, marginBottom: 4 }}>{p.name} ({p.id})</div>
+            <Input
+              value={emailSettings.profileEmails[p.id] ?? ''}
+              onChange={e => updateProfileEmail(p.id, e.target.value)}
+              placeholder="email@example.com"
+              style={inputStyle}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div style={cardStyle}>
+        <div style={labelStyle}>Send nudge now (manual)</div>
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 12, color: C.body, marginBottom: 4 }}>Profile</div>
+          <Select
+            value={manualProfileId}
+            onChange={setManualProfileId}
+            style={{ width: '100%' }}
+            options={PROFILES.map(p => ({ value: p.id, label: p.name }))}
+          />
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 12, color: C.body, marginBottom: 4 }}>Type</div>
+          <Select
+            value={manualType}
+            onChange={setManualType}
+            style={{ width: '100%' }}
+            options={[
+              { value: 'smart_nudge', label: 'Smart nudge' },
+              { value: 'welcome', label: 'Welcome' },
+              { value: 'check_in_confirmation', label: 'Check-in confirmation' },
+            ]}
+          />
+        </div>
+        <Button loading={manualSending} onClick={handleManualNudge} style={{ marginTop: 12, borderRadius: 10 }}>
+          Send nudge now
+        </Button>
+        {manualResult && <div style={{ fontSize: 12, color: C.body, marginTop: 8 }}>{manualResult}</div>}
+      </div>
+
+      <Button type="primary" loading={emailSaving} onClick={handleEmailSave}
+        style={{ width: '100%', background: C.primary, border: 'none', borderRadius: 12, height: 44, fontWeight: 600 }}>
+        {emailSaved ? 'Email settings saved ✓' : 'Save email settings'}
+      </Button>
+    </div>
+  );
+}
+
+
 export function AdminView({ onBack }: Props) {
   const [tab, setTab] = useState('overview');
   const [showMigration, setShowMigration] = useState(false);
@@ -1826,7 +2098,7 @@ export function AdminView({ onBack }: Props) {
   return (
     <div style={{ minHeight: '100dvh', background: C.bg, maxWidth: 430, margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
       {/* Header */}
-      <div style={{ background: `linear-gradient(160deg, ${C.headline} 0%, #1a6da8 100%)`, padding: '52px 16px 20px' }}>
+      <div style={{ background: `linear-gradient(160deg, ${C.headline} 0%, #1a6da8 100%)`, padding: 'max(52px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <Button icon={<ArrowLeftOutlined />} type="text" onClick={onBack}
             style={{ color: 'rgba(255,255,255,0.8)', paddingLeft: 0 }}>
@@ -1901,6 +2173,7 @@ export function AdminView({ onBack }: Props) {
         {tab === 'feedback' && <FeedbackTab />}
         {tab === 'goals' && <PersonalGoalsTab />}
         {tab === 'devices' && <DevicesTab />}
+        {tab === 'settings' && <SettingsTab />}
       </div>
 
       {/* Data Migration Modal */}

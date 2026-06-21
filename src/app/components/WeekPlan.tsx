@@ -4,7 +4,7 @@ import { PageTour, PageTourButton, TOUR_KEYS } from './AppTour';
 import { CheckCircleFilled, StarFilled } from '@ant-design/icons';
 import {
   getWeekPlanForProfile, getAllTasksForProfile, getTaskCategoriesForProfile,
-  getTaskStatus, setTaskStatus, isTaskDeleted, getTodayKey, type Profile,
+  getTaskStatus, setTaskStatus, isTaskDeleted, getTodayKey, getDateKey, type Profile,
 } from '../data/profiles';
 import { getPersonalGoals, type PersonalGoal } from '../data/personalGoals';
 import { getUserTasks, isTaskScheduledForDate, type UserTask } from '../data/userTasks';
@@ -25,7 +25,7 @@ function getDateForDay(day: string) {
   return t;
 }
 function dateKey(day: string) {
-  return getDateForDay(day).toISOString().split('T')[0];
+  return getDateKey(getDateForDay(day));
 }
 
 function getGoalTaskProgress(profileId: string, goalId: string, allUserTasks: UserTask[]) {
@@ -74,7 +74,7 @@ export function WeekPlan({ profile }: Props) {
         s[day][tid] = getTaskStatus(profile.id, tid, dk);
         d[day][tid] = isTaskDeleted(profile.id, tid, dk);
       });
-      // User tasks — only include if scheduled for that day
+      // User tasks - only include if scheduled for that day
       uts.filter(ut => isTaskScheduledForDate(ut, dk)).forEach(ut => {
         s[day][ut.id] = getTaskStatus(profile.id, ut.id, dk);
         d[day][ut.id] = isTaskDeleted(profile.id, ut.id, dk);
@@ -165,7 +165,7 @@ export function WeekPlan({ profile }: Props) {
         <PageTourButton onClick={() => setShowTour(true)} />
       </div>
 
-      {/* Goals Summary — task-based progress */}
+      {/* Goals Summary - task-based progress */}
       {personalGoals.length > 0 && (
         <div data-tour-id="week-goals" style={{
           background: C.bgCard, border: `1.5px solid ${C.border}`,

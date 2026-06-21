@@ -68,7 +68,7 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks }: Prop
 
   const displayStreak = computeLiveStreak(profile.id, pct > 0);
 
-  // "Do this now" — prefer in-progress tasks, then time-of-day match
+  // "Do this now" - prefer in-progress tasks, then time-of-day match
   const hour = new Date().getHours();
   const preferredTime = hour >= 17 ? 'evening' : 'morning';
   const whatNext: Task | undefined =
@@ -145,6 +145,7 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks }: Prop
       footer={null}
       centered
       closable={false}
+      width="min(360px, calc(100vw - 24px))"
       styles={{
         content: { borderRadius: 24, padding: 0, overflow: 'hidden', maxWidth: 360, margin: '0 auto' },
         mask: { backdropFilter: 'blur(6px)', background: 'rgba(9,64,103,0.3)' },

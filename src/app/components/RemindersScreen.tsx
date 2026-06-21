@@ -3,6 +3,8 @@ import { App, Button, Switch, Input, Modal } from 'antd';
 import { BellOutlined, BellFilled, PlusOutlined, DeleteOutlined, CheckCircleOutlined, ExclamationCircleOutlined, SendOutlined, MobileOutlined } from '@ant-design/icons';
 import { DEFAULT_REMINDERS, type Profile } from '../data/profiles';
 import { C } from '../data/colors';
+import { areNotificationsEnabled, fetchAppSettings } from '../data/appSettings';
+import { showNotification } from '../data/notifications';
 
 interface Reminder { id: string; label: string; time: string; days: string[]; enabled: boolean; }
 interface Props { profile: Profile; swRegistration: ServiceWorkerRegistration | null; onShowInstallTutorial: () => void; }
@@ -18,11 +20,13 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
   const [newTime, setNewTime] = useState('09:00');
   const [newDays, setNewDays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
   const [sending, setSending] = useState(false);
+  const [notifGloballyEnabled, setNotifGloballyEnabled] = useState(() => areNotificationsEnabled());
 
   useEffect(() => {
     if ('Notification' in window) setPermission(Notification.permission as Permission);
     const saved = localStorage.getItem(`reminders-${profile.id}`);
     setReminders(saved ? (JSON.parse(saved) as Reminder[]) : DEFAULT_REMINDERS);
+    fetchAppSettings().then(() => setNotifGloballyEnabled(areNotificationsEnabled()));
   }, [profile.id]);
 
   const save = (updated: Reminder[]) => {
@@ -31,6 +35,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
   };
 
   const requestPermission = async () => {
+    if (!notifGloballyEnabled) { message.warning('Notifications are currently disabled by admin'); return; }
     if (!('Notification' in window)) { message.error('Notifications not supported on this device'); return; }
     // If already granted just fire a test - re-requesting won't re-show the prompt
     // and Android may show a confusing "already allowed" state.
@@ -42,29 +47,14 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
   };
 
   const showTest = async () => {
+    if (!notifGloballyEnabled) { message.warning('Notifications are currently disabled by admin'); return; }
     if (Notification.permission !== 'granted') { message.warning('Enable notifications first'); return; }
     setSending(true);
     const title = 'Arbol Momentum 🌿';
     const body = `Hey ${profile.name.split(' ')[0]}! Time for your home reset. Keep that streak alive! 🔥`;
     try {
-      // Prefer routing through the active SW worker via postMessage.
-      // This works on both Android and iOS even when the SW is a blob-URL registration,
-      // because postMessage reaches the active worker regardless of scope.
-      if (swRegistration?.active) {
-        swRegistration.active.postMessage({ type: 'SHOW', title, body, tag: 'test' });
-        message.success('Test notification sent!');
-      } else if (swRegistration) {
-        // SW registered but not yet active - wait for it
-        const worker = await navigator.serviceWorker.ready;
-        worker.active?.postMessage({ type: 'SHOW', title, body, tag: 'test' });
-        message.success('Test notification sent!');
-      } else if ('Notification' in window) {
-        // Fallback: direct Notification API (no SW - works in browser tab)
-        new Notification(title, { body, icon: '/icon-192.png' });
-        message.success('Test notification sent!');
-      } else {
-        message.error('Notifications not supported on this device');
-      }
+      await showNotification(swRegistration, title, body, 'test');
+      message.success('Test notification sent!');
     } catch (err) {
       console.warn('Notification test failed:', err);
       message.error('Could not send notification - check device settings');
@@ -73,14 +63,14 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
   };
 
   const scheduleReminder = (r: Reminder) => {
+    if (!notifGloballyEnabled) return;
     if (Notification.permission !== 'granted') return;
     const [h, m] = r.time.split(':').map(Number);
     const now = new Date(), target = new Date();
     target.setHours(h, m, 0, 0);
     if (target <= now) target.setDate(target.getDate() + 1);
     setTimeout(async () => {
-      if (swRegistration) await swRegistration.showNotification(`${r.label} ⏰`, { body: `Time for your ${r.label.toLowerCase()}! 🔥`, tag: `r-${r.id}` } as NotificationOptions);
-      else if (Notification.permission === 'granted') new Notification(`${r.label} ⏰`, { body: `Time for your ${r.label.toLowerCase()}! 🔥` });
+      await showNotification(swRegistration, `${r.label} ⏰`, `Time for your ${r.label.toLowerCase()}! 🔥`, `r-${r.id}`);
     }, target.getTime() - now.getTime());
   };
 
@@ -140,21 +130,22 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
           }
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600, fontSize: 14, color: C.headline }}>
-              {permission === 'granted' ? 'Notifications enabled' : permission === 'denied' ? 'Notifications blocked' : 'Enable notifications'}
+              {!notifGloballyEnabled ? 'Notifications disabled' : permission === 'granted' ? 'Notifications enabled' : permission === 'denied' ? 'Notifications blocked' : 'Enable notifications'}
             </div>
             <div style={{ color: C.body, fontSize: 12, marginTop: 2 }}>
-              {permission === 'granted' ? "You'll receive timely home care reminders"
+              {!notifGloballyEnabled ? 'Notifications are turned off globally by admin'
+                : permission === 'granted' ? "You'll receive timely home care reminders"
                 : permission === 'denied' ? 'Open browser settings to allow notifications'
                 : 'Get reminders for your home reset routines'}
             </div>
           </div>
-          {permission === 'default' && (
+          {notifGloballyEnabled && permission === 'default' && (
             <Button type="primary" size="small" icon={<BellOutlined />} onClick={requestPermission}
               style={{ background: C.primary, border: 'none', borderRadius: 8, fontSize: 12, flexShrink: 0 }}>
               Enable
             </Button>
           )}
-          {permission === 'granted' && (
+          {notifGloballyEnabled && permission === 'granted' && (
             <Button size="small" icon={<SendOutlined />} onClick={showTest} loading={sending}
               style={{ background: `${C.primary}15`, border: `1px solid ${C.primary}40`, color: C.primary, borderRadius: 8, fontSize: 12, flexShrink: 0 }}>
               Test
@@ -205,6 +196,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
 
       <Modal open={showAdd} title={<span style={{ color: C.headline }}>New Reminder</span>}
         onCancel={() => setShowAdd(false)} onOk={add} okText="Save Reminder"
+        width="min(400px, calc(100vw - 24px))"
         okButtonProps={{ style: { background: C.primary, border: 'none' } }}>
         <div style={{ paddingTop: 8 }}>
           <div style={{ marginBottom: 16 }}>

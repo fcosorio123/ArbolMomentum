@@ -7,7 +7,7 @@ import { PageTour, PageTourButton, TOUR_KEYS } from './AppTour';
 import type { Profile } from '../data/profiles';
 import {
   getTaskCategoriesForProfile, getTaskStatus, isTaskDeleted,
-  getTodayKey, computeLiveStreak, getEarnedBadges, BADGES,
+  getTodayKey, getDateKey, hasActivityOnDate, computeLiveStreak, getEarnedBadges, BADGES,
 } from '../data/profiles';
 import { getUserTasks, isTaskScheduledForDate } from '../data/userTasks';
 import { getPersonalGoals } from '../data/personalGoals';
@@ -34,13 +34,6 @@ function getGreeting() {
   return 'Good evening';
 }
 
-function localDateKey(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
 function getDailyTaskCount(profileId: string, dateKey: string): number {
   let count = 0;
   for (let i = 0; i < localStorage.length; i++) {
@@ -58,18 +51,18 @@ function getDailyTaskCount(profileId: string, dateKey: string): number {
 // Mon-Sun ISO week dots (PRD 5.4)
 function buildWeekDots(profileId: string, todayHasActivity: boolean) {
   const now = new Date();
-  const todayKey = localDateKey(now);
+  const todayKey = getDateKey(now);
   const dayOfWeek = (now.getDay() + 6) % 7;
   const DOW_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(now);
     d.setDate(now.getDate() - dayOfWeek + i);
-    const dk = localDateKey(d);
+    const dk = getDateKey(d);
     const isFuture = dk > todayKey;
     const isToday = dk === todayKey;
     const active = isToday
-      ? todayHasActivity
-      : !isFuture && localStorage.getItem(`streak-${profileId}-${dk}`) === 'true';
+      ? (todayHasActivity || hasActivityOnDate(profileId, dk))
+      : !isFuture && hasActivityOnDate(profileId, dk);
     return { label: DOW_LABELS[i], active, isToday, isFuture };
   });
 }
@@ -77,13 +70,13 @@ function buildWeekDots(profileId: string, todayHasActivity: boolean) {
 function buildMonthGrid(profileId: string, year: number, month: number) {
   const firstDay = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const todayKey = localDateKey(new Date());
+  const todayKey = getDateKey(new Date());
   const startOffset = firstDay.getDay(); // 0 = Sun
   let activeDays = 0;
 
   const days = Array.from({ length: daysInMonth }, (_, idx) => {
     const date = new Date(year, month, idx + 1);
-    const dk = localDateKey(date);
+    const dk = getDateKey(date);
     const isFuture = dk > todayKey;
     const count = isFuture ? 0 : getDailyTaskCount(profileId, dk);
     if (count > 0) activeDays++;
@@ -163,7 +156,7 @@ export function Dashboard({
   const weekDots = buildWeekDots(profile.id, completionPct > 0);
   const earnedBadges = getEarnedBadges(profile);
 
-  // Today's tasks count (seed + user tasks, all time periods) — refreshes on arbol-goals-updated
+  // Today's tasks count (seed + user tasks, all time periods) - refreshes on arbol-goals-updated
   const { todayDone, todayTotal } = useMemo(() => {
     const today = getTodayKey();
     const cats = getTaskCategoriesForProfile(profile.id);
@@ -207,7 +200,7 @@ export function Dashboard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile.id, todayDone, todayTotal, refreshTick]);
 
-  // "Do Now" — find the single most urgent task for this moment
+  // "Do Now" - find the single most urgent task for this moment
   const doNowTask = useMemo(() => {
     const today = getTodayKey();
     const hour = new Date().getHours();
@@ -229,7 +222,7 @@ export function Dashboard({
       });
     });
 
-    // User tasks — only if scheduled for today
+    // User tasks - only if scheduled for today
     getUserTasks(profile.id).filter(ut => isTaskScheduledForDate(ut, today)).forEach(ut => {
       if (!isTaskDeleted(profile.id, ut.id, today) && getTaskStatus(profile.id, ut.id, today) !== 'done') {
         const goalTitle = ut.goalId ? goalMap[ut.goalId] : undefined;
@@ -331,7 +324,7 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* ── Check-in Banner — red / yellow / green */}
+      {/* ── Check-in Banner - red / yellow / green */}
       {(() => {
         if (bannerState === 'red') {
           const count = checkInGoals.length;
@@ -339,7 +332,7 @@ export function Dashboard({
             <div data-tour-id="home-banner" style={{
               background: '#ef456510', border: '1.5px solid #ef456530',
               borderRadius: 18, padding: '14px 16px', marginBottom: 16,
-              display: 'flex', alignItems: 'center', gap: 12,
+              display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
             }}>
               <span style={{ fontSize: 22, flexShrink: 0 }}>🔴</span>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -365,7 +358,7 @@ export function Dashboard({
             <div data-tour-id="home-banner" style={{
               background: '#f5a62310', border: '1.5px solid #f5a62330',
               borderRadius: 18, padding: '14px 16px', marginBottom: 16,
-              display: 'flex', alignItems: 'center', gap: 12,
+              display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
             }}>
               <span style={{ fontSize: 22, flexShrink: 0 }}>🟡</span>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -382,7 +375,7 @@ export function Dashboard({
             </div>
           );
         }
-        // green — all done
+        // green - all done
         return (
           <div data-tour-id="home-banner" style={{
             background: '#2cb67d0e', border: '1.5px solid #2cb67d30',
@@ -392,7 +385,7 @@ export function Dashboard({
             <span style={{ fontSize: 20, flexShrink: 0 }}>🟢</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#2cb67d', marginBottom: 1 }}>You're checked in and all done!</div>
-              <div style={{ fontSize: 11, color: C.body }}>Great work — everything for today is complete.</div>
+              <div style={{ fontSize: 11, color: C.body }}>Great work - everything for today is complete.</div>
             </div>
             {onNavigateGoals && (
               <button onClick={onNavigateGoals} style={{
@@ -472,7 +465,7 @@ export function Dashboard({
       </div>
 
 
-      {/* ── [3] Do Now — single most urgent task */}
+      {/* ── [3] Do Now - single most urgent task */}
       {doNowTask && completionPct < 100 && onNavigateTasks && (
         <div data-tour-id="home-do-now" style={{ ...card, padding: 0, overflow: 'hidden', border: `1.5px solid ${C.primary}30` }}>
           <div style={{
@@ -649,13 +642,13 @@ export function Dashboard({
         steps={[
           {
             title: '🔴 Goal Check-In',
-            description: 'Tap here daily to update your goal progress. It tracks done, in-progress, or skipped — takes under a minute.',
+            description: 'Tap here daily to update your goal progress. It tracks done, in-progress, or skipped - takes under a minute.',
             target: () => document.querySelector('[data-tour-id="home-banner"]') as HTMLElement | null,
             placement: 'bottom',
           },
           {
             title: '🔥 Your Streak',
-            description: 'Consecutive days you\'ve completed tasks. The dots show this week at a glance — orange means you showed up!',
+            description: 'Consecutive days you\'ve completed tasks. The dots show this week at a glance - orange means you showed up!',
             target: () => document.querySelector('[data-tour-id="home-streak"]') as HTMLElement | null,
             placement: 'bottom',
           },

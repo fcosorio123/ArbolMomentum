@@ -4,6 +4,7 @@
 // ──────────────────────────────────────────────
 
 import type { ValueStats, ValueType } from './profiles';
+import { getDateKey, getTodayKey } from './profiles';
 
 export interface ValueTracker {
   profileId: string;
@@ -17,23 +18,19 @@ export interface ValueTracker {
 }
 
 // ──────────────────────────────────────────────
-// Get current date keys
+// Get current date keys (local timezone)
 // ──────────────────────────────────────────────
-function getDateKey(): string {
-  return new Date().toISOString().split('T')[0];
-}
-
 function getWeekStart(): string {
   const now = new Date();
   const dayOfWeek = (now.getDay() + 6) % 7; // 0 = Monday
   const monday = new Date(now);
   monday.setDate(now.getDate() - dayOfWeek);
-  return monday.toISOString().split('T')[0];
+  return getDateKey(monday);
 }
 
 function getMonthStart(): string {
   const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  return getDateKey(new Date(now.getFullYear(), now.getMonth(), 1));
 }
 
 // ──────────────────────────────────────────────
@@ -50,7 +47,7 @@ export function getValueTracker(profileId: string): ValueTracker {
   const key = `value-tracker-${profileId}`;
   const stored = localStorage.getItem(key);
 
-  const today = getDateKey();
+  const today = getTodayKey();
   const thisWeekStart = getWeekStart();
   const thisMonthStart = getMonthStart();
 
@@ -280,7 +277,7 @@ export function getWeeklySummary(profileId: string): WeeklySummary {
 
   return {
     weekStart: tracker.weekStart,
-    weekEnd: weekEnd.toISOString().split('T')[0],
+    weekEnd: getDateKey(weekEnd),
     values: tracker.weekly,
     projections,
     comparisonToLastWeek: lastWeek ? {

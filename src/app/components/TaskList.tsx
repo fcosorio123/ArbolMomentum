@@ -111,7 +111,9 @@ function TaskItem({
         {onEdit && (
           <button onClick={onEdit} style={{
             background: 'none', border: 'none', cursor: 'pointer', color: C.secondary,
-            fontSize: 13, padding: '4px 6px', borderRadius: 6, transition: 'color 0.15s, background 0.15s',
+            fontSize: 13, padding: 10, borderRadius: 6, minWidth: 44, minHeight: 44,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'color 0.15s, background 0.15s',
           }}
             onMouseEnter={e => { e.currentTarget.style.color = C.primary; e.currentTarget.style.background = `${C.primary}12`; }}
             onMouseLeave={e => { e.currentTarget.style.color = C.secondary; e.currentTarget.style.background = 'none'; }}
@@ -121,7 +123,9 @@ function TaskItem({
         )}
         <button onClick={onDelete} style={{
           background: 'none', border: 'none', cursor: 'pointer', color: C.secondary,
-          fontSize: 15, padding: '4px 6px', borderRadius: 6, transition: 'color 0.15s, background 0.15s',
+          fontSize: 15, padding: 10, borderRadius: 6, minWidth: 44, minHeight: 44,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transition: 'color 0.15s, background 0.15s',
         }}
           onMouseEnter={e => { e.currentTarget.style.color = C.tertiary; e.currentTarget.style.background = `${C.tertiary}12`; }}
           onMouseLeave={e => { e.currentTarget.style.color = C.secondary; e.currentTarget.style.background = 'none'; }}
@@ -133,7 +137,7 @@ function TaskItem({
   );
 }
 
-// ── "Other Tasks to Explore" — milestone-suggested + custom task entry
+// ── "Other Tasks to Explore" - milestone-suggested + custom task entry
 function OtherTasksSection({
   tasks, goalId, accentColor, onAdd,
 }: {
@@ -530,11 +534,6 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
         });
       }
 
-      // Any forward progress on any task counts toward the streak for today
-      if (next === 'inprogress' || next === 'done') {
-        localStorage.setItem(`streak-${profile.id}-${today}`, 'true');
-      }
-
       const allDone = newVisible.length > 0 && newVisible.every(t =>
         (t.id === task.id ? next : newStatuses[t.id]) === 'done'
       );
@@ -583,7 +582,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
       setEditingTask(existingUserTask);
       setEditingSeedTaskId(null);
     } else {
-      // Seed task — build a fake UserTask to pre-populate modal
+      // Seed task - build a fake UserTask to pre-populate modal
       setEditingTask({
         id: task.id, profileId: profile.id,
         label: task.label, timeOfDay: task.timeOfDay, type: task.type,
@@ -686,7 +685,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     });
   });
 
-  // User tasks — only include those scheduled for today
+  // User tasks - only include those scheduled for today
   userTasks.filter(ut => isTaskScheduledForDate(ut, today)).forEach(ut => {
     const taskObj: UserTask_ = {
       id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, type: ut.type,
@@ -707,7 +706,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   const isEmpty = categories.length === 0 && userTasks.length === 0;
 
   return (
-    <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 16px', background: C.bg, minHeight: '100dvh' }}>
+    <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 100px', background: C.bg, minHeight: '100dvh' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 }}>
         <div>
@@ -748,7 +747,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
       )}
 
       {/* Time filter pills */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
         {([
           { key: 'all',     label: 'All tasks' },
           { key: 'morning', label: '☀️ Morning' },
@@ -767,7 +766,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
         ))}
       </div>
 
-      {/* Week Plan CTA — sticky at top of content */}
+      {/* Week Plan CTA - sticky at top of content */}
       {onNavigateWeek && (
         <div
           onClick={onNavigateWeek}
@@ -813,7 +812,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
             </div>
           ))}
 
-          {/* Routines — tasks not linked to any goal */}
+          {/* Routines - tasks not linked to any goal */}
           {ungroupedTasks.filter(t => (timeFilter === 'all' || t.timeOfDay === timeFilter) && !deleted[t.id]).length > 0 && (
             <div style={{ marginBottom: 18 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
@@ -844,7 +843,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
         data-tour-id="tasks-add-btn"
         onClick={() => { setEditingTask(null); setManageTaskOpen(true); }}
         style={{
-          position: 'fixed', bottom: 88, right: 20, zIndex: 48,
+          position: 'fixed', bottom: 'calc(72px + env(safe-area-inset-bottom, 0px) + 12px)', right: 20, zIndex: 48,
           width: 52, height: 52, borderRadius: '50%',
           background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
           border: 'none', cursor: 'pointer', color: '#fff', fontSize: 24,
@@ -887,7 +886,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
             <strong style={{ color: C.headline }}>"{deleteUserTaskTarget?.label}"</strong>
           </p>
 
-          {/* Scope selector — only for recurring tasks */}
+          {/* Scope selector - only for recurring tasks */}
           {deleteUserTaskTarget && isRecurringUT(deleteUserTaskTarget) && (
             <div style={{ marginBottom: 16 }}>
               {([
@@ -1015,7 +1014,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
         storageKey={TOUR_KEYS.tasks}
         pageLabel="Tasks"
         doneEmoji="✅"
-        doneMessage="You know how Tasks work. Mark tasks done as you go — every checkmark builds your streak!"
+        doneMessage="You know how Tasks work. Mark tasks done as you go - every checkmark builds your streak!"
         onInteract={() => { setEditingTask(null); setManageTaskOpen(true); }}
         interactLabel="Add a task now →"
         steps={[

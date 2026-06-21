@@ -144,6 +144,21 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
   const markDoneToday = () => {
     localStorage.setItem(`arbol-checkin-${profile.id}-${today}`, 'true');
     try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
+
+    import('../data/emailSettings').then(({ isEmailTypeEnabled }) => {
+      if (!isEmailTypeEnabled('checkInConfirmationEnabled')) return;
+      import('../data/profileContact').then(({ getProfileEmail }) => {
+        import('../data/emailNudges').then(({ requestEmailSend }) => {
+          requestEmailSend({
+            profileId: profile.id,
+            type: 'check_in_confirmation',
+            date: today,
+            profileName: profile.name,
+            recipient: getProfileEmail(profile.id) || undefined,
+          });
+        });
+      });
+    });
   };
 
   const goNext = () => {
@@ -231,14 +246,14 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
             background: '#f5a62310', border: '1.5px solid #f5a62330',
             borderRadius: 16, padding: '16px 18px', marginBottom: 14,
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <span style={{ fontSize: 18 }}>⏰</span>
-              <span style={{ fontSize: 14, fontWeight: 800, color: '#f5a623' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 18, flexShrink: 0 }}>⏰</span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: '#f5a623', flex: 1, minWidth: 0, lineHeight: 1.4 }}>
                 {needsCount} task{needsCount !== 1 ? 's' : ''} across {goalsNeedingCount} goal{goalsNeedingCount !== 1 ? 's' : ''} need your input
               </span>
             </div>
             <div style={{ fontSize: 12, color: C.body, lineHeight: 1.5, marginLeft: 26 }}>
-              We'll ask you one question at a time — quick and easy.
+              We'll ask you one question at a time - quick and easy.
             </div>
           </div>
         ) : (
@@ -346,7 +361,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
           </span>
         </div>
 
-        {/* Question card — takes remaining height */}
+        {/* Question card - takes remaining height */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           {isAutoDetected && (
             <div style={{
@@ -369,7 +384,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
             {taskQuestion(label)}
           </div>
 
-          {/* Status options — big tap targets */}
+          {/* Status options - big tap targets */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {STATUS_OPTIONS.map(opt => {
               const active = status === opt.value;
@@ -401,7 +416,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
               );
             })}
 
-            {/* Not started — smaller, less prominent */}
+            {/* Not started - smaller, less prominent */}
             <button
               onClick={() => {
                 selectStatus(id, null);
@@ -571,7 +586,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
         border: 'none', color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer',
         boxShadow: `0 8px 28px ${C.primary}40`,
       }}>
-        Done — Back to Dashboard
+        Done - Back to Dashboard
       </button>
     </div>
   );

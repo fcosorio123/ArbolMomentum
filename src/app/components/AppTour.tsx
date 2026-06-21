@@ -241,7 +241,7 @@ export function PageTour({
         <div style={{ padding: '28px 24px 26px', textAlign: 'center' }}>
           <div style={{ fontSize: 46, marginBottom: 10 }}>{doneEmoji}</div>
           <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 800, color: C.headline }}>
-            {pageLabel} — unlocked!
+            {pageLabel} - unlocked!
           </h3>
           <p style={{ margin: '0 0 22px', color: C.body, fontSize: 13, lineHeight: 1.6 }}>
             {doneMessage ?? `You know how this page works. Tap ? anytime to revisit the tour.`}

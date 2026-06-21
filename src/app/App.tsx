@@ -24,6 +24,11 @@ import {
   saveSchedule, getSchedule, markScheduleFired,
   type ScheduledNotif,
 } from './data/deviceAnalytics';
+import { fetchAppSettings, areNotificationsEnabled } from './data/appSettings';
+import { fetchEmailSettings, getEmailSettings } from './data/emailSettings';
+import { requestEmailSend } from './data/emailNudges';
+import { getProfileEmail } from './data/profileContact';
+import { showNotification } from './data/notifications';
 import {
   PROFILES, type Profile, type Badge,
   getTaskCategoriesForProfile, getTaskStatus, isTaskDeleted, getTodayKey,
@@ -98,22 +103,6 @@ function buildNudge(pending: number, streak: number, firstName: string): { title
   };
 }
 
-// ── Show a notification immediately (via SW or Notification API)
-async function showNotification(
-  swReg: ServiceWorkerRegistration | null,
-  title: string,
-  body: string,
-  tag: string,
-) {
-  try {
-    if (swReg?.active) {
-      swReg.active.postMessage({ type: 'SHOW', title, body, tag });
-    } else if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(title, { body, tag, icon: '/icon-192.png' });
-    }
-  } catch {}
-}
-
 export default function App() {
   const [activeProfile, setActiveProfile] = useState<Profile | null>(() => {
     try {
@@ -148,6 +137,8 @@ export default function App() {
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
   }, []);
+
+  useEffect(() => { fetchAppSettings(); fetchEmailSettings(); }, []);
 
   // ── PWA setup: meta tags + manifest link + canvas icon injection
   useEffect(() => {
@@ -299,43 +290,11 @@ export default function App() {
   }, []);
 
   // ── Service worker
-  // Try to register /sw.js (proper origin → satisfies Chrome Android install criteria).
-  // Falls back to a blob URL if the environment proxy serves HTML instead of JS
-  // (e.g. Figma Make preview). Notifications and badge still work via blob URL.
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
-
-    const SW_CODE = `
-const CACHE_NAME='arbol-v3';
-self.addEventListener('install',()=>{self.skipWaiting();});
-self.addEventListener('activate',e=>{e.waitUntil(self.clients.claim());});
-self.addEventListener('fetch',e=>{
-  if(e.request.method!=='GET')return;
-  e.respondWith(fetch(e.request).then(r=>{if(r.ok){const c=r.clone();caches.open(CACHE_NAME).then(ch=>ch.put(e.request,c));}return r;}).catch(()=>caches.match(e.request)));
-});
-self.addEventListener('push',e=>{
-  let d={title:'Arbol Momentum',body:'Time to keep your streak going!'};
-  try{d=e.data?.json()??d;}catch{}
-  e.waitUntil(self.registration.showNotification(d.title,{body:d.body,tag:d.tag||'arbol',renotify:true,icon:'/icon-192.png',badge:'/icon-72.png'}));
-});
-self.addEventListener('notificationclick',e=>{e.notification.close();e.waitUntil(clients.openWindow('/'));});
-self.addEventListener('message',e=>{
-  const t=e.data?.type;
-  if(t==='SHOW'){const{title,body,tag}=e.data;e.waitUntil(self.registration.showNotification(title,{body,tag,renotify:true,icon:'/icon-192.png',badge:'/icon-72.png'}));}
-  if(t==='BADGE'){const{count}=e.data;if('setAppBadge' in self){count>0?self.setAppBadge(count):self.clearAppBadge();}}
-});`;
-
-    const registerBlob = () => {
-      const blob = new Blob([SW_CODE], { type: 'application/javascript' });
-      const url = URL.createObjectURL(blob);
-      navigator.serviceWorker.register(url)
-        .then(reg => { setSwRegistration(reg); URL.revokeObjectURL(url); })
-        .catch(() => URL.revokeObjectURL(url));
-    };
-
     navigator.serviceWorker.register('/sw.js', { scope: '/' })
       .then(reg => setSwRegistration(reg))
-      .catch(() => registerBlob()); // fallback when proxy returns HTML for /sw.js
+      .catch(err => console.warn('[SW] Registration failed:', err));
   }, []);
 
   // ── Install prompt
@@ -449,6 +408,7 @@ self.addEventListener('message',e=>{
   // Strategy: store schedule in localStorage, check every 60s + on visibilitychange.
   const scheduleNotifications = useCallback(async () => {
     if (!activeProfile) return;
+    if (!areNotificationsEnabled()) return;
     if (Notification?.permission !== 'granted') return;
 
     const today = getTodayKey();
@@ -496,6 +456,21 @@ self.addEventListener('message',e=>{
         trackEvent(activeProfile.id, 'notif_sent', { tag: notif.tag });
         saveDeviceRecord(activeProfile.id, { lastNotifSent: Date.now() });
         markScheduleFired(activeProfile.id, notif.tag);
+
+        const emailCfg = getEmailSettings();
+        if (emailCfg.enabled && emailCfg.smartNudgeEnabled && emailCfg.triggerMode !== 'manual') {
+          requestEmailSend({
+            profileId: activeProfile.id,
+            type: 'smart_nudge',
+            tag: notif.tag,
+            date: today,
+            profileName: activeProfile.name,
+            title: notif.title,
+            body: notif.body,
+            pendingCount: pending,
+            recipient: getProfileEmail(activeProfile.id) || undefined,
+          });
+        }
       }
     }
   }, [activeProfile, computePending]);
@@ -742,9 +717,9 @@ self.addEventListener('message',e=>{
           />
 
           {/* Post-install push notification prompt */}
-          {showPostInstallNotif && (
+          {showPostInstallNotif && areNotificationsEnabled() && (
             <div style={{
-              position: 'fixed', bottom: isDesktop ? 24 : 80, left: isDesktop ? 'auto' : 16, right: isDesktop ? 24 : 16, zIndex: 200, maxWidth: isDesktop ? 380 : undefined,
+              position: 'fixed', bottom: isDesktop ? 24 : 'calc(72px + env(safe-area-inset-bottom, 0px) + 8px)', left: isDesktop ? 'auto' : 16, right: isDesktop ? 24 : 16, zIndex: 200, maxWidth: isDesktop ? 380 : undefined,
               background: C.bgCard, border: `1.5px solid ${C.primary}40`,
               borderRadius: 18, padding: '16px 18px',
               boxShadow: '0 8px 32px rgba(9,64,103,0.15)',

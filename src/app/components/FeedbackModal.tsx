@@ -57,6 +57,7 @@ export function FeedbackModal({ open, profileId, onSubmit, onLater }: Props) {
       footer={null}
       centered
       closable={false}
+      width="min(360px, calc(100vw - 24px))"
       styles={{
         content: { borderRadius: 24, padding: 0, overflow: 'hidden', maxWidth: 360, margin: '0 auto' },
         mask: { backdropFilter: 'blur(6px)', background: 'rgba(9,64,103,0.25)' },

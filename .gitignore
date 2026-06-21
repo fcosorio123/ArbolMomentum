@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+supabase/.secrets.env
+supabase/.temp/
+supabase/functions/make-server-5d90ddf5/

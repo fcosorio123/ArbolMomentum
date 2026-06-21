@@ -3,7 +3,7 @@
 // ──────────────────────────────────────────────
 // Simplified Strava-style streak system
 
-import { getTaskStatus } from './profiles';
+import { getTaskStatus, getDateKey } from './profiles';
 
 export interface StreakData {
   // Daily streaks (existing logic)
@@ -17,13 +17,6 @@ export interface StreakData {
   // Monthly streaks (Strava-style: ≥1 task per month)
   monthlyStreak: number;
   bestMonthlyStreak: number;
-}
-
-/**
- * Get date string in YYYY-MM-DD format
- */
-function getDateKey(date: Date): string {
-  return date.toISOString().split('T')[0];
 }
 
 /**

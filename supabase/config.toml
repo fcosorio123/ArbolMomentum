@@ -1,0 +1,5 @@
+# Supabase project: lhbvzojmtvjeauqnnmdu (Arbol Momentum / Figma Make)
+project_id = "lhbvzojmtvjeauqnnmdu"
+
+[functions.make-server-5d90ddf5]
+verify_jwt = false

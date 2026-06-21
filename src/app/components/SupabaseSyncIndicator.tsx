@@ -36,7 +36,7 @@ export function SupabaseSyncIndicator() {
   return (
     <div style={{
       position: 'fixed',
-      bottom: 80,
+      bottom: 'calc(72px + env(safe-area-inset-bottom, 0px) + 8px)',
       right: 16,
       zIndex: 1000,
       background: '#22c55e',

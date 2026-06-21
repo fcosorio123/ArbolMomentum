@@ -1,4 +1,4 @@
-import { getTodayKey } from './profiles';
+import { getTodayKey, getDateKey } from './profiles';
 
 // ──────────────────────────────────────────────
 // Feedback types
@@ -152,7 +152,7 @@ export function getWeeklyEngagement(profileId: string, completionFn: (profileId:
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
-    const date = d.toISOString().split('T')[0];
+    const date = getDateKey(d);
     const visits = parseInt(localStorage.getItem(`visit-${profileId}-${date}`) || '0');
     const pct = completionFn(profileId, date);
     return { label: DAYS[d.getDay()], date, visits, pct };

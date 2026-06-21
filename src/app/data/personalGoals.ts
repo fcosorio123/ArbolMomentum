@@ -913,7 +913,7 @@ export const DEFAULT_PERSONAL_GOALS: PersonalGoal[] = [
     id: 'eunice-artwork',
     profileId: 'eunice',
     title: 'Renew Living Room Artwork',
-    deepWhy: 'I want my home to reflect who I am and what I love — painting 3 pieces for the living room is how I reclaim my creative space.',
+    deepWhy: 'I want my home to reflect who I am and what I love - painting 3 pieces for the living room is how I reclaim my creative space.',
     targetValue: 3,
     currentValue: 0,
     unit: 'paintings',
@@ -965,7 +965,7 @@ export const DEFAULT_PERSONAL_GOALS: PersonalGoal[] = [
   {
     id: 'eunice-strava',
     profileId: 'eunice',
-    title: 'Strava 5KM Walk — Mon, Wed, Fri',
+    title: 'Strava 5KM Walk - Mon, Wed, Fri',
     deepWhy: 'Moving my body regularly clears my mind, gives me fresh ideas, and keeps me feeling alive. 5KM three times a week is my promise to myself.',
     targetValue: 12,
     currentValue: 0,
@@ -1000,7 +1000,7 @@ export const DEFAULT_PERSONAL_GOALS: PersonalGoal[] = [
       {
         id: 'eu-strava-m4',
         level: 'hard',
-        title: 'Three months — habit locked',
+        title: 'Three months - habit locked',
         targetValue: 36,
         tasks: ['36 total 5KM walks completed', 'Track personal pace improvement', 'Share milestone on Strava'],
         completed: false,

@@ -59,10 +59,6 @@ export function PersonalGoals({ profileId, onBack, onNavigateTasks }: Props) {
     const cur = taskStatuses[taskId];
     const next: TaskStatus | null = cur === 'done' ? null : cur === 'inprogress' ? 'done' : 'inprogress';
     setTaskStatus(profileId, taskId, today, next);
-    // Mirror TaskList: any forward progress counts as a streak day
-    if (next === 'inprogress' || next === 'done') {
-      localStorage.setItem(`streak-${profileId}-${today}`, 'true');
-    }
     setTaskStatuses(prev => ({ ...prev, [taskId]: next }));
   };
 

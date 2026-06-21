@@ -5,6 +5,7 @@
 // survives Figma Make preview URL changes (which wipe localStorage).
 
 import { supabase } from '/utils/supabase/client';
+import { getStorageKey } from './environment';
 
 const FN = 'make-server-5d90ddf5';
 
@@ -41,6 +42,7 @@ function collectLocalData(profileId: string): Record<string, unknown> {
     goalsVersion:   localStorage.getItem(`arbol-goals-version-${profileId}`),
     goalLogs:       raw(`arbol-goal-logs-${profileId}`),
     streakBest:     raw(`streak-best-${profileId}`),
+    profileEmail:   localStorage.getItem(getStorageKey(`arbol-email-${profileId}`)) || null,
     taskStatuses,
     taskDeletions,
     streakDays,
@@ -61,6 +63,10 @@ function applyLocalData(profileId: string, data: Record<string, unknown>): void 
   write(`arbol-user-cats-${profileId}`, data.userCategories);
   write(`arbol-goal-logs-${profileId}`, data.goalLogs);
   write(`streak-best-${profileId}`, data.streakBest);
+
+  if (typeof data.profileEmail === 'string' && data.profileEmail.trim()) {
+    localStorage.setItem(getStorageKey(`arbol-email-${profileId}`), data.profileEmail.trim());
+  }
 
   if (data.goalsVersion && typeof data.goalsVersion === 'string') {
     localStorage.setItem(`arbol-goals-version-${profileId}`, data.goalsVersion);
@@ -118,7 +124,7 @@ export async function saveToCloud(profileId: string): Promise<void> {
     method: 'POST',
     body: payload,
   });
-  // Silently swallow transient network failures — localStorage is the source of truth
+  // Silently swallow transient network failures - localStorage is the source of truth
   if (error && !isTransientError(error)) {
     console.warn('[CloudBackup] Save failed:', error);
   }

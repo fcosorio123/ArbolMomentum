@@ -274,7 +274,7 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
           data-tour-id="goals-add-btn"
           onClick={() => { setEditingGoal(null); setManageGoalOpen(true); }}
           style={{
-            position: 'fixed', bottom: 88, right: 20, zIndex: 48,
+            position: 'fixed', bottom: 'calc(72px + env(safe-area-inset-bottom, 0px) + 12px)', right: 20, zIndex: 48,
             width: 52, height: 52, borderRadius: '50%',
             background: `linear-gradient(135deg, #ef4565, #f5a623)`,
             border: 'none', cursor: 'pointer', color: '#fff', fontSize: 22,
@@ -324,13 +324,14 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
         okButtonProps={{ danger: true }}
         title="Delete this goal?"
         centered
+        width="min(400px, calc(100vw - 24px))"
       >
         <p style={{ color: C.body }}>
-          <strong>"{deleteTarget?.title}"</strong> will be removed. Tasks linked to this goal won't be deleted — they'll become unlinked routines.
+          <strong>"{deleteTarget?.title}"</strong> will be removed. Tasks linked to this goal won't be deleted - they'll become unlinked routines.
         </p>
       </Modal>
 
-      {/* Congratulatory modal — shown immediately after goal creation */}
+      {/* Congratulatory modal - shown immediately after goal creation */}
       {congratGoal && (
         <CongratModal
           open={!!congratGoal}
@@ -349,7 +350,7 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
         />
       )}
 
-      {/* Task Suggestion Modal — shown after creating a new goal */}
+      {/* Task Suggestion Modal - shown after creating a new goal */}
       <Modal
         open={!!suggestionGoal}
         onCancel={closeSuggestions}
@@ -438,13 +439,13 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
         storageKey={TOUR_KEYS.goals}
         pageLabel="Goals"
         doneEmoji="🎯"
-        doneMessage="You're ready to set and track goals. A goal without tasks is just a wish — add tasks to make it real!"
+        doneMessage="You're ready to set and track goals. A goal without tasks is just a wish - add tasks to make it real!"
         onInteract={() => { setEditingGoal(null); setManageGoalOpen(true); }}
         interactLabel="Create a goal now →"
         steps={[
           {
             title: '🎯 Your Goals',
-            description: 'Each goal card shows your target, today\'s progress, and task breakdown by status — done, in-progress, or not started.',
+            description: 'Each goal card shows your target, today\'s progress, and task breakdown by status - done, in-progress, or not started.',
             target: () => document.querySelector('[data-tour-id="goals-section"]') as HTMLElement | null,
             placement: 'bottom',
           },
@@ -456,7 +457,7 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
           },
           {
             title: '✨ Add a Goal',
-            description: 'Tap the + button to create a goal. Be specific — "Save ₱50k by December" beats "save more money." Tap the button below to try it now!',
+            description: 'Tap the + button to create a goal. Be specific - "Save ₱50k by December" beats "save more money." Tap the button below to try it now!',
             target: () => document.querySelector('[data-tour-id="goals-add-btn"]') as HTMLElement | null,
             placement: 'left',
           },
@@ -601,7 +602,7 @@ function GoalCard({
           </div>
         </div>
 
-        {/* Weekly breakdown — collapsible */}
+        {/* Weekly breakdown - collapsible */}
         <button
           onClick={() => setWeekOpen(o => !o)}
           style={{
@@ -654,7 +655,7 @@ function GoalCard({
                       <div style={{ width: `${dayPct}%`, height: '100%', background: accentColor, borderRadius: 3, transition: 'width 0.3s' }} />
                     </div>
                     <span style={{ fontSize: 11, fontWeight: 600, color: isToday ? accentColor : C.secondary, minWidth: 30, textAlign: 'right' }}>
-                      {b.total > 0 ? `${b.done}/${b.total}` : '—'}
+                      {b.total > 0 ? `${b.done}/${b.total}` : '-'}
                     </span>
                     <span style={{ fontSize: 12, color: C.secondary, transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s', display: 'inline-block' }}>⌄</span>
                   </button>

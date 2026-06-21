@@ -171,7 +171,7 @@ export const PROFILES: Profile[] = [
     avatar: '🎨',
     joinedWeek: 1,
     completionRate: 65,
-    bio: 'Creative soul who paints a lot, needs meditation, and is actively building a healthy daily routine. Finds joy in small rituals — morning walks with the dog, cooking, and making art.',
+    bio: 'Creative soul who paints a lot, needs meditation, and is actively building a healthy daily routine. Finds joy in small rituals - morning walks with the dog, cooking, and making art.',
   },
 ];
 
@@ -1687,22 +1687,43 @@ export function getWeekPlanForProfile(profileId: string): Record<string, string[
 // ──────────────────────────────────────────────
 // Task state helpers
 // ──────────────────────────────────────────────
+export function getDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export function getTodayKey() {
-  return new Date().toISOString().split('T')[0];
+  return getDateKey(new Date());
+}
+
+export function hasActivityOnDate(profileId: string, dateKey: string): boolean {
+  if (localStorage.getItem(`streak-${profileId}-${dateKey}`) === 'true') return true;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (
+      key &&
+      key.startsWith(`task-${profileId}-`) &&
+      key.endsWith(`-${dateKey}`) &&
+      localStorage.getItem(key) === 'done'
+    ) return true;
+  }
+  return false;
 }
 
 // Computes the live streak from localStorage for any profile.
 // Pass todayHasActivity=true if the caller already knows the user touched a task today.
 export function computeLiveStreak(profileId: string, todayHasActivity = false): number {
-  const todayKey = new Date().toISOString().split('T')[0];
-  const todayDone = todayHasActivity || localStorage.getItem(`streak-${profileId}-${todayKey}`) === 'true';
+  const todayKey = getTodayKey();
+  const todayDone = todayHasActivity || hasActivityOnDate(profileId, todayKey);
 
   if (todayDone) {
     let count = 1;
     for (let i = 1; i <= 365; i++) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      if (localStorage.getItem(`streak-${profileId}-${d.toISOString().split('T')[0]}`) === 'true') {
+      if (hasActivityOnDate(profileId, getDateKey(d))) {
         count++;
       } else {
         break;
@@ -1715,7 +1736,7 @@ export function computeLiveStreak(profileId: string, todayHasActivity = false): 
     for (let i = 1; i <= 365; i++) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      if (localStorage.getItem(`streak-${profileId}-${d.toISOString().split('T')[0]}`) === 'true') {
+      if (hasActivityOnDate(profileId, getDateKey(d))) {
         count++;
       } else {
         break;
@@ -1734,11 +1755,32 @@ export function setTaskStatus(profileId: string, taskId: string, date: string, s
   if (!status) localStorage.removeItem(key);
   else localStorage.setItem(key, status);
 
+  if (status === 'done') {
+    localStorage.setItem(`streak-${profileId}-${date}`, 'true');
+  }
+
   // Sync to Supabase (async, non-blocking)
   import('./supabaseSync').then(({ syncTaskStatus }) => {
     syncTaskStatus(profileId, taskId, date, status);
   });
   import('./cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId));
+
+  if (status === 'done') {
+    import('./emailSettings').then(({ isEmailTypeEnabled }) => {
+      if (!isEmailTypeEnabled('taskCompletionEnabled')) return;
+      import('./profileContact').then(({ getProfileEmail }) => {
+        import('./emailNudges').then(({ requestEmailSend }) => {
+          requestEmailSend({
+            profileId,
+            type: 'task_completion',
+            taskId,
+            date,
+            recipient: getProfileEmail(profileId) || undefined,
+          });
+        });
+      });
+    });
+  }
 }
 
 export function isTaskDeleted(profileId: string, taskId: string, date: string): boolean {
