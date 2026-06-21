@@ -15,6 +15,8 @@ function collectLocalData(profileId: string): Record<string, unknown> {
   const taskStatuses: Record<string, string> = {};
   const taskDeletions: Record<string, string> = {};
   const streakDays: Record<string, string> = {};
+  const taskNotes: Record<string, string> = {};
+  const taskBlocked: Record<string, string> = {};
 
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
@@ -28,6 +30,12 @@ function collectLocalData(profileId: string): Record<string, unknown> {
     } else if (key.startsWith(`streak-${profileId}-`)) {
       const v = localStorage.getItem(key);
       if (v) streakDays[key] = v;
+    } else if (key.startsWith(`task-note-${profileId}-`)) {
+      const v = localStorage.getItem(key);
+      if (v) taskNotes[key] = v;
+    } else if (key.startsWith(`arbol-task-blocked-${profileId}-`)) {
+      const v = localStorage.getItem(key);
+      if (v) taskBlocked[key] = v;
     }
   }
 
@@ -43,9 +51,13 @@ function collectLocalData(profileId: string): Record<string, unknown> {
     goalLogs:       raw(`arbol-goal-logs-${profileId}`),
     streakBest:     raw(`streak-best-${profileId}`),
     profileEmail:   localStorage.getItem(getStorageKey(`arbol-email-${profileId}`)) || null,
+    liveReports:    raw(`arbol-live-reports-${profileId}`),
+    liveSnapshots:  raw(`arbol-live-snapshots-${profileId}`),
     taskStatuses,
     taskDeletions,
     streakDays,
+    taskNotes,
+    taskBlocked,
     savedAt: Date.now(),
   };
 }
@@ -63,6 +75,8 @@ function applyLocalData(profileId: string, data: Record<string, unknown>): void 
   write(`arbol-user-cats-${profileId}`, data.userCategories);
   write(`arbol-goal-logs-${profileId}`, data.goalLogs);
   write(`streak-best-${profileId}`, data.streakBest);
+  write(`arbol-live-reports-${profileId}`, data.liveReports);
+  write(`arbol-live-snapshots-${profileId}`, data.liveSnapshots);
 
   if (typeof data.profileEmail === 'string' && data.profileEmail.trim()) {
     localStorage.setItem(getStorageKey(`arbol-email-${profileId}`), data.profileEmail.trim());
@@ -82,6 +96,8 @@ function applyLocalData(profileId: string, data: Record<string, unknown>): void 
   restoreMap(data.taskStatuses);
   restoreMap(data.taskDeletions);
   restoreMap(data.streakDays);
+  restoreMap(data.taskNotes);
+  restoreMap(data.taskBlocked);
 }
 
 // ── API calls ────────────────────────────────────────────────────────

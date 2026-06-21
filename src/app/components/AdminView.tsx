@@ -36,6 +36,10 @@ import {
   sendTestEmail, sendManualNudge,
   type EmailSettings, type EmailTriggerMode,
 } from '../data/emailSettings';
+import {
+  fetchLiveCheckInSettings, saveLiveCheckInSettings, getLiveCheckInSettings,
+  type LiveCheckInSettings,
+} from '../data/liveCheckInSettings';
 
 interface Props { onBack: () => void }
 
@@ -1829,11 +1833,14 @@ function PersonalGoalsTab() {
 function SettingsTab() {
   const [settings, setSettings] = useState<AppNotificationSettings>(() => getAppNotificationSettings());
   const [emailSettings, setEmailSettings] = useState<EmailSettings>(() => getEmailSettings());
+  const [liveCheckInSettings, setLiveCheckInSettings] = useState<LiveCheckInSettings>(() => getLiveCheckInSettings());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [emailSaving, setEmailSaving] = useState(false);
   const [emailSaved, setEmailSaved] = useState(false);
+  const [liveCheckInSaving, setLiveCheckInSaving] = useState(false);
+  const [liveCheckInSaved, setLiveCheckInSaved] = useState(false);
   const [testSending, setTestSending] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [manualProfileId, setManualProfileId] = useState(PROFILES[0]?.id ?? '');
@@ -1842,9 +1849,10 @@ function SettingsTab() {
   const [manualResult, setManualResult] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([fetchAppSettings(), fetchEmailSettings()]).then(([s, e]) => {
+    Promise.all([fetchAppSettings(), fetchEmailSettings(), fetchLiveCheckInSettings()]).then(([s, e, l]) => {
       setSettings(s);
       setEmailSettings(e);
+      setLiveCheckInSettings(l);
       setLoading(false);
     });
   }, []);
@@ -1867,6 +1875,16 @@ function SettingsTab() {
     setEmailSaving(false);
     setEmailSaved(true);
     setTimeout(() => setEmailSaved(false), 2500);
+  };
+
+  const handleLiveCheckInSave = async () => {
+    setLiveCheckInSaving(true);
+    setLiveCheckInSaved(false);
+    const next = await saveLiveCheckInSettings(liveCheckInSettings);
+    setLiveCheckInSettings(next);
+    setLiveCheckInSaving(false);
+    setLiveCheckInSaved(true);
+    setTimeout(() => setLiveCheckInSaved(false), 2500);
   };
 
   const handleTestEmail = async () => {
@@ -1955,6 +1973,46 @@ function SettingsTab() {
       <Button type="primary" loading={saving} onClick={handleSave}
         style={{ width: '100%', background: C.primary, border: 'none', borderRadius: 12, height: 44, fontWeight: 600, marginBottom: 24 }}>
         {saved ? 'Browser settings saved ✓' : 'Save browser settings'}
+      </Button>
+
+      <div style={{ ...labelStyle, marginBottom: 10 }}>Live Check-In Feedback</div>
+
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14, color: C.headline }}>Enabled</div>
+            <div style={{ color: C.body, fontSize: 12, marginTop: 4 }}>
+              Shows report buttons and the live feedback card on the Tasks page.
+            </div>
+          </div>
+          <Switch
+            checked={liveCheckInSettings.enabled}
+            onChange={enabled => setLiveCheckInSettings(s => ({ ...s, enabled }))}
+            style={{ background: liveCheckInSettings.enabled ? C.primary : undefined }}
+          />
+        </div>
+      </div>
+
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14, color: C.headline }}>Voice playback enabled</div>
+            <div style={{ color: C.body, fontSize: 12, marginTop: 4 }}>
+              Allows opt-in Read aloud on the feedback card.
+            </div>
+          </div>
+          <Switch
+            checked={liveCheckInSettings.voiceEnabled}
+            disabled={!liveCheckInSettings.enabled}
+            onChange={voiceEnabled => setLiveCheckInSettings(s => ({ ...s, voiceEnabled }))}
+            style={{ background: liveCheckInSettings.voiceEnabled && liveCheckInSettings.enabled ? C.primary : undefined }}
+          />
+        </div>
+      </div>
+
+      <Button type="primary" loading={liveCheckInSaving} onClick={handleLiveCheckInSave}
+        style={{ width: '100%', background: C.primary, border: 'none', borderRadius: 12, height: 44, fontWeight: 600, marginBottom: 24 }}>
+        {liveCheckInSaved ? 'Live check-in settings saved ✓' : 'Save live check-in settings'}
       </Button>
 
       <div style={{ ...labelStyle, marginBottom: 10 }}>Email notifications (Resend)</div>

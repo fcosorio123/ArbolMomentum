@@ -26,6 +26,7 @@ import {
 } from './data/deviceAnalytics';
 import { fetchAppSettings, areNotificationsEnabled } from './data/appSettings';
 import { fetchEmailSettings, getEmailSettings } from './data/emailSettings';
+import { fetchLiveCheckInSettings } from './data/liveCheckInSettings';
 import { requestEmailSend } from './data/emailNudges';
 import { getProfileEmail } from './data/profileContact';
 import { showNotification } from './data/notifications';
@@ -138,7 +139,7 @@ export default function App() {
     return () => window.removeEventListener('resize', handler);
   }, []);
 
-  useEffect(() => { fetchAppSettings(); fetchEmailSettings(); }, []);
+  useEffect(() => { fetchAppSettings(); fetchEmailSettings(); fetchLiveCheckInSettings(); }, []);
 
   // ── PWA setup: meta tags + manifest link + canvas icon injection
   useEffect(() => {

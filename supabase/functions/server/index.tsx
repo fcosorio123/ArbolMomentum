@@ -1,4 +1,4 @@
-import { Hono } from "npm:hono";
+﻿import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
 import * as kv from "./kv_store.tsx";
@@ -76,6 +76,29 @@ app.post("/make-server-5d90ddf5/app-settings", async (c) => {
     return c.json({ ok: true });
   } catch (err) {
     console.log("[AppSettings] Error saving settings:", err);
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+// Live Check-In Feedback settings
+app.get("/make-server-5d90ddf5/live-check-in-settings", async (c) => {
+  try {
+    const data = await kv.get("arbol-live-check-in-settings");
+    if (!data) return c.json({ ok: true, data: null });
+    return c.json({ ok: true, data });
+  } catch (err) {
+    console.log("[LiveCheckInSettings] Error fetching settings:", err);
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+app.post("/make-server-5d90ddf5/live-check-in-settings", async (c) => {
+  try {
+    const payload = await c.req.json();
+    await kv.set("arbol-live-check-in-settings", payload);
+    return c.json({ ok: true });
+  } catch (err) {
+    console.log("[LiveCheckInSettings] Error saving settings:", err);
     return c.json({ error: String(err) }, 500);
   }
 });
