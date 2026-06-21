@@ -2,15 +2,42 @@
 // Environment Detection & Data Management
 // ──────────────────────────────────────────────
 
-export const PUBLISHED_URL = 'https://sound-press-69397091.figma.site';
+/** Legacy Figma Make hosted URL (may still be in use during transition) */
+export const LEGACY_FIGMA_PUBLISHED_ORIGIN = 'https://sound-press-69397091.figma.site';
+
+/** GitHub Pages production URL (deployed from main via GitHub Actions) */
+export const GITHUB_PAGES_ORIGIN = 'https://fcosorio123.github.io';
+export const GITHUB_PAGES_BASE_PATH = '/ArbolMomentum';
+
+/** Primary production URL shown in admin/debug (GitHub Pages when built with VITE_PUBLISHED) */
+export const PUBLISHED_URL = import.meta.env.VITE_PUBLISHED === 'true'
+  ? `${GITHUB_PAGES_ORIGIN}${GITHUB_PAGES_BASE_PATH}`
+  : LEGACY_FIGMA_PUBLISHED_ORIGIN;
+
 export const DATA_COLLECTION_START_DATE = '2026-05-14'; // May 14, 2026
 
 /**
- * Check if the app is running on the published production URL
+ * Check if the app is running on a published production URL
+ * (GitHub Pages from CI, legacy Figma site, or matching hostname)
  */
 export function isPublishedVersion(): boolean {
   if (typeof window === 'undefined') return false;
-  return window.location.origin === PUBLISHED_URL;
+
+  // Baked in at build time for GitHub Pages deploys
+  if (import.meta.env.VITE_PUBLISHED === 'true') return true;
+
+  const { origin, pathname } = window.location;
+
+  if (origin === LEGACY_FIGMA_PUBLISHED_ORIGIN) return true;
+
+  if (
+    origin === GITHUB_PAGES_ORIGIN &&
+    (pathname === GITHUB_PAGES_BASE_PATH || pathname.startsWith(`${GITHUB_PAGES_BASE_PATH}/`))
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -101,6 +128,7 @@ export function getEnvironmentInfo() {
     isPublished: isPublishedVersion(),
     shouldCollect: shouldCollectData(),
     origin: typeof window !== 'undefined' ? window.location.origin : 'unknown',
+    publishedUrl: PUBLISHED_URL,
     collectionStartDate: DATA_COLLECTION_START_DATE,
   };
 }

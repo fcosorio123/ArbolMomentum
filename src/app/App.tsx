@@ -156,8 +156,9 @@ export default function App() {
       if (extra) Object.entries(extra).forEach(([k, v]) => el!.setAttribute(k, v));
     };
 
-    // Manifest
-    setLink('manifest', '/manifest.json');
+    // Manifest (static fallback; replaced below with dynamic PNG manifest)
+    const appBase = import.meta.env.BASE_URL;
+    setLink('manifest', `${appBase}manifest.json`);
 
     // Universal PWA meta
     setMeta('theme-color', '#094067');
@@ -237,8 +238,8 @@ export default function App() {
       name: 'Arbol Momentum',
       short_name: 'Momentum',
       description: 'Track habits, streaks, and daily tasks.',
-      start_url: '/',
-      scope: '/',
+      start_url: appBase,
+      scope: appBase,
       display: 'standalone',
       orientation: 'portrait-primary',
       background_color: '#f0f4f8',
@@ -292,7 +293,8 @@ export default function App() {
   // ── Service worker
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
-    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    const appBase = import.meta.env.BASE_URL;
+    navigator.serviceWorker.register(`${appBase}sw.js`, { scope: appBase })
       .then(reg => setSwRegistration(reg))
       .catch(err => console.warn('[SW] Registration failed:', err));
   }, []);
