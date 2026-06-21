@@ -1,0 +1,4 @@
+Sync this entire project from GitHub repository fcosorio123/ArbolMomentum branch main.
+Replace all application source files to match GitHub exactly.
+Do not push anything back to GitHub.
+Keep vite.config, package.json, and src/ in sync with the repo.

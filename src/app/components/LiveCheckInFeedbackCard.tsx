@@ -9,6 +9,7 @@ import {
   getRecentReports,
   getTodayChartData,
   LOADER_MESSAGES,
+  ADJUSTMENT_LABELS,
 } from '../data/liveCheckInFeedback';
 import { isVoicePlaybackEnabled } from '../data/liveCheckInSettings';
 import { C } from '../data/colors';
@@ -180,6 +181,22 @@ export function LiveCheckInFeedbackCard({ profileId, isProcessing, processingMes
               }}>
                 Next: {latest.recommendedNextAction.label}
               </span>
+              {latest.recommendedNextAction.adjustment && (
+                <span style={{
+                  fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 8,
+                  background: '#fff7e6', color: '#d48806',
+                }}>
+                  Coach: {ADJUSTMENT_LABELS[latest.recommendedNextAction.adjustment]}
+                </span>
+              )}
+              {latest.recommendedNextAction.reason && (
+                <span style={{
+                  fontSize: 11, fontWeight: 500, padding: '4px 10px', borderRadius: 8,
+                  background: C.bgAlt, color: C.secondary,
+                }}>
+                  {latest.recommendedNextAction.reason}
+                </span>
+              )}
               <span style={{
                 fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 8,
                 background: C.bgAlt, color: MOVEMENT_META[latest.movementState].color,

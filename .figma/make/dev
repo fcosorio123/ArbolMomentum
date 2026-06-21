@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+echo "Starting Vite dev server"
+npm run dev -- --host 127.0.0.1 --port 5173

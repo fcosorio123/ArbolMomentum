@@ -1,33 +1,54 @@
-# Publish to Figma Make (`sound-press-69397091.figma.site`)
+# Keep Figma Make in sync (no manual code editing)
 
-GitHub is the source of truth. Figma Make **cannot** pull from GitHub automatically.
+GitHub (`main`) is the source of truth. **Do not use Push to GitHub in Figma** — that overwrites newer GitHub code with stale Make code.
 
-## Do NOT use "Push to GitHub" in Figma
+Production URLs:
 
-That sends **old Figma code → GitHub** and removes features. Build in Cursor; deploy via GitHub Pages.
+- **GitHub Pages (always current after push):** https://fcosorio123.github.io/ArbolMomentum/
+- **Figma site:** https://sound-press-69397091.figma.site (only updates when you **Publish** from Make)
 
-## Restore your Figma URL (2 minutes)
+This repo includes `.figma/make/` so Figma can run the Vite app when linked to GitHub.
 
-Your Figma Make file has a **Publish** button (top-right). Use it after a one-line fix so the Figma link always shows the latest app:
+---
+
+## Option A — Figma Make chat (web, no code panel)
+
+You do **not** need to paste scripts or edit files by hand.
 
 1. Open your [Figma Make file](https://www.figma.com/design/d8cDh8DPdqXBqJbzLPlWRo/Arbol-Momentum).
-2. Open the **Code** panel and edit **`index.html`**.
-3. Inside `<head>`, paste this script (or copy the whole `index.html` from GitHub):
+2. Open the **Make chat** and paste this **once** after we push updates:
 
-```html
-<script>
-(function () {
-  var LEGACY = 'https://sound-press-69397091.figma.site';
-  var CANONICAL = 'https://fcosorio123.github.io/ArbolMomentum/';
-  if (location.origin === LEGACY) location.replace(CANONICAL + location.search + location.hash);
-})();
-</script>
+```
+Sync this entire project from GitHub repository fcosorio123/ArbolMomentum branch main.
+Replace all application source files to match GitHub exactly.
+Do not push anything back to GitHub.
+Keep vite.config, package.json, and src/ in sync with the repo.
 ```
 
-4. Click **Publish** → **Update** (top-right, not Settings → GitHub).
+3. When the chat finishes, click **Publish → Update** (top-right).
+4. Open https://sound-press-69397091.figma.site and hard-refresh.
 
-After that, `https://sound-press-69397091.figma.site` opens the same latest build as GitHub Pages.
+Repeat steps 2–4 whenever you want the Figma URL to match GitHub. Step 2 is one chat message — not editing code yourself.
 
-## Direct production URL
+The same prompt lives in `scripts/figma-make-sync-prompt.txt` for copy-paste.
 
-**https://fcosorio123.github.io/ArbolMomentum/** — always current after every push to `main`.
+---
+
+## Option B — Clone repo in Figma Beta (Mac desktop)
+
+If you use **Figma Beta for desktop (Mac)**:
+
+1. **Make a copy → Clone repository from GitHub**
+2. Repository: `fcosorio123/ArbolMomentum`, branch `main`
+3. Figma reads `.figma/make/` for install, dev, and verify
+4. **Publish → Update** when ready
+
+After the first clone, pulling latest from GitHub + Publish keeps the Figma site current without rewriting files in Make.
+
+---
+
+## What we cannot automate
+
+Figma has no API to **Publish** your Make site from GitHub Actions. Until the Make file is synced (Option A or B) and published, `figma.site` may lag behind GitHub Pages.
+
+**Bookmark GitHub Pages** for the guaranteed-latest build: https://fcosorio123.github.io/ArbolMomentum/

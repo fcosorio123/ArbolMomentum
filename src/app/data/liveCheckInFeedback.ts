@@ -20,6 +20,8 @@ export interface RecommendedAction {
   label: string;
   reason: string;
   taskId?: string;
+  /** Coach-style pace or focus adjustment */
+  adjustment?: 'increase_pace' | 'maintain' | 'narrow_focus' | 'close_loops' | 'recover';
 }
 
 export interface ReportEntry {
@@ -69,13 +71,12 @@ const BLOCKED_KEY = (profileId: string, taskId: string, date: string) =>
 const MAX_REPORTS = 50;
 
 export const LOADER_MESSAGES = [
-  'Reading your update…',
-  'Checking task progress…',
-  'Reviewing momentum…',
-  'Looking for blockers…',
-  'Checking execution signals…',
-  'Preparing your report…',
-  'Updating the plan…',
+  'Reviewing how your day is going…',
+  'Reading your progress pattern…',
+  'Thinking through your next move…',
+  'Checking what actually moved…',
+  'Calibrating coaching advice…',
+  'Preparing your check-in…',
 ];
 
 const BLOCKER_KEYWORDS = [
@@ -231,18 +232,45 @@ export function calculateMomentumScore(opts: {
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
-function bandPhrase(progress: number): string {
-  if (progress >= 100) return 'complete';
-  if (progress >= 81) return 'almost complete';
-  if (progress >= 51) return 'showing strong progress';
-  if (progress >= 26) return 'building traction';
-  return 'still in low-momentum territory';
+type PaceStatus = 'ahead' | 'on_track' | 'behind' | 'catch_up';
+
+function computePaceStatus(progress: number, hour: number): PaceStatus {
+  const expected = Math.round((hour / 24) * 100);
+  const gap = expected - progress;
+  if (progress >= expected + 12) return 'ahead';
+  if (gap >= 25) return 'catch_up';
+  if (gap >= 12) return 'behind';
+  return 'on_track';
 }
 
-function statusLabel(status: TaskStatus | null): string {
-  if (status === 'done') return 'Done';
-  if (status === 'inprogress') return 'In Progress';
-  return 'Not Started';
+function timeOfDayPhrase(hour: number): string {
+  if (hour < 12) return 'morning';
+  if (hour < 17) return 'afternoon';
+  return 'evening';
+}
+
+export const ADJUSTMENT_LABELS: Record<NonNullable<RecommendedAction['adjustment']>, string> = {
+  increase_pace: 'Increase pace',
+  maintain: 'Maintain rhythm',
+  narrow_focus: 'Narrow focus',
+  close_loops: 'Close loops first',
+  recover: 'Ease off / recover',
+};
+
+function pickAdjustment(
+  warningType: WarningType,
+  pace: PaceStatus,
+  inProgressCount: number,
+  progress: number,
+  remaining: number,
+): RecommendedAction['adjustment'] {
+  if (warningType === 'open_loops' || inProgressCount > 2) return 'close_loops';
+  if (progress >= 100) return 'recover';
+  if (pace === 'catch_up') return 'increase_pace';
+  if (pace === 'behind' && remaining >= 3) return 'increase_pace';
+  if (pace === 'behind') return 'narrow_focus';
+  if (remaining >= 5 && inProgressCount >= 1) return 'narrow_focus';
+  return 'maintain';
 }
 
 // ── Recommended next action ───────────────────────────────────────────
@@ -251,11 +279,30 @@ export function recommendNextAction(
   profileId: string,
   dateKey: string,
   warningType: WarningType,
+  scope?: {
+    progress: number;
+    doneTaskCount: number;
+    inProgressTaskCount: number;
+    notStartedTaskCount: number;
+  },
 ): RecommendedAction {
+  const counts = scope ?? calculateScopeProgress(profileId, dateKey);
+  const remaining = counts.notStartedTaskCount + counts.inProgressTaskCount;
+  const hour = new Date().getHours();
+  const pace = computePaceStatus(counts.progress, hour);
+  const adjustment = pickAdjustment(
+    warningType,
+    pace,
+    counts.inProgressTaskCount,
+    counts.progress,
+    remaining,
+  );
+
   if (warningType === 'urgent_safety') {
     return {
       label: 'Get appropriate help now',
       reason: 'outside what ArbolMomentum can safely evaluate',
+      adjustment: 'recover',
     };
   }
 
@@ -265,42 +312,88 @@ export function recommendNextAction(
   if (blocked) {
     return {
       label: blocked.label,
-      reason: 'blocked - reduce friction on this step',
+      reason: pace === 'catch_up'
+        ? 'unblock this before you try to speed up elsewhere'
+        : 'reduce friction here before adding more load',
       taskId: blocked.id,
+      adjustment: 'narrow_focus',
     };
+  }
+
+  if (warningType === 'open_loops' || counts.inProgressTaskCount > 2) {
+    const open = tasks.find(t => getTaskStatus(profileId, t.id, dateKey) === 'inprogress');
+    if (open) {
+      return {
+        label: open.label,
+        reason: 'finish one open loop before starting anything new',
+        taskId: open.id,
+        adjustment: 'close_loops',
+      };
+    }
   }
 
   const highInProgress = tasks.find(t =>
     t.type === 'priority' && getTaskStatus(profileId, t.id, dateKey) === 'inprogress',
   );
   if (highInProgress) {
-    return { label: highInProgress.label, reason: 'already in motion', taskId: highInProgress.id };
+    return {
+      label: highInProgress.label,
+      reason: pace === 'catch_up'
+        ? 'stay on this priority — finishing it moves the whole day'
+        : 'you already started the highest-leverage work',
+      taskId: highInProgress.id,
+      adjustment: pace === 'catch_up' ? 'increase_pace' : 'maintain',
+    };
   }
 
   const highNotStarted = tasks.find(t =>
     t.type === 'priority' && !getTaskStatus(profileId, t.id, dateKey),
   );
   if (highNotStarted) {
-    return { label: highNotStarted.label, reason: 'highest leverage next step', taskId: highNotStarted.id };
+    return {
+      label: highNotStarted.label,
+      reason: pace === 'catch_up' || pace === 'behind'
+        ? 'pick up the priority task now to make up ground'
+        : 'highest leverage if you want the day to feel different',
+      taskId: highNotStarted.id,
+      adjustment: pace === 'catch_up' ? 'increase_pace' : 'narrow_focus',
+    };
   }
 
   const anyInProgress = tasks.find(t => getTaskStatus(profileId, t.id, dateKey) === 'inprogress');
   if (anyInProgress) {
-    return { label: anyInProgress.label, reason: 'already in motion', taskId: anyInProgress.id };
+    return {
+      label: anyInProgress.label,
+      reason: 'close what you already opened before spreading out',
+      taskId: anyInProgress.id,
+      adjustment: counts.inProgressTaskCount > 1 ? 'close_loops' : 'maintain',
+    };
   }
 
   const anyNotStarted = tasks.find(t => !getTaskStatus(profileId, t.id, dateKey));
   if (anyNotStarted) {
-    return { label: anyNotStarted.label, reason: 'next open task', taskId: anyNotStarted.id };
+    return {
+      label: anyNotStarted.label,
+      reason: remaining <= 2
+        ? 'one of the last open items on your list'
+        : 'next sensible step without overloading the day',
+      taskId: anyNotStarted.id,
+      adjustment: pace === 'catch_up' ? 'increase_pace' : 'maintain',
+    };
   }
 
-  return { label: 'Pick your next task area', reason: 'current tasks are complete' };
+  return {
+    label: 'Protect what you finished',
+    reason: 'today’s list is complete — recovery counts as progress too',
+    adjustment: 'recover',
+  };
 }
 
-// ── Report text generator ─────────────────────────────────────────────
+// ── Coaching feedback generator ───────────────────────────────────────
 
 export function generateReportText(opts: {
   taskTitle: string;
+  taskType?: TaskType;
   status: TaskStatus | null;
   statusChanged: boolean;
   progress: number;
@@ -309,47 +402,94 @@ export function generateReportText(opts: {
   momentumScore: number;
   warningType: WarningType;
   inProgressCount: number;
+  doneCount: number;
+  remaining: number;
+  totalTasks: number;
   recommended: RecommendedAction;
+  isFirstCompletionToday: boolean;
+  hourOfDay: number;
 }): string {
   const {
-    taskTitle, status, statusChanged, progress, previousProgress,
-    movementState, momentumScore, warningType, inProgressCount, recommended,
+    taskTitle, taskType, status, progress, previousProgress,
+    movementState, momentumScore, warningType, inProgressCount,
+    doneCount, remaining, totalTasks, recommended,
+    isFirstCompletionToday, hourOfDay,
   } = opts;
+
+  const progressDelta = progress - previousProgress;
+  const pace = computePaceStatus(progress, hourOfDay);
+  const dayPart = timeOfDayPhrase(hourOfDay);
+  const next = recommended.label;
+  const adj = recommended.adjustment;
+  const isPriority = taskType === 'priority';
+  const significantJump = progressDelta >= 8 || (isPriority && status === 'done' && progressDelta >= 5);
 
   if (warningType === 'urgent_safety') return URGENT_ESCALATION;
 
-  const next = recommended.label === 'Get appropriate help now'
-    ? recommended.label
-    : recommended.label;
+  const paceAdvice = (() => {
+    if (adj === 'increase_pace' && remaining > 0) {
+      return `Given the ${dayPart} and ${remaining} task${remaining === 1 ? '' : 's'} still open, I'd increase intensity for the next stretch — not by doing everything, but by protecting time for "${next}".`;
+    }
+    if (adj === 'close_loops') {
+      return `I'd slow the starting of new work and close loops first. "${next}" is the one I'd finish before opening anything else.`;
+    }
+    if (adj === 'narrow_focus') {
+      return `Don't spread effort evenly right now. Narrow to "${next}" until something concrete moves.`;
+    }
+    if (adj === 'recover') {
+      return `You're at ${progress}% with nothing left on today's list. I'd ease off execution pressure and let the completion land.`;
+    }
+    if (pace === 'ahead') {
+      return `You're ahead of where I'd expect for this ${dayPart}. Keep the rhythm on "${next}" rather than adding busywork.`;
+    }
+    return `Stay with "${next}" at a steady pace — that's the move that keeps momentum honest.`;
+  })();
 
   if (warningType === 'blocker') {
-    return `You flagged friction on "${taskTitle}." Your progress is at ${progress}%, and this looks less like failure and more like a blocked next step. Your next move is to ${next} because it reduces the blocker.`;
+    return `I read your note on "${taskTitle}" as friction, not failure. You're at ${progress}% with momentum at ${momentumScore}, which tells me the plan is fine but this step needs a smaller entry. ${paceAdvice}`;
   }
 
   if (movementState === 'down') {
-    return `Your update moved progress from ${previousProgress}% to ${progress}%, so the plan is less certain right now. Momentum Score is ${momentumScore}, which means the next move should be stabilizing. Focus on ${next} next.`;
+    return `Progress slipped from ${previousProgress}% to ${progress}%, so something reopened or got harder — that's worth treating seriously, not brushing off. Momentum is ${momentumScore}. Before you add new work, stabilize with "${next}". ${adj === 'increase_pace' ? 'Once stable, pick up the pace on that one task only.' : ''}`.trim();
+  }
+
+  if (progress >= 100 && remaining === 0) {
+    return `You closed the full list — ${doneCount} task${doneCount === 1 ? '' : 's'} done. That last completion on "${taskTitle}" wasn't cosmetic; it finished the day. ${paceAdvice}`;
+  }
+
+  if (isFirstCompletionToday && status === 'done') {
+    return `Good — "${taskTitle}" is your first completion today, and it moved you to ${progress}%. That sets the tone. ${isPriority ? 'Starting with a priority item was the right call.' : 'If you want the day to feel stronger, follow with your highest-leverage task next.'} ${paceAdvice}`;
+  }
+
+  if (significantJump && status === 'done') {
+    return `That last one mattered: finishing "${taskTitle}" took you from ${previousProgress}% to ${progress}%${isPriority ? ' on a priority item' : ''}. That's meaningful progress, not a small tick. ${paceAdvice}`;
   }
 
   if (inProgressCount > 2) {
-    return `You have ${inProgressCount} tasks in progress, which shows activity but also creates drag. Progress is at ${progress}% and Momentum Score is ${momentumScore}. Close one loop next by working on ${next}.`;
+    return `You have ${inProgressCount} tasks in motion at once — activity without closure creates drag even when you're working hard. Progress is ${progress}% and momentum is ${momentumScore}. ${paceAdvice}`;
   }
 
-  if (status === 'done' && !statusChanged) {
-    if (movementState === 'up') {
-      return `You completed "${taskTitle}," bringing progress to ${progress}% from ${previousProgress}%. Momentum Score is ${momentumScore}. Your next move is to ${next}.`;
-    }
-    return `You completed "${taskTitle}." Overall progress is at ${progress}%, and Momentum Score is ${momentumScore}. Your next move is to ${next}.`;
+  if (pace === 'catch_up' && remaining > 0) {
+    return `Honest read: ${progress}% done this ${dayPart} with ${remaining} still open — you're behind the pace I'd want for today. The fix isn't panic; it's a focused catch-up block on "${next}". ${paceAdvice}`;
   }
 
-  if (movementState === 'flat' && !statusChanged) {
-    return `You updated "${taskTitle}," but progress is still flat at ${progress}%. That means activity happened, but the task list did not move forward yet. Your next move is to ${next}.`;
+  if (pace === 'behind' && remaining > 0) {
+    return `You're at ${progress}% with ${remaining} task${remaining === 1 ? '' : 's'} left, and the day is further along than your progress shows. I'd trim scope mentally and push "${next}" ahead of lower-leverage items. ${paceAdvice}`;
   }
 
-  if (movementState === 'flat' && statusChanged) {
-    return `You moved "${taskTitle}" to ${statusLabel(status)}, and progress is holding at ${progress}%. This is ${bandPhrase(progress)}. Your next move is to ${next}.`;
+  if (status === 'done' && movementState === 'up') {
+    return `"${taskTitle}" is done — progress moved from ${previousProgress}% to ${progress}% and momentum is ${momentumScore}. ${progressDelta >= 3 ? 'That was a real step forward.' : 'Solid closure.'} ${paceAdvice}`;
   }
 
-  return `You moved "${taskTitle}" to ${statusLabel(status)}, bringing progress to ${progress}% from ${previousProgress}%. This is ${bandPhrase(progress)}, and Momentum Score is ${momentumScore}. Your next move is to ${next}.`;
+  if (status === 'done') {
+    return `"${taskTitle}" is checked off. You're at ${progress}% overall with ${remaining} still on the board${totalTasks > 0 ? ` out of ${totalTasks}` : ''}. ${paceAdvice}`;
+  }
+
+  if (movementState === 'flat') {
+    return `You touched "${taskTitle}" but the scoreboard is still flat at ${progress}%. That usually means prep or partial work — not nothing, but not closure yet. ${paceAdvice}`;
+  }
+
+  return `Update on "${taskTitle}": progress is ${progress}% (from ${previousProgress}%), momentum ${momentumScore}. ${paceAdvice}`;
 }
 
 // ── Persistence ───────────────────────────────────────────────────────
@@ -473,9 +613,15 @@ export function submitReportUpdate(params: SubmitReportParams): ReportEntry {
     urgentSafety,
   });
 
-  const recommended = recommendNextAction(profileId, dateKey, warningType);
+  const recommended = recommendNextAction(profileId, dateKey, warningType, scope);
+  const remaining = scope.notStartedTaskCount + scope.inProgressTaskCount;
+  const reportsToday = readReports(profileId).filter(r => r.dateKey === dateKey);
+  const isFirstCompletionToday =
+    targetStatus === 'done' && reportsToday.every(r => r.statusAtReport !== 'done');
+
   const responseText = generateReportText({
     taskTitle,
+    taskType: task?.type,
     status: targetStatus,
     statusChanged,
     progress: scope.progress,
@@ -484,7 +630,12 @@ export function submitReportUpdate(params: SubmitReportParams): ReportEntry {
     momentumScore,
     warningType,
     inProgressCount: scope.inProgressTaskCount,
+    doneCount: scope.doneTaskCount,
+    remaining,
+    totalTasks: scope.doneTaskCount + remaining,
     recommended,
+    isFirstCompletionToday,
+    hourOfDay: new Date().getHours(),
   });
 
   const entry: ReportEntry = {
