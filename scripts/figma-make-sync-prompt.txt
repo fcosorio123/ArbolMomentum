@@ -1,4 +1,27 @@
-Sync this entire project from GitHub repository fcosorio123/ArbolMomentum branch main.
-Replace all application source files to match GitHub exactly.
-Do not push anything back to GitHub.
-Keep vite.config, package.json, and src/ in sync with the repo.
+ONE-WAY SYNC ONLY. Read GitHub into this Figma Make project. Do NOT push, commit, or write anything to GitHub.
+
+The repository ALREADY EXISTS (do NOT create it, do NOT push to GitHub):
+- Owner: fcosorio123
+- Name: ArbolMomentum
+- Full name: fcosorio123/ArbolMomentum
+- Branch: main
+- URL: https://github.com/fcosorio123/ArbolMomentum
+
+If you cannot see this repo, STOP and tell me. Do NOT suggest Push to GitHub or Create repository.
+
+Access: PRIVATE. I will provide a read-only PAT via Option A. The PAT must belong to GitHub user fcosorio123 OR a collaborator with read access to fcosorio123/ArbolMomentum.
+
+Your job:
+1. List the repository names you can access with my PAT (so we can verify ArbolMomentum is included).
+2. Fetch FROM fcosorio123/ArbolMomentum branch main.
+3. Replace Make project files to match GitHub main exactly.
+4. Sync: src/, package.json, package-lock.json, vite.config.ts, index.html, public/, .figma/make/
+
+Strict rules:
+- Do NOT Push to GitHub.
+- Do NOT create a new repository.
+- Do NOT commit to GitHub.
+- Ignore missing Make-only assets like image-13.png if they are not on GitHub main.
+- GitHub main wins on any conflict.
+
+After sync, remind me to Publish → Update. Do NOT suggest pushing to GitHub.

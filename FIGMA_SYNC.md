@@ -1,65 +1,82 @@
-# Keep Figma Make in sync (no manual code editing)
+# Sync GitHub → Figma Make (private repo, no Push to GitHub)
 
-GitHub (`main`) is the source of truth. **Do not use Push to GitHub in Figma** — that overwrites newer GitHub code with stale Make code.
-
-## Protection if you accidentally Push to GitHub from Figma
-
-This repo has an automatic guard on `main`:
-
-1. **`.github/workflows/protect-main.yml`** — if a push looks like Figma Make (commit message) or removes protected feature files, GitHub Actions **reverts that commit automatically** within about a minute.
-2. **Deploy gate** — GitHub Pages will not deploy if protected files are missing.
-
-Protected file list: `.github/protected-paths.txt`
-
-Optional stronger lock (one-time, in GitHub): see **`.github/BRANCH_PROTECTION.md`**.
-
-Production URLs:
-
-- **GitHub Pages (always current after push):** https://fcosorio123.github.io/ArbolMomentum/
-- **Figma site:** https://sound-press-69397091.figma.site (only updates when you **Publish** from Make)
-
-This repo includes `.figma/make/` so Figma can run the Vite app when linked to GitHub.
+GitHub `main` is the source of truth. **Never click Push to GitHub in Figma.**
 
 ---
 
-## Option A — Figma Make chat (web, no code panel)
+## Method 1 — ZIP upload (recommended, always works)
 
-You do **not** need to paste scripts or edit files by hand.
+No GitHub token in Figma. No account mismatch. Repo stays private.
 
-1. Open your [Figma Make file](https://www.figma.com/design/d8cDh8DPdqXBqJbzLPlWRo/Arbol-Momentum).
-2. Open the **Make chat** and paste this **once** after we push updates:
+### Step 1 — Get a ZIP of GitHub main
 
-```
-Sync this entire project from GitHub repository fcosorio123/ArbolMomentum branch main.
-Replace all application source files to match GitHub exactly.
-Do not push anything back to GitHub.
-Keep vite.config, package.json, and src/ in sync with the repo.
+**Option A — From your machine (easiest if you use Cursor):**
+
+```bash
+npm run pack:figma-sync
 ```
 
-3. When the chat finishes, click **Publish → Update** (top-right).
-4. Open https://sound-press-69397091.figma.site and hard-refresh.
+Creates `figma-sync-from-github.zip` in the project root (exact current `main` code).
 
-Repeat steps 2–4 whenever you want the Figma URL to match GitHub. Step 2 is one chat message — not editing code yourself.
+**Option B — From GitHub website:**
 
-The same prompt lives in `scripts/figma-make-sync-prompt.txt` for copy-paste.
+1. Log in as **fcosorio123**
+2. Open https://github.com/fcosorio123/ArbolMomentum
+3. **Code → Download ZIP**
+
+### Step 2 — Upload to Figma Make chat
+
+1. Open your [Figma Make file](https://www.figma.com/design/d8cDh8DPdqXBqJbzLPlWRo/Arbol-Momentum)
+2. Open **Make chat**
+3. **Attach/upload** the ZIP file
+4. Paste the prompt from `scripts/figma-make-upload-prompt.txt`
+
+### Step 3 — Publish
+
+1. Wait for chat to finish replacing files
+2. **Publish → Update** (top-right)
+3. Hard-refresh https://sound-press-69397091.figma.site
+
+Repeat whenever Cursor pushes new code to GitHub.
 
 ---
 
-## Option B — Clone repo in Figma Beta (Mac desktop)
+## Method 2 — GitHub PAT in chat (only if ZIP fails)
 
-If you use **Figma Beta for desktop (Mac)**:
+Only works if the PAT belongs to **fcosorio123** (or a collaborator with read access).
 
-1. **Make a copy → Clone repository from GitHub**
-2. Repository: `fcosorio123/ArbolMomentum`, branch `main`
-3. Figma reads `.figma/make/` for install, dev, and verify
-4. **Publish → Update** when ready
-
-After the first clone, pulling latest from GitHub + Publish keeps the Figma site current without rewriting files in Make.
+See `scripts/figma-make-sync-prompt.txt` and the troubleshooting section below.
 
 ---
 
-## What we cannot automate
+## Protection
 
-Figma has no API to **Publish** your Make site from GitHub Actions. Until the Make file is synced (Option A or B) and published, `figma.site` may lag behind GitHub Pages.
+If you accidentally **Push to GitHub** from Figma, GitHub Actions auto-reverts `main` within ~1 minute.
 
-**Bookmark GitHub Pages** for the guaranteed-latest build: https://fcosorio123.github.io/ArbolMomentum/
+---
+
+## URLs
+
+- **GitHub Pages (always latest after push):** https://fcosorio123.github.io/ArbolMomentum/
+- **Figma site (after Publish):** https://sound-press-69397091.figma.site
+
+---
+
+## Troubleshooting PAT / "repo does not exist"
+
+Figma’s token often belongs to a **different GitHub account** than `fcosorio123`. Use **Method 1 (ZIP)** instead.
+
+If you insist on PAT:
+
+1. Log in as **fcosorio123** → confirm repo opens
+2. Fine-grained token → **Resource owner: fcosorio123** → only `ArbolMomentum` → Contents read-only
+3. Option A in Figma chat → paste token
+4. **Do not** Push to GitHub or Create repository
+
+---
+
+## Method 3 — Figma Beta desktop (Mac)
+
+Clone repository from GitHub (OAuth as fcosorio123) → Publish.
+
+Requires `.figma/make/` in repo (already included).

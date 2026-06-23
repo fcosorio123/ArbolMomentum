@@ -6,3 +6,4 @@ dist/
 supabase/.secrets.env
 supabase/.temp/
 supabase/functions/make-server-5d90ddf5/
+figma-sync-from-github.zip

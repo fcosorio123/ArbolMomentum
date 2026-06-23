@@ -1,0 +1,17 @@
+ONE-WAY SYNC ONLY. I uploaded a ZIP of GitHub main (fcosorio123/ArbolMomentum).
+
+Do NOT push to GitHub. Do NOT create a repository. Do NOT commit to GitHub.
+
+Your job:
+1. Extract the attached ZIP.
+2. Replace this Make project's files so they match the ZIP exactly.
+3. Ensure these are in sync: src/, package.json, package-lock.json, vite.config.ts, index.html, public/, .figma/make/, supabase/ (if present in ZIP).
+
+Strict rules:
+- GitHub / ZIP contents win on any conflict.
+- Ignore old Make-only files (e.g. image-13.png) if they are not in the ZIP.
+- Do NOT suggest Push to GitHub.
+
+When finished:
+- Confirm which folders were updated.
+- Remind me to click Publish → Update (top-right).

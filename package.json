@@ -7,6 +7,7 @@
     "build": "vite build",
     "build:pages": "vite build && node scripts/prepare-pages-dist.mjs",
     "build:figma": "vite build && node scripts/prepare-figma-dist.mjs",
+    "pack:figma-sync": "git archive --format=zip --output=figma-sync-from-github.zip HEAD",
     "dev": "vite"
   },
   "dependencies": {
