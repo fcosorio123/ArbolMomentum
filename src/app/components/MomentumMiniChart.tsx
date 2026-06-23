@@ -6,15 +6,16 @@ import { C } from '../data/colors';
 
 interface Props {
   profileId: string;
+  height?: number;
 }
 
-export function MomentumMiniChart({ profileId }: Props) {
+export function MomentumMiniChart({ profileId, height = 96 }: Props) {
   const chartData = getTodayChartData(profileId);
   const hasData = chartData.length > 0;
   const display = hasData ? chartData : [{ label: '—', progress: 0, momentum: 0 }];
 
   return (
-    <div style={{ width: '100%', height: 120 }}>
+    <div style={{ width: '100%', height }}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={display} margin={{ top: 4, right: 4, left: -22, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
