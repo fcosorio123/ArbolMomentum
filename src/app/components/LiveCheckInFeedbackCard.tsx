@@ -8,7 +8,6 @@ import {
   getLatestReport,
   getRecentReports,
   getTodayChartData,
-  LOADER_MESSAGES,
   ADJUSTMENT_LABELS,
 } from '../data/liveCheckInFeedback';
 import { isVoicePlaybackEnabled } from '../data/liveCheckInSettings';
@@ -16,8 +15,6 @@ import { C } from '../data/colors';
 
 interface Props {
   profileId: string;
-  isProcessing: boolean;
-  processingMessage: string;
 }
 
 function formatRelativeTime(ts: number): string {
@@ -44,7 +41,7 @@ function speakText(text: string) {
   window.speechSynthesis.speak(utter);
 }
 
-export function LiveCheckInFeedbackCard({ profileId, isProcessing, processingMessage }: Props) {
+export function LiveCheckInFeedbackCard({ profileId }: Props) {
   const [latest, setLatest] = useState<ReportEntry | null>(() => getLatestReport(profileId));
   const [ledger, setLedger] = useState<ReportEntry[]>(() => getRecentReports(profileId, 5));
   const [chartData, setChartData] = useState(() => getTodayChartData(profileId));
@@ -64,16 +61,12 @@ export function LiveCheckInFeedbackCard({ profileId, isProcessing, processingMes
     return () => window.removeEventListener('arbol-live-feedback-updated', handler);
   }, [refresh]);
 
-  useEffect(() => {
-    if (!isProcessing) refresh();
-  }, [isProcessing, refresh]);
-
   const voiceSupported =
     typeof window !== 'undefined' &&
     'speechSynthesis' in window &&
     isVoicePlaybackEnabled();
 
-  const showUrgent = latest?.warningType === 'urgent_safety' && !isProcessing;
+  const showUrgent = latest?.warningType === 'urgent_safety';
 
   const chartHasData = chartData.length > 0;
   const displayChart = useMemo(
@@ -111,7 +104,7 @@ export function LiveCheckInFeedbackCard({ profileId, isProcessing, processingMes
       <div style={cardStyle} id="live-check-in-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <span style={{ fontWeight: 700, fontSize: 14, color: C.headline }}>Live check-in</span>
-          {latest && !isProcessing && (
+          {latest && (
             <span style={{ fontSize: 11, color: C.secondary }}>{formatRelativeTime(latest.timestamp)}</span>
           )}
         </div>
@@ -143,26 +136,14 @@ export function LiveCheckInFeedbackCard({ profileId, isProcessing, processingMes
               </LineChart>
             </ResponsiveContainer>
           </div>
-          {!chartHasData && !isProcessing && (
+          {!chartHasData && (
             <div style={{ fontSize: 11, color: C.secondary, textAlign: 'center', marginTop: -8 }}>
               Complete a task to start the chart.
             </div>
           )}
         </div>
 
-        {isProcessing ? (
-          <div style={{ textAlign: 'center', padding: '12px 8px' }}>
-            <div style={{
-              width: 28, height: 28, borderRadius: '50%',
-              border: `3px solid ${C.border}`, borderTopColor: C.primary,
-              animation: 'spin 0.8s linear infinite', margin: '0 auto 12px',
-            }} />
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            <div style={{ fontSize: 13, color: C.body, lineHeight: 1.5 }}>
-              {processingMessage || LOADER_MESSAGES[0]}
-            </div>
-          </div>
-        ) : !latest ? (
+        {!latest ? (
           <div style={{ fontSize: 13, color: C.secondary, lineHeight: 1.5, padding: '8px 0' }}>
             Mark a task Done to get your live check-in feedback.
           </div>
@@ -241,7 +222,7 @@ export function LiveCheckInFeedbackCard({ profileId, isProcessing, processingMes
           </>
         )}
 
-        {ledger.length > 0 && !isProcessing && (
+        {ledger.length > 0 && (
           <div style={{ marginTop: 14, borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
             <button
               onClick={() => setLedgerOpen(o => !o)}

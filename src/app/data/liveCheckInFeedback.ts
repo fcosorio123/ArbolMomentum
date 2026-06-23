@@ -681,6 +681,30 @@ export function submitReportUpdate(params: SubmitReportParams): ReportEntry {
   return entry;
 }
 
+/** Short headline for the momentum completion modal. */
+export function getMomentumHeadline(entry: ReportEntry): string {
+  const delta = entry.progressAtTime - entry.previousProgress;
+  if (entry.warningType === 'urgent_safety') return 'Please pause and get help';
+  if (entry.progressAtTime >= 100) return 'You closed the day strong 🎯';
+  if (delta >= 8 || (entry.movementState === 'up' && delta >= 5)) return "You're building momentum 🚀";
+  if (entry.momentumScore >= 70) return "You're on a roll today";
+  if (entry.movementState === 'up') return 'Progress is moving forward';
+  if (entry.movementState === 'flat') return 'Nice work — keep it going';
+  return 'Keep stacking small wins';
+}
+
+/** One-line coaching hint for the momentum modal. */
+export function getMomentumCoachingLine(entry: ReportEntry): string | null {
+  if (entry.warningType === 'urgent_safety') return null;
+  const adj = entry.recommendedNextAction.adjustment;
+  if (adj === 'increase_pace') return "One more task keeps today's momentum strong.";
+  if (adj === 'close_loops') return 'Close what you started before opening something new.';
+  if (adj === 'narrow_focus') return "Stay narrow on your highest-impact goal.";
+  if (adj === 'recover') return 'Consistency beats intensity — let the win land.';
+  if (entry.movementState === 'up') return 'Consistency beats intensity.';
+  return null;
+}
+
 export function randomProcessingDelayMs(): number {
   return 1500 + Math.floor(Math.random() * 1001);
 }

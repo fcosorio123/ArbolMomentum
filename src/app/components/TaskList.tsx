@@ -22,9 +22,10 @@ import { C } from '../data/colors';
 import { trackActivity } from '../data/feedback';
 import { PageTour, PageTourButton, TOUR_KEYS } from './AppTour';
 import { CongratModal } from './CongratModal';
+import { MomentumUpdateModal } from './MomentumUpdateModal';
 import { LiveCheckInFeedbackCard } from './LiveCheckInFeedbackCard';
 import {
-  submitReportUpdate, LOADER_MESSAGES, randomProcessingDelayMs,
+  submitReportUpdate, type ReportEntry,
 } from '../data/liveCheckInFeedback';
 import { isLiveCheckInEnabled, fetchLiveCheckInSettings } from '../data/liveCheckInSettings';
 
@@ -470,8 +471,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   const [editingSeedTaskId, setEditingSeedTaskId] = useState<string | null>(null);
   const [seedDeleteMode, setSeedDeleteMode] = useState<'today' | 'permanent'>('permanent');
   const [liveCheckInEnabled, setLiveCheckInEnabled] = useState(() => isLiveCheckInEnabled());
-  const [isReportProcessing, setIsReportProcessing] = useState(false);
-  const [processingMessage, setProcessingMessage] = useState(LOADER_MESSAGES[0]);
+  const [momentumEntry, setMomentumEntry] = useState<ReportEntry | null>(null);
 
   const today = getTodayKey();
   const categories = getTaskCategoriesForProfile(profile.id);
@@ -511,36 +511,32 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     fetchLiveCheckInSettings().then(s => setLiveCheckInEnabled(s.enabled));
   }, []);
 
-  useEffect(() => {
-    if (!isReportProcessing) return;
-    let idx = 0;
-    setProcessingMessage(LOADER_MESSAGES[0]);
-    const interval = setInterval(() => {
-      idx = (idx + 1) % LOADER_MESSAGES.length;
-      setProcessingMessage(LOADER_MESSAGES[idx]);
-    }, 500);
-    return () => clearInterval(interval);
-  }, [isReportProcessing]);
-
   const runLiveFeedback = useCallback((params: {
     taskId: string; taskTitle: string; status?: TaskStatus | null; note?: string;
-  }) => {
-    if (!liveCheckInEnabled || isReportProcessing) return;
-    setIsReportProcessing(true);
-    const delay = randomProcessingDelayMs();
-    setTimeout(() => {
-      submitReportUpdate({
-        profileId: profile.id,
-        taskId: params.taskId,
-        taskTitle: params.taskTitle,
-        status: params.status,
-        note: params.note,
-      });
-      loadState();
-      setIsReportProcessing(false);
+  }, opts?: { showModal?: boolean }) => {
+    if (!liveCheckInEnabled) return null;
+    const entry = submitReportUpdate({
+      profileId: profile.id,
+      taskId: params.taskId,
+      taskTitle: params.taskTitle,
+      status: params.status,
+      note: params.note,
+    });
+    loadState();
+    if (opts?.showModal !== false) setMomentumEntry(entry);
+    return entry;
+  }, [profile.id, liveCheckInEnabled, loadState]);
+
+  const handleMomentumContinue = useCallback(() => {
+    setMomentumEntry(null);
+  }, []);
+
+  const handleViewFeedback = useCallback(() => {
+    setMomentumEntry(null);
+    requestAnimationFrame(() => {
       document.getElementById('live-check-in-card')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, delay);
-  }, [profile.id, liveCheckInEnabled, isReportProcessing, loadState]);
+    });
+  }, []);
 
   // Auto-start tasks tour on first visit
   useEffect(() => {
@@ -573,6 +569,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
       const allDone = newVisible.length > 0 && newVisible.every(t =>
         (t.id === task.id ? next : newStatuses[t.id]) === 'done'
       );
+      const isPerfectDay = allDone && !!onPerfectDay;
       if (allDone) {
         const seenKey = `badges-seen-${profile.id}`;
         const seen = new Set<string>(JSON.parse(localStorage.getItem(seenKey) || '[]'));
@@ -585,7 +582,10 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
       }
 
       if (liveCheckInEnabled) {
-        runLiveFeedback({ taskId: task.id, taskTitle: task.label, status: 'done' });
+        runLiveFeedback(
+          { taskId: task.id, taskTitle: task.label, status: 'done' },
+          { showModal: !isPerfectDay },
+        );
       }
     }
   };
@@ -778,11 +778,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
       )}
 
       {liveCheckInEnabled && !isEmpty && (
-        <LiveCheckInFeedbackCard
-          profileId={profile.id}
-          isProcessing={isReportProcessing}
-          processingMessage={processingMessage}
-        />
+        <LiveCheckInFeedbackCard profileId={profile.id} />
       )}
 
       {/* Time filter pills */}
@@ -1045,6 +1041,14 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
           onClose={() => setCongratTask(null)}
         />
       )}
+
+      <MomentumUpdateModal
+        open={!!momentumEntry}
+        entry={momentumEntry}
+        profileId={profile.id}
+        onContinue={handleMomentumContinue}
+        onViewFeedback={handleViewFeedback}
+      />
 
       {/* ── Tasks Page Tour */}
       <PageTour
