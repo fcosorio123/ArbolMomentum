@@ -4,6 +4,8 @@
 src/app/data/liveCheckInFeedback.ts
 src/app/data/liveCheckInSettings.ts
 src/app/components/LiveCheckInFeedbackCard.tsx
+src/app/components/MomentumUpdateModal.tsx
+src/app/components/MomentumMiniChart.tsx
 src/app/components/TaskList.tsx
 src/app/components/AdminView.tsx
 src/app/App.tsx
