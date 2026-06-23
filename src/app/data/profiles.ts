@@ -1623,17 +1623,19 @@ function getTodayDayName(): string {
  */
 export function getTaskCategoriesForProfile(profileId: string, dayName?: string): TaskCategory[] {
   const day = dayName ?? getTodayDayName();
+  let categories: TaskCategory[];
   switch (profileId) {
-    case 'kyle':   return KYLE_BY_DAY[day] ?? [];
-    case 'john':   return JOHN_CATEGORIES;
-    case 'jude':   return JUDE_BY_DAY[day] ?? [];
-    case 'rafael': return RAFAEL_BY_DAY[day] ?? [];
-    case 'yesa':   return YESA_BY_DAY[day] ?? [];
-    case 'favio':  return FAVIO_BY_DAY[day] ?? [];
-    case 'roi':    return ROI_BY_DAY[day] ?? [];
-    case 'eunice': return EUNICE_BY_DAY[day] ?? [];
-    default:       return TASK_CATEGORIES.filter(c => c.id !== 'personal-goals');
+    case 'kyle':   categories = KYLE_BY_DAY[day] ?? []; break;
+    case 'john':   categories = JOHN_CATEGORIES; break;
+    case 'jude':   categories = JUDE_BY_DAY[day] ?? []; break;
+    case 'rafael': categories = RAFAEL_BY_DAY[day] ?? []; break;
+    case 'yesa':   categories = YESA_BY_DAY[day] ?? []; break;
+    case 'favio':  categories = FAVIO_BY_DAY[day] ?? []; break;
+    case 'roi':    categories = ROI_BY_DAY[day] ?? []; break;
+    case 'eunice': categories = EUNICE_BY_DAY[day] ?? []; break;
+    default:       categories = TASK_CATEGORIES.filter(c => c.id !== 'personal-goals');
   }
+  return filterHiddenSeedCategories(profileId, categories);
 }
 
 export function getAllTasks(): Task[] {
@@ -1641,17 +1643,20 @@ export function getAllTasks(): Task[] {
 }
 
 export function getAllTasksForProfile(profileId: string): Task[] {
+  const hidden = getPermanentlyHiddenSeedTaskIds(profileId);
+  let tasks: Task[];
   switch (profileId) {
-    case 'kyle':   return Object.values(KYLE_BY_DAY).flat().flatMap(c => c.tasks);
-    case 'john':   return JOHN_CATEGORIES.flatMap(c => c.tasks);
-    case 'jude':   return Object.values(JUDE_BY_DAY).flat().flatMap(c => c.tasks);
-    case 'rafael': return Object.values(RAFAEL_BY_DAY).flat().flatMap(c => c.tasks);
-    case 'yesa':   return Object.values(YESA_BY_DAY).flat().flatMap(c => c.tasks);
-    case 'favio':  return Object.values(FAVIO_BY_DAY).flat().flatMap(c => c.tasks);
-    case 'roi':    return Object.values(ROI_BY_DAY).flat().flatMap(c => c.tasks);
-    case 'eunice': return Object.values(EUNICE_BY_DAY).flat().flatMap(c => c.tasks);
-    default:       return getAllTasks();
+    case 'kyle':   tasks = Object.values(KYLE_BY_DAY).flat().flatMap(c => c.tasks); break;
+    case 'john':   tasks = JOHN_CATEGORIES.flatMap(c => c.tasks); break;
+    case 'jude':   tasks = Object.values(JUDE_BY_DAY).flat().flatMap(c => c.tasks); break;
+    case 'rafael': tasks = Object.values(RAFAEL_BY_DAY).flat().flatMap(c => c.tasks); break;
+    case 'yesa':   tasks = Object.values(YESA_BY_DAY).flat().flatMap(c => c.tasks); break;
+    case 'favio':  tasks = Object.values(FAVIO_BY_DAY).flat().flatMap(c => c.tasks); break;
+    case 'roi':    tasks = Object.values(ROI_BY_DAY).flat().flatMap(c => c.tasks); break;
+    case 'eunice': tasks = Object.values(EUNICE_BY_DAY).flat().flatMap(c => c.tasks); break;
+    default:       tasks = getAllTasks();
   }
+  return hidden.size === 0 ? tasks : tasks.filter(t => !hidden.has(t.id));
 }
 
 export function getTasksForToday(profileId: string): Task[] {
@@ -1660,28 +1665,42 @@ export function getTasksForToday(profileId: string): Task[] {
 
 export function getWeekPlanForProfile(profileId: string): Record<string, string[]> {
   const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  let plan: Record<string, string[]>;
   switch (profileId) {
     case 'kyle':
-      return Object.fromEntries(DAYS.map(d => [d, (KYLE_BY_DAY[d] ?? []).flatMap(c => c.tasks.map(t => t.id))]));
+      plan = Object.fromEntries(DAYS.map(d => [d, (KYLE_BY_DAY[d] ?? []).flatMap(c => c.tasks.map(t => t.id))]));
+      break;
     case 'john': {
       const ids = JOHN_CATEGORIES.flatMap(c => c.tasks.map(t => t.id));
-      return Object.fromEntries(DAYS.map(d => [d, ids]));
+      plan = Object.fromEntries(DAYS.map(d => [d, ids]));
+      break;
     }
     case 'jude':
-      return Object.fromEntries(DAYS.map(d => [d, (JUDE_BY_DAY[d] ?? []).flatMap(c => c.tasks.map(t => t.id))]));
+      plan = Object.fromEntries(DAYS.map(d => [d, (JUDE_BY_DAY[d] ?? []).flatMap(c => c.tasks.map(t => t.id))]));
+      break;
     case 'rafael':
-      return Object.fromEntries(DAYS.map(d => [d, (RAFAEL_BY_DAY[d] ?? []).flatMap(c => c.tasks.map(t => t.id))]));
+      plan = Object.fromEntries(DAYS.map(d => [d, (RAFAEL_BY_DAY[d] ?? []).flatMap(c => c.tasks.map(t => t.id))]));
+      break;
     case 'yesa':
-      return Object.fromEntries(DAYS.map(d => [d, (YESA_BY_DAY[d] ?? []).flatMap(c => c.tasks.map(t => t.id))]));
+      plan = Object.fromEntries(DAYS.map(d => [d, (YESA_BY_DAY[d] ?? []).flatMap(c => c.tasks.map(t => t.id))]));
+      break;
     case 'favio':
-      return Object.fromEntries(DAYS.map(d => [d, (FAVIO_BY_DAY[d] ?? []).flatMap(c => c.tasks.map(t => t.id))]));
+      plan = Object.fromEntries(DAYS.map(d => [d, (FAVIO_BY_DAY[d] ?? []).flatMap(c => c.tasks.map(t => t.id))]));
+      break;
     case 'roi':
-      return Object.fromEntries(DAYS.map(d => [d, (ROI_BY_DAY[d] ?? []).flatMap(c => c.tasks.map(t => t.id))]));
+      plan = Object.fromEntries(DAYS.map(d => [d, (ROI_BY_DAY[d] ?? []).flatMap(c => c.tasks.map(t => t.id))]));
+      break;
     case 'eunice':
-      return Object.fromEntries(DAYS.map(d => [d, (EUNICE_BY_DAY[d] ?? []).flatMap(c => c.tasks.map(t => t.id))]));
+      plan = Object.fromEntries(DAYS.map(d => [d, (EUNICE_BY_DAY[d] ?? []).flatMap(c => c.tasks.map(t => t.id))]));
+      break;
     default:
-      return WEEK_PLAN;
+      plan = WEEK_PLAN;
   }
+  const hidden = getPermanentlyHiddenSeedTaskIds(profileId);
+  if (hidden.size === 0) return plan;
+  return Object.fromEntries(
+    Object.entries(plan).map(([day, ids]) => [day, ids.filter(id => !hidden.has(id))]),
+  );
 }
 
 // ──────────────────────────────────────────────
@@ -1785,6 +1804,39 @@ export function setTaskStatus(profileId: string, taskId: string, date: string, s
 
 export function isTaskDeleted(profileId: string, taskId: string, date: string): boolean {
   return localStorage.getItem(`task-del-${profileId}-${taskId}-${date}`) === 'true';
+}
+
+function hiddenSeedStorageKey(profileId: string) {
+  return `arbol-hidden-seed-${profileId}`;
+}
+
+function filterHiddenSeedCategories(profileId: string, categories: TaskCategory[]): TaskCategory[] {
+  const hidden = getPermanentlyHiddenSeedTaskIds(profileId);
+  if (hidden.size === 0) return categories;
+  return categories.map(cat => ({
+    ...cat,
+    tasks: cat.tasks.filter(t => !hidden.has(t.id)),
+  }));
+}
+
+export function getPermanentlyHiddenSeedTaskIds(profileId: string): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(hiddenSeedStorageKey(profileId)) || '[]') as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
+export function isSeedTaskPermanentlyHidden(profileId: string, taskId: string): boolean {
+  return getPermanentlyHiddenSeedTaskIds(profileId).has(taskId);
+}
+
+export function permanentlyHideSeedTask(profileId: string, taskId: string) {
+  const hidden = getPermanentlyHiddenSeedTaskIds(profileId);
+  hidden.add(taskId);
+  localStorage.setItem(hiddenSeedStorageKey(profileId), JSON.stringify([...hidden]));
+  import('./cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId));
+  try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch { /* ignore */ }
 }
 
 export function markTaskDeleted(profileId: string, taskId: string, date: string) {

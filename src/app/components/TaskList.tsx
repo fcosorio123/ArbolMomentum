@@ -4,7 +4,7 @@ import { DeleteOutlined, CheckCircleFilled, PlayCircleOutlined, ArrowRightOutlin
 import {
   type Profile, type Task, type TaskStatus,
   getTaskCategoriesForProfile, getTaskStatus, setTaskStatus,
-  isTaskDeleted, markTaskDeleted, getTodayKey,
+  isTaskDeleted, markTaskDeleted, permanentlyHideSeedTask, getTodayKey,
   getEarnedBadges, type Badge,
 } from '../data/profiles';
 import {
@@ -469,19 +469,12 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   const [congratTask, setCongratTask] = useState<{ label: string; rows: Array<{ icon: string; label: string; value: string }> } | null>(null);
   const [editingSeedTaskId, setEditingSeedTaskId] = useState<string | null>(null);
   const [seedDeleteMode, setSeedDeleteMode] = useState<'today' | 'permanent'>('permanent');
-  const [hiddenSeedIds, setHiddenSeedIds] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem(`arbol-hidden-seed-${profile.id}`) || '[]')); } catch { return new Set(); }
-  });
   const [liveCheckInEnabled, setLiveCheckInEnabled] = useState(() => isLiveCheckInEnabled());
   const [isReportProcessing, setIsReportProcessing] = useState(false);
   const [processingMessage, setProcessingMessage] = useState(LOADER_MESSAGES[0]);
 
   const today = getTodayKey();
-  // Filter out seed tasks the user has converted to user tasks (permanently hidden)
-  const categories = getTaskCategoriesForProfile(profile.id).map(cat => ({
-    ...cat,
-    tasks: cat.tasks.filter(t => !hiddenSeedIds.has(t.id)),
-  }));
+  const categories = getTaskCategoriesForProfile(profile.id);
   const allTasks = categories.flatMap(c => c.tasks);
   const allTasksCombined = [
     ...allTasks,
@@ -600,7 +593,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   const doDelete = () => {
     if (!pendingDelete) return;
     if (seedDeleteMode === 'permanent') {
-      permanentlyHideSeedTask(pendingDelete.id);
+      permanentlyHideSeedTask(profile.id, pendingDelete.id);
       message.info('Task permanently removed');
     } else {
       markTaskDeleted(profile.id, pendingDelete.id, today);
@@ -611,15 +604,6 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     setPendingDelete(null);
     const newVisible = allTasksCombined.filter(t => !newDeleted[t.id]);
     onTasksChange?.(newVisible.filter(t => statuses[t.id] !== 'done').length);
-  };
-
-  const permanentlyHideSeedTask = (taskId: string) => {
-    setHiddenSeedIds(prev => {
-      const next = new Set(prev);
-      next.add(taskId);
-      localStorage.setItem(`arbol-hidden-seed-${profile.id}`, JSON.stringify([...next]));
-      return next;
-    });
   };
 
   // Open edit modal for ANY task (seed or user)
@@ -648,7 +632,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
 
     if (editingSeedTaskId) {
       createUserTask(profile.id, taskData);
-      permanentlyHideSeedTask(editingSeedTaskId);
+      permanentlyHideSeedTask(profile.id, editingSeedTaskId);
       setEditingSeedTaskId(null);
     } else if (editingTask) {
       if (applyTo === 'this') {
