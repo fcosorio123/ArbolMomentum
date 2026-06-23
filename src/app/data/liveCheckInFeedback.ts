@@ -689,20 +689,33 @@ export function getMomentumHeadline(entry: ReportEntry): string {
   if (delta >= 8 || (entry.movementState === 'up' && delta >= 5)) return "You're building momentum 🚀";
   if (entry.momentumScore >= 70) return "You're on a roll today";
   if (entry.movementState === 'up') return 'Progress is moving forward';
-  if (entry.movementState === 'flat') return 'Nice work — keep it going';
+  if (entry.movementState === 'flat') return 'Nice work - keep it going';
   return 'Keep stacking small wins';
 }
 
-/** One-line coaching hint for the momentum modal. */
-export function getMomentumCoachingLine(entry: ReportEntry): string | null {
-  if (entry.warningType === 'urgent_safety') return null;
-  const adj = entry.recommendedNextAction.adjustment;
-  if (adj === 'increase_pace') return "One more task keeps today's momentum strong.";
-  if (adj === 'close_loops') return 'Close what you started before opening something new.';
-  if (adj === 'narrow_focus') return "Stay narrow on your highest-impact goal.";
-  if (adj === 'recover') return 'Consistency beats intensity — let the win land.';
-  if (entry.movementState === 'up') return 'Consistency beats intensity.';
-  return null;
+/** Preview of Live Check-in feedback for the momentum modal (first sentence, truncated). */
+export function getFeedbackTeaser(responseText: string, maxLen = 110): string {
+  const cleaned = responseText
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/—/g, '-')
+    .replace(/–/g, '-');
+  if (!cleaned) return '';
+
+  const firstSentence = cleaned.match(/^[^.]+\./)?.[0]?.trim() ?? cleaned;
+  let excerpt = firstSentence.length <= maxLen ? firstSentence : cleaned;
+
+  if (excerpt.length > maxLen) {
+    const slice = excerpt.slice(0, maxLen);
+    const lastSpace = slice.lastIndexOf(' ');
+    excerpt = (lastSpace > 50 ? slice.slice(0, lastSpace) : slice).trim();
+  }
+
+  const hasMore = cleaned.length > excerpt.replace(/\.$/, '').length;
+  if (hasMore || excerpt.length < cleaned.length) {
+    return `${excerpt.replace(/\.$/, '')}...`;
+  }
+  return excerpt;
 }
 
 export function randomProcessingDelayMs(): number {

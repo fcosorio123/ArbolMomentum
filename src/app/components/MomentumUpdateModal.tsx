@@ -3,7 +3,7 @@ import { Modal, Button } from 'antd';
 import {
   type ReportEntry,
   getMomentumHeadline,
-  getMomentumCoachingLine,
+  getFeedbackTeaser,
 } from '../data/liveCheckInFeedback';
 import { MomentumMiniChart } from './MomentumMiniChart';
 import { C } from '../data/colors';
@@ -26,9 +26,9 @@ export function MomentumUpdateModal({
   if (!entry) return null;
 
   const delta = entry.progressAtTime - entry.previousProgress;
-  const headline = getMomentumHeadline(entry);
-  const coaching = getMomentumCoachingLine(entry);
   const isUrgent = entry.warningType === 'urgent_safety';
+  const headline = getMomentumHeadline(entry);
+  const teaser = !isUrgent ? getFeedbackTeaser(entry.responseText) : '';
 
   const handleTouchStart = (e: TouchEvent) => {
     touchStartY.current = e.touches[0]?.clientY ?? null;
@@ -160,10 +160,30 @@ export function MomentumUpdateModal({
               <p style={{ margin: '0 0 20px', fontSize: 13, color: '#cf1322', lineHeight: 1.55 }}>
                 {entry.responseText}
               </p>
-            ) : coaching ? (
-              <p style={{ margin: '0 0 20px', fontSize: 13, color: C.body, lineHeight: 1.55, fontStyle: 'italic' }}>
-                {coaching}
-              </p>
+            ) : teaser ? (
+              <div style={{ position: 'relative', marginBottom: 20 }}>
+                <p style={{
+                  margin: 0,
+                  fontSize: 12,
+                  color: C.body,
+                  lineHeight: 1.55,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                }}>
+                  {teaser}
+                </p>
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: 14,
+                  background: `linear-gradient(to bottom, transparent, ${C.bgCard})`,
+                  pointerEvents: 'none',
+                }} />
+              </div>
             ) : (
               <div style={{ marginBottom: 20 }} />
             )}
