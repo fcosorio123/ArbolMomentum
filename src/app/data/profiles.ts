@@ -1802,8 +1802,41 @@ export function setTaskStatus(profileId: string, taskId: string, date: string, s
   }
 }
 
-export function isTaskDeleted(profileId: string, taskId: string, date: string): boolean {
+/** Skipped for a single date only (Delete for Today). */
+export function isTaskSkippedForDate(profileId: string, taskId: string, date: string): boolean {
   return localStorage.getItem(`task-del-${profileId}-${taskId}-${date}`) === 'true';
+}
+
+/** @deprecated Use isTaskSkippedForDate for day skips or isTaskActiveForDate for inclusion checks. */
+export function isTaskDeleted(profileId: string, taskId: string, date: string): boolean {
+  return isTaskSkippedForDate(profileId, taskId, date);
+}
+
+/** Permanently removed via Delete Forever (seed tasks). */
+export function isTaskPermanentlyRemoved(profileId: string, taskId: string): boolean {
+  return getPermanentlyHiddenSeedTaskIds(profileId).has(taskId);
+}
+
+/** Single source of truth: should this task appear anywhere for this date? */
+export function isTaskActiveForDate(profileId: string, taskId: string, dateKey: string): boolean {
+  if (isTaskPermanentlyRemoved(profileId, taskId)) return false;
+  if (isTaskSkippedForDate(profileId, taskId, dateKey)) return false;
+  return true;
+}
+
+/** Remove per-task localStorage state after permanent deletion. */
+export function purgeTaskLocalState(profileId: string, taskId: string) {
+  const prefixes = [
+    `task-${profileId}-${taskId}-`,
+    `task-del-${profileId}-${taskId}-`,
+    `task-note-${profileId}-${taskId}-`,
+    `arbol-task-blocked-${profileId}-${taskId}-`,
+  ];
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i);
+    if (!key) continue;
+    if (prefixes.some(p => key.startsWith(p))) localStorage.removeItem(key);
+  }
 }
 
 function hiddenSeedStorageKey(profileId: string) {
@@ -1835,7 +1868,9 @@ export function permanentlyHideSeedTask(profileId: string, taskId: string) {
   const hidden = getPermanentlyHiddenSeedTaskIds(profileId);
   hidden.add(taskId);
   localStorage.setItem(hiddenSeedStorageKey(profileId), JSON.stringify([...hidden]));
+  purgeTaskLocalState(profileId, taskId);
   import('./cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId));
+  try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch { /* ignore */ }
   try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch { /* ignore */ }
 }
 
@@ -1847,6 +1882,7 @@ export function markTaskDeleted(profileId: string, taskId: string, date: string)
     syncTaskDeletion(profileId, taskId, date);
   });
   import('./cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId));
+  try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch {}
 }
 
 // ──────────────────────────────────────────────

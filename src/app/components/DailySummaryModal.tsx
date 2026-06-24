@@ -3,7 +3,7 @@ import { Modal, Progress } from 'antd';
 import { ArrowRightOutlined, FireOutlined, StarFilled } from '@ant-design/icons';
 import {
   type Profile, type Task, getTaskCategoriesForProfile,
-  getTaskStatus, isTaskDeleted, getTodayKey, computeLiveStreak,
+  getTaskStatus, isTaskActiveForDate, getTodayKey, computeLiveStreak,
 } from '../data/profiles';
 import { getPersonalGoals } from '../data/personalGoals';
 import { getUserTasks, isTaskScheduledForDate, type UserTask } from '../data/userTasks';
@@ -61,7 +61,7 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks }: Prop
   }));
   const allTasksCombined = [...seedTasks, ...userTaskLike];
 
-  const visible = allTasksCombined.filter(t => !isTaskDeleted(profile.id, t.id, today));
+  const visible = allTasksCombined.filter(t => !isTaskActiveForDate(profile.id, t.id, today));
   const done = visible.filter(t => getTaskStatus(profile.id, t.id, today) === 'done').length;
   const inProgress = visible.filter(t => getTaskStatus(profile.id, t.id, today) === 'inprogress').length;
   const pct = visible.length > 0 ? Math.round((done / visible.length) * 100) : 0;
@@ -101,11 +101,11 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks }: Prop
     const linkedSeedTasks = categories
       .filter(c => c.goalId === goal.id)
       .flatMap(c => c.tasks)
-      .filter(t => !isTaskDeleted(profile.id, t.id, today))
+      .filter(t => !isTaskActiveForDate(profile.id, t.id, today))
       .map(t => ({ ...t, status: getTaskStatus(profile.id, t.id, today) }));
 
     const linkedUserTasks = userTasks
-      .filter(ut => ut.goalId === goal.id && !isTaskDeleted(profile.id, ut.id, today))
+      .filter(ut => ut.goalId === goal.id && !isTaskActiveForDate(profile.id, ut.id, today))
       .map(ut => ({
         id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, type: ut.type, category: 'user',
         status: getTaskStatus(profile.id, ut.id, today),
@@ -127,11 +127,11 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks }: Prop
     ...categories
       .filter(c => !c.goalId || !personalGoals.some(g => g.id === c.goalId))
       .flatMap(c => c.tasks)
-      .filter(t => !isTaskDeleted(profile.id, t.id, today))
+      .filter(t => !isTaskActiveForDate(profile.id, t.id, today))
       .map(t => ({ ...t, status: getTaskStatus(profile.id, t.id, today) })),
     ...userTasks
       .filter(ut => !ut.goalId || !personalGoals.some(g => g.id === ut.goalId))
-      .filter(ut => !isTaskDeleted(profile.id, ut.id, today))
+      .filter(ut => !isTaskActiveForDate(profile.id, ut.id, today))
       .map(ut => ({
         id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, type: ut.type, category: 'user',
         status: getTaskStatus(profile.id, ut.id, today),

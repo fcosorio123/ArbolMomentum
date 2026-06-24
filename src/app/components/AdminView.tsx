@@ -6,7 +6,7 @@ import {
   BarChart, Bar, LineChart, Line,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
-import { PROFILES, getTaskCategoriesForProfile, isTaskDeleted, getTaskStatus, computeLiveStreak, getTodayKey, getDateKey } from '../data/profiles';
+import { PROFILES, getTaskCategoriesForProfile, isTaskActiveForDate, getTaskStatus, computeLiveStreak, getTodayKey, getDateKey } from '../data/profiles';
 import {
   getAllFeedbackAll, getActivityChartData, getWeeklyEngagement,
   generateInsight, RATING_EMOJIS, type FeedbackEntry,
@@ -63,7 +63,7 @@ function getDateForWeekday(dayName: string) {
 function computeCompletion(profileId: string, date: string): number {
   const cats = getTaskCategoriesForProfile(profileId);
   const tasks = cats.flatMap(c => c.tasks);
-  const visible = tasks.filter(t => !isTaskDeleted(profileId, t.id, date));
+  const visible = tasks.filter(t => !isTaskActiveForDate(profileId, t.id, date));
   if (visible.length === 0) return 0;
   const done = visible.filter(t => getTaskStatus(profileId, t.id, date) === 'done').length;
   return Math.round((done / visible.length) * 100);
@@ -72,7 +72,7 @@ function computeCompletion(profileId: string, date: string): number {
 function computeDayDetail(profileId: string, date: string) {
   const cats = getTaskCategoriesForProfile(profileId);
   const tasks = cats.flatMap(c => c.tasks);
-  const visible = tasks.filter(t => !isTaskDeleted(profileId, t.id, date));
+  const visible = tasks.filter(t => !isTaskActiveForDate(profileId, t.id, date));
   const deleted = tasks.length - visible.length;
   const done = visible.filter(t => getTaskStatus(profileId, t.id, date) === 'done').length;
   const inprog = visible.filter(t => getTaskStatus(profileId, t.id, date) === 'inprogress').length;

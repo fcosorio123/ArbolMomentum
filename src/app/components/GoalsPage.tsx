@@ -8,7 +8,7 @@ import {
   isMonetaryGoal, type PersonalGoal,
 } from '../data/personalGoals';
 import {
-  getTaskCategoriesForProfile, getTaskStatus, isTaskDeleted, getTodayKey,
+  getTaskCategoriesForProfile, getTaskStatus, isTaskActiveForDate, getTodayKey,
 } from '../data/profiles';
 import { getUserTasks, createUserTask, orphanUserTasksForGoal, isTaskScheduledForDate } from '../data/userTasks';
 import { ManageGoalModal } from './ManageGoalModal';
@@ -22,7 +22,7 @@ function getGoalTaskBreakdown(profileId: string, goalId: string, dateKey: string
   const userTasks = getUserTasks(profileId);
   let done = 0, inprogress = 0, notStarted = 0;
   const count = (taskId: string) => {
-    if (isTaskDeleted(profileId, taskId, dateKey)) return;
+    if (!isTaskActiveForDate(profileId, taskId, dateKey)) return;
     const s = getTaskStatus(profileId, taskId, dateKey);
     if (s === 'done') done++;
     else if (s === 'inprogress') inprogress++;

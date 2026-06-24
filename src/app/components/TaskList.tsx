@@ -4,7 +4,7 @@ import { DeleteOutlined, CheckCircleFilled, PlayCircleOutlined, ArrowRightOutlin
 import {
   type Profile, type Task, type TaskStatus,
   getTaskCategoriesForProfile, getTaskStatus, setTaskStatus,
-  isTaskDeleted, markTaskDeleted, permanentlyHideSeedTask, getTodayKey,
+  isTaskSkippedForDate, markTaskDeleted, permanentlyHideSeedTask, getTodayKey,
   getEarnedBadges, type Badge,
 } from '../data/profiles';
 import {
@@ -488,7 +488,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     const d: DeletedMap = {};
     allTasks.forEach(task => {
       s[task.id] = getTaskStatus(profile.id, task.id, today);
-      d[task.id] = isTaskDeleted(profile.id, task.id, today);
+      d[task.id] = isTaskSkippedForDate(profile.id, task.id, today);
     });
     const uts = getUserTasks(profile.id);
     uts.forEach(ut => {
@@ -504,7 +504,11 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     loadState();
     const handler = () => loadState();
     window.addEventListener('arbol-goals-updated', handler);
-    return () => window.removeEventListener('arbol-goals-updated', handler);
+    window.addEventListener('arbol-tasks-updated', handler);
+    return () => {
+      window.removeEventListener('arbol-goals-updated', handler);
+      window.removeEventListener('arbol-tasks-updated', handler);
+    };
   }, [loadState]);
 
   useEffect(() => {
@@ -602,6 +606,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     const newDeleted = { ...deleted, [pendingDelete.id]: true };
     setDeleted(newDeleted);
     setPendingDelete(null);
+    loadState();
     const newVisible = allTasksCombined.filter(t => !newDeleted[t.id]);
     onTasksChange?.(newVisible.filter(t => statuses[t.id] !== 'done').length);
   };

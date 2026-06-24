@@ -53,6 +53,7 @@ function collectLocalData(profileId: string): Record<string, unknown> {
     profileEmail:   localStorage.getItem(getStorageKey(`arbol-email-${profileId}`)) || null,
     liveReports:    raw(`arbol-live-reports-${profileId}`),
     liveSnapshots:  raw(`arbol-live-snapshots-${profileId}`),
+    permanentlyHiddenSeedTasks: raw(`arbol-hidden-seed-${profileId}`),
     taskStatuses,
     taskDeletions,
     streakDays,
@@ -77,6 +78,7 @@ function applyLocalData(profileId: string, data: Record<string, unknown>): void 
   write(`streak-best-${profileId}`, data.streakBest);
   write(`arbol-live-reports-${profileId}`, data.liveReports);
   write(`arbol-live-snapshots-${profileId}`, data.liveSnapshots);
+  write(`arbol-hidden-seed-${profileId}`, data.permanentlyHiddenSeedTasks);
 
   if (typeof data.profileEmail === 'string' && data.profileEmail.trim()) {
     localStorage.setItem(getStorageKey(`arbol-email-${profileId}`), data.profileEmail.trim());

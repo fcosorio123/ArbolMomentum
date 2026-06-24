@@ -6,7 +6,7 @@ import {
 import { PageTour, PageTourButton, TOUR_KEYS } from './AppTour';
 import type { Profile } from '../data/profiles';
 import {
-  getTaskCategoriesForProfile, getTaskStatus, isTaskDeleted,
+  getTaskCategoriesForProfile, getTaskStatus, isTaskActiveForDate,
   getTodayKey, getDateKey, hasActivityOnDate, computeLiveStreak, getEarnedBadges, BADGES,
 } from '../data/profiles';
 import { getUserTasks, isTaskScheduledForDate } from '../data/userTasks';
@@ -127,7 +127,7 @@ export function Dashboard({
     categories.forEach(cat => {
       cat.tasks.forEach(task => {
         if (task.timeOfDay !== period) return;
-        if (!isTaskDeleted(profile.id, task.id, today)) {
+        if (!isTaskActiveForDate(profile.id, task.id, today)) {
           total++;
           if (getTaskStatus(profile.id, task.id, today) === 'done') done++;
         }
@@ -140,7 +140,11 @@ export function Dashboard({
   useEffect(() => {
     const handler = () => forceRefresh(n => n + 1);
     window.addEventListener('arbol-goals-updated', handler);
-    return () => window.removeEventListener('arbol-goals-updated', handler);
+    window.addEventListener('arbol-tasks-updated', handler);
+    return () => {
+      window.removeEventListener('arbol-goals-updated', handler);
+      window.removeEventListener('arbol-tasks-updated', handler);
+    };
   }, []);
 
   // Auto-start home tour on first visit
@@ -164,13 +168,13 @@ export function Dashboard({
     const uts = getUserTasks(profile.id);
     let done = 0, total = 0;
     cats.forEach(cat => cat.tasks.forEach(t => {
-      if (isTaskDeleted(profile.id, t.id, today)) return;
+      if (!isTaskActiveForDate(profile.id, t.id, today)) return;
       total++;
       if (getTaskStatus(profile.id, t.id, today) === 'done') done++;
     }));
     uts.forEach(ut => {
       if (!isTaskScheduledForDate(ut, today)) return;
-      if (isTaskDeleted(profile.id, ut.id, today)) return;
+      if (!isTaskActiveForDate(profile.id, ut.id, today)) return;
       total++;
       if (getTaskStatus(profile.id, ut.id, today) === 'done') done++;
     });
@@ -191,7 +195,7 @@ export function Dashboard({
         const seedTasks = cats.filter(c => c.goalId === goal.id).flatMap(c => c.tasks);
         const userTasksForGoal = uts.filter(ut => ut.goalId === goal.id && isTaskScheduledForDate(ut, today));
         return [...seedTasks, ...userTasksForGoal].some(
-          t => !isTaskDeleted(profile.id, t.id, today) && getTaskStatus(profile.id, t.id, today) === null
+          t => isTaskActiveForDate(profile.id, t.id, today) && getTaskStatus(profile.id, t.id, today) === null
         );
       });
       return { bannerState: 'red', checkInGoals: needingGoals.map(g => g.title) };
@@ -216,7 +220,7 @@ export function Dashboard({
     const seedCats = getTaskCategoriesForProfile(profile.id);
     seedCats.forEach(cat => {
       cat.tasks.forEach(task => {
-        if (!isTaskDeleted(profile.id, task.id, today) && getTaskStatus(profile.id, task.id, today) !== 'done') {
+        if (isTaskActiveForDate(profile.id, task.id, today) && getTaskStatus(profile.id, task.id, today) !== 'done') {
           const goalTitle = cat.goalId ? goalMap[cat.goalId] : undefined;
           candidates.push({ id: task.id, label: task.label, timeOfDay: task.timeOfDay, goalTitle });
         }
@@ -225,7 +229,7 @@ export function Dashboard({
 
     // User tasks - only if scheduled for today
     getUserTasks(profile.id).filter(ut => isTaskScheduledForDate(ut, today)).forEach(ut => {
-      if (!isTaskDeleted(profile.id, ut.id, today) && getTaskStatus(profile.id, ut.id, today) !== 'done') {
+      if (isTaskActiveForDate(profile.id, ut.id, today) && getTaskStatus(profile.id, ut.id, today) !== 'done') {
         const goalTitle = ut.goalId ? goalMap[ut.goalId] : undefined;
         candidates.push({ id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, goalTitle });
       }

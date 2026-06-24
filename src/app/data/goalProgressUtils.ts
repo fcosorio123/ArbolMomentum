@@ -1,5 +1,5 @@
 import {
-  getTaskCategoriesForProfile, getTaskStatus, isTaskDeleted, getTodayKey, setTaskStatus,
+  getTaskCategoriesForProfile, getTaskStatus, isTaskActiveForDate, getTodayKey, setTaskStatus,
 } from './profiles';
 import { getUserTasks, isTaskScheduledForDate } from './userTasks';
 import { getPersonalGoals, logGoalProgress, isMonetaryGoal, type PersonalGoal } from './personalGoals';
@@ -17,7 +17,7 @@ export function getGoalTaskBreakdown(profileId: string, goalId: string, dateKey:
   const userTasks = getUserTasks(profileId);
   let done = 0, inprogress = 0, notStarted = 0;
   const count = (taskId: string) => {
-    if (isTaskDeleted(profileId, taskId, dateKey)) return;
+    if (!isTaskActiveForDate(profileId, taskId, dateKey)) return;
     const s = getTaskStatus(profileId, taskId, dateKey);
     if (s === 'done') done++;
     else if (s === 'inprogress') inprogress++;
@@ -62,7 +62,7 @@ function findFirstIncompleteTask(profileId: string, goalId: string, dateKey: str
   for (const cat of categories) {
     if (cat.goalId !== goalId) continue;
     for (const task of cat.tasks) {
-      if (isTaskDeleted(profileId, task.id, dateKey)) continue;
+      if (!isTaskActiveForDate(profileId, task.id, dateKey)) continue;
       if (getTaskStatus(profileId, task.id, dateKey) !== 'done') {
         return { id: task.id, label: task.label };
       }
@@ -72,7 +72,7 @@ function findFirstIncompleteTask(profileId: string, goalId: string, dateKey: str
     ut => ut.goalId === goalId && isTaskScheduledForDate(ut, dateKey),
   );
   for (const ut of userTasks) {
-    if (isTaskDeleted(profileId, ut.id, dateKey)) continue;
+    if (!isTaskActiveForDate(profileId, ut.id, dateKey)) continue;
     if (getTaskStatus(profileId, ut.id, dateKey) !== 'done') {
       return { id: ut.id, label: ut.label };
     }

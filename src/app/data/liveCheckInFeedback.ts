@@ -8,10 +8,10 @@ import {
   getTaskCategoriesForProfile,
   getTaskStatus,
   setTaskStatus,
-  isTaskDeleted,
+  isTaskActiveForDate,
   getTodayKey,
 } from './profiles';
-import { getUserTasks, isTaskScheduledForDate } from './userTasks';
+import { getActiveUserTasksForDate } from './userTasks';
 
 export type MovementState = 'up' | 'flat' | 'down';
 export type WarningType = null | 'blocker' | 'open_loops' | 'decline' | 'urgent_safety';
@@ -96,13 +96,13 @@ const URGENT_ESCALATION =
 
 export function getVisibleTasksForDate(profileId: string, dateKey: string): ScopedTask[] {
   const categories = getTaskCategoriesForProfile(profileId);
-  const userTasks = getUserTasks(profileId);
+  const userTasks = getActiveUserTasksForDate(profileId, dateKey);
   const seen = new Set<string>();
   const out: ScopedTask[] = [];
 
   for (const cat of categories) {
     for (const t of cat.tasks) {
-      if (isTaskDeleted(profileId, t.id, dateKey)) continue;
+      if (!isTaskActiveForDate(profileId, t.id, dateKey)) continue;
       if (seen.has(t.id)) continue;
       seen.add(t.id);
       out.push({ id: t.id, label: t.label, type: t.type });
@@ -110,8 +110,7 @@ export function getVisibleTasksForDate(profileId: string, dateKey: string): Scop
   }
 
   for (const ut of userTasks) {
-    if (!isTaskScheduledForDate(ut, dateKey)) continue;
-    if (isTaskDeleted(profileId, ut.id, dateKey)) continue;
+    if (!isTaskActiveForDate(profileId, ut.id, dateKey)) continue;
     if (seen.has(ut.id)) continue;
     seen.add(ut.id);
     out.push({ id: ut.id, label: ut.label, type: ut.type });

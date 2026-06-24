@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Progress } from 'antd';
 import { PageTour, PageTourButton, TOUR_KEYS } from './AppTour';
 import { CheckCircleFilled, StarFilled } from '@ant-design/icons';
 import {
   getWeekPlanForProfile, getAllTasksForProfile, getTaskCategoriesForProfile,
-  getTaskStatus, setTaskStatus, isTaskDeleted, getTodayKey, getDateKey, type Profile,
+  getTaskStatus, setTaskStatus, isTaskSkippedForDate, isTaskActiveForDate,
+  isTaskPermanentlyRemoved, getTodayKey, getDateKey, type Profile,
 } from '../data/profiles';
 import { getPersonalGoals, type PersonalGoal } from '../data/personalGoals';
-import { getUserTasks, isTaskScheduledForDate, type UserTask } from '../data/userTasks';
+import { getActiveUserTasksForDate, getUserTasks, type UserTask } from '../data/userTasks';
 import { C } from '../data/colors';
 
 interface Props { profile: Profile }
@@ -35,14 +36,14 @@ function getGoalTaskProgress(profileId: string, goalId: string, allUserTasks: Us
   cats.forEach(cat => {
     if (cat.goalId !== goalId) return;
     cat.tasks.forEach(t => {
-      if (isTaskDeleted(profileId, t.id, today)) return;
+      if (!isTaskActiveForDate(profileId, t.id, today)) return;
       total++;
       if (getTaskStatus(profileId, t.id, today) === 'done') done++;
     });
   });
   allUserTasks.forEach(ut => {
     if (ut.goalId !== goalId) return;
-    if (isTaskDeleted(profileId, ut.id, today)) return;
+    if (!isTaskActiveForDate(profileId, ut.id, today)) return;
     total++;
     if (getTaskStatus(profileId, ut.id, today) === 'done') done++;
   });
@@ -56,11 +57,19 @@ export function WeekPlan({ profile }: Props) {
   const [personalGoals, setPersonalGoals] = useState<PersonalGoal[]>([]);
   const [userTasks, setUserTasks] = useState<UserTask[]>([]);
   const [showTour, setShowTour] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
 
-  const weekPlan = getWeekPlanForProfile(profile.id);
-  const allTasks = getAllTasksForProfile(profile.id);
+  const weekPlan = useMemo(
+    () => getWeekPlanForProfile(profile.id),
+    [profile.id, refreshTick],
+  );
+  const allTasks = useMemo(
+    () => getAllTasksForProfile(profile.id),
+    [profile.id, refreshTick],
+  );
 
-  const loadState = () => {
+  const loadState = useCallback(() => {
+    const plan = getWeekPlanForProfile(profile.id);
     const s: typeof statuses = {};
     const d: typeof deletedMap = {};
     const uts = getUserTasks(profile.id);
@@ -70,27 +79,35 @@ export function WeekPlan({ profile }: Props) {
       const dk = dateKey(day);
       s[day] = {};
       d[day] = {};
-      (weekPlan[day] || []).forEach(tid => {
+      (plan[day] || []).forEach(tid => {
+        if (isTaskPermanentlyRemoved(profile.id, tid)) return;
         s[day][tid] = getTaskStatus(profile.id, tid, dk);
-        d[day][tid] = isTaskDeleted(profile.id, tid, dk);
+        d[day][tid] = isTaskSkippedForDate(profile.id, tid, dk);
       });
-      // User tasks - only include if scheduled for that day
-      uts.filter(ut => isTaskScheduledForDate(ut, dk)).forEach(ut => {
+      getActiveUserTasksForDate(profile.id, dk).forEach(ut => {
         s[day][ut.id] = getTaskStatus(profile.id, ut.id, dk);
-        d[day][ut.id] = isTaskDeleted(profile.id, ut.id, dk);
+        d[day][ut.id] = isTaskSkippedForDate(profile.id, ut.id, dk);
       });
     });
     setStatuses(s);
     setDeletedMap(d);
     setPersonalGoals(getPersonalGoals(profile.id));
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.id]);
 
   useEffect(() => {
     loadState();
-    const handler = () => loadState();
+    const handler = () => {
+      loadState();
+      setRefreshTick(n => n + 1);
+    };
     window.addEventListener('arbol-goals-updated', handler);
-    return () => window.removeEventListener('arbol-goals-updated', handler);
-  }, [profile.id]);
+    window.addEventListener('arbol-tasks-updated', handler);
+    return () => {
+      window.removeEventListener('arbol-goals-updated', handler);
+      window.removeEventListener('arbol-tasks-updated', handler);
+    };
+  }, [loadState]);
 
   // Auto-start week tour on first visit
   useEffect(() => {
@@ -111,16 +128,15 @@ export function WeekPlan({ profile }: Props) {
 
   const todayDay = getCurrentDay();
 
-  // Helper: all task ids for a day (seed + user tasks scheduled that day)
+  // All task ids for a day: permanently removed are excluded; day-skipped still listed as "Removed"
   const allDayIds = (day: string) => {
     const dk = dateKey(day);
-    return [
-      ...(weekPlan[day] || []),
-      ...userTasks.filter(ut => isTaskScheduledForDate(ut, dk)).map(ut => ut.id),
-    ];
+    const seedIds = (weekPlan[day] || []).filter(id => !isTaskPermanentlyRemoved(profile.id, id));
+    const userIds = getActiveUserTasksForDate(profile.id, dk).map(ut => ut.id);
+    return [...seedIds, ...userIds];
   };
 
-  // Active (non-deleted) task ids for a day
+  // Active (non-skipped-for-day) task ids
   const activeIds = (day: string) =>
     allDayIds(day).filter(id => !deletedMap[day]?.[id]);
 
@@ -130,7 +146,8 @@ export function WeekPlan({ profile }: Props) {
     .map(id => allTasks.find(t => t.id === id))
     .filter(Boolean) as typeof allTasks;
   const activeDayDk = dateKey(activeDay);
-  const dayUserTasks = userTasks.filter(ut => isTaskScheduledForDate(ut, activeDayDk) && !deletedMap[activeDay]?.[ut.id]);
+  const dayUserTasks = getActiveUserTasksForDate(profile.id, activeDayDk)
+    .filter(ut => !deletedMap[activeDay]?.[ut.id]);
 
   const activeDayIds = activeIds(activeDay);
   const activeDayDone = activeDayIds.filter(id => statuses[activeDay]?.[id] === 'done').length;

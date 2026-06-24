@@ -1,4 +1,5 @@
 import type { TimeOfDay, TaskType } from './profiles';
+import { purgeTaskLocalState } from './profiles';
 import { scheduleSave } from './cloudBackup';
 
 // ── Recurrence ────────────────────────────────────────────────────────
@@ -93,6 +94,11 @@ export function getUserTasks(profileId: string): UserTask[] {
   }
 }
 
+/** User tasks scheduled for a date (excludes skipped occurrences). */
+export function getActiveUserTasksForDate(profileId: string, dateKey: string): UserTask[] {
+  return getUserTasks(profileId).filter(ut => isTaskScheduledForDate(ut, dateKey));
+}
+
 export function saveUserTasks(profileId: string, tasks: UserTask[]) {
   localStorage.setItem(storageKey(profileId), JSON.stringify(tasks));
   scheduleSave(profileId);
@@ -123,6 +129,8 @@ export function updateUserTask(profileId: string, taskId: string, data: Partial<
 export function deleteUserTask(profileId: string, taskId: string) {
   const tasks = getUserTasks(profileId);
   saveUserTasks(profileId, tasks.filter(t => t.id !== taskId));
+  purgeTaskLocalState(profileId, taskId);
+  try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch {}
   try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
 }
 
@@ -135,6 +143,7 @@ export function skipTaskOccurrence(profileId: string, taskId: string, dateKey: s
       : t
   ));
   try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
+  try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch {}
 }
 
 export function orphanUserTasksForGoal(profileId: string, goalId: string) {

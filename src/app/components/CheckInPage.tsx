@@ -4,10 +4,10 @@ import { CloseOutlined, CheckOutlined, RightOutlined, LeftOutlined } from '@ant-
 import { getPersonalGoals, type PersonalGoal } from '../data/personalGoals';
 import {
   getTaskCategoriesForProfile, getTaskStatus, setTaskStatus,
-  isTaskDeleted, getTodayKey, getEarnedBadges,
+  isTaskActiveForDate, getTodayKey, getEarnedBadges,
   type TaskStatus,
 } from '../data/profiles';
-import { getUserTasks, isTaskScheduledForDate } from '../data/userTasks';
+import { getActiveUserTasksForDate } from '../data/userTasks';
 import { C } from '../data/colors';
 import type { Profile } from '../data/profiles';
 
@@ -75,12 +75,23 @@ function ConfettiBlast() {
 export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: () => void }) {
   const today = getTodayKey();
   const [startTime] = useState(Date.now());
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  useEffect(() => {
+    const handler = () => setRefreshTick(n => n + 1);
+    window.addEventListener('arbol-tasks-updated', handler);
+    window.addEventListener('arbol-goals-updated', handler);
+    return () => {
+      window.removeEventListener('arbol-tasks-updated', handler);
+      window.removeEventListener('arbol-goals-updated', handler);
+    };
+  }, []);
 
   // Build a flat ordered list of tasks that need answering
   const { allTasks, goalMeta } = useMemo(() => {
     const goals = getPersonalGoals(profile.id);
     const cats = getTaskCategoriesForProfile(profile.id);
-    const uts = getUserTasks(profile.id);
+    const uts = getActiveUserTasksForDate(profile.id, today);
 
     const goalMeta: Record<string, { title: string; deepWhy?: string; accentColor: string }> = {};
     goals.forEach(g => {
@@ -93,14 +104,13 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
       cats.forEach(cat => {
         if (cat.goalId !== goal.id) return;
         cat.tasks.forEach(t => {
-          if (isTaskDeleted(profile.id, t.id, today)) return;
+          if (!isTaskActiveForDate(profile.id, t.id, today)) return;
           flat.push({ id: t.id, label: t.label, timeOfDay: t.timeOfDay, goalId: goal.id, goalTitle: goal.title, accentColor: ac, preExisting: getTaskStatus(profile.id, t.id, today) });
         });
       });
       uts.forEach(ut => {
         if (ut.goalId !== goal.id) return;
-        if (!isTaskScheduledForDate(ut, today)) return;
-        if (isTaskDeleted(profile.id, ut.id, today)) return;
+        if (!isTaskActiveForDate(profile.id, ut.id, today)) return;
         flat.push({ id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, goalId: goal.id, goalTitle: goal.title, accentColor: ac, preExisting: getTaskStatus(profile.id, ut.id, today) });
       });
     });
@@ -109,7 +119,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
     const needs = flat.filter(t => t.preExisting === null);
     const done = flat.filter(t => t.preExisting !== null);
     return { allTasks: [...needs, ...done], goalMeta };
-  }, [profile.id, today]);
+  }, [profile.id, today, refreshTick]);
 
   const needsCheckIn = allTasks.filter(t => t.preExisting === null);
   const totalTasks = allTasks.length;

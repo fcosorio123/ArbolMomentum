@@ -32,7 +32,7 @@ import { getProfileEmail } from './data/profileContact';
 import { showNotification } from './data/notifications';
 import {
   PROFILES, type Profile, type Badge,
-  getTaskCategoriesForProfile, getTaskStatus, isTaskDeleted, getTodayKey,
+  getTaskCategoriesForProfile, getTaskStatus, isTaskActiveForDate, getTodayKey,
 } from './data/profiles';
 import { C } from './data/colors';
 
@@ -388,7 +388,7 @@ export default function App() {
     const today = getTodayKey();
     const tasks = getTaskCategoriesForProfile(profile.id).flatMap(c => c.tasks);
     return tasks.filter(t =>
-      !isTaskDeleted(profile.id, t.id, today) &&
+      !isTaskActiveForDate(profile.id, t.id, today) &&
       getTaskStatus(profile.id, t.id, today) !== 'done'
     ).length;
   }, []);
