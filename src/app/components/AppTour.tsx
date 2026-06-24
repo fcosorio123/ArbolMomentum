@@ -3,7 +3,6 @@ import { Tour, Modal, Button } from 'antd';
 import type { TourProps } from 'antd';
 import { C } from '../data/colors';
 
-// ── Storage keys per page ─────────────────────────────────────────────
 export const TOUR_KEYS = {
   home:  'arbol-tour-home-done',
   goals: 'arbol-tour-goals-done',
@@ -11,83 +10,90 @@ export const TOUR_KEYS = {
   week:  'arbol-tour-week-done',
 };
 
-// ── Inject brand CSS once ─────────────────────────────────────────────
 let styleInjected = false;
 function injectTourStyles() {
   if (styleInjected) return;
   styleInjected = true;
   const el = document.createElement('style');
   el.textContent = `
-    /* Lower z-index so modals can appear above the tour */
-    .ant-tour { z-index: 999 !important; }
-    .ant-tour-mask { z-index: 998 !important; }
+    .ant-tour { z-index: 999 !important; transition: opacity 0.25s ease !important; }
+    .ant-tour-mask { z-index: 998 !important; backdrop-filter: blur(2px); }
 
-    /* Brand-coded popup */
     .arbol-page-tour .ant-tour-inner {
-      border-radius: 18px !important;
+      border-radius: 16px !important;
       overflow: hidden !important;
-      box-shadow: 0 12px 40px rgba(9,64,103,0.22) !important;
-      border: 1.5px solid rgba(9,64,103,0.14) !important;
-      max-width: 280px;
+      box-shadow: 0 8px 32px rgba(9,64,103,0.18) !important;
+      border: 1px solid rgba(9,64,103,0.12) !important;
+      max-width: min(340px, calc(100vw - 32px)) !important;
+      animation: arbolTourIn 0.25s ease;
     }
-    .arbol-page-tour .ant-tour-inner-content {
-      padding: 0 !important;
+    @keyframes arbolTourIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
     }
+    .arbol-page-tour .ant-tour-inner-content { padding: 0 !important; }
     .arbol-page-tour .ant-tour-content {
-      padding: 14px 16px 16px !important;
+      padding: 16px 20px !important;
+      gap: 12px;
     }
-    .arbol-page-tour .ant-tour-header {
-      padding: 0 0 6px !important;
-    }
+    .arbol-page-tour .ant-tour-header { padding: 0 0 4px !important; }
     .arbol-page-tour .ant-tour-title {
-      font-size: 14px !important;
+      font-size: 15px !important;
       font-weight: 800 !important;
       color: #094067 !important;
+      line-height: 1.35 !important;
     }
     .arbol-page-tour .ant-tour-description {
-      font-size: 12px !important;
+      font-size: 13px !important;
       color: #5f6c7b !important;
       line-height: 1.55 !important;
     }
     .arbol-page-tour .ant-tour-footer {
-      padding: 10px 16px 14px !important;
+      padding: 12px 20px 16px !important;
       border-top: 1px solid rgba(9,64,103,0.08) !important;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 8px !important;
     }
-    .arbol-page-tour .ant-tour-buttons {
-      gap: 6px !important;
-    }
-    .arbol-page-tour .ant-tour-prev-btn {
-      border-color: rgba(9,64,103,0.25) !important;
-      color: #094067 !important;
+    .arbol-page-tour .ant-tour-buttons { gap: 8px !important; margin-left: auto !important; }
+    .arbol-page-tour .ant-tour-prev-btn,
+    .arbol-page-tour .ant-tour-next-btn,
+    .arbol-page-tour .ant-tour-finish-btn {
       border-radius: 10px !important;
       font-size: 12px !important;
-      height: 32px !important;
+      font-weight: 700 !important;
+      height: 34px !important;
       padding: 0 14px !important;
+    }
+    .arbol-page-tour .ant-tour-prev-btn {
+      border-color: rgba(9,64,103,0.2) !important;
+      color: #094067 !important;
     }
     .arbol-page-tour .ant-tour-next-btn,
     .arbol-page-tour .ant-tour-finish-btn {
       background: linear-gradient(135deg, #094067, #1a6da8) !important;
       border: none !important;
-      border-radius: 10px !important;
-      font-size: 12px !important;
-      font-weight: 700 !important;
-      height: 32px !important;
-      padding: 0 16px !important;
     }
-    /* Spotlight ring */
+    .arbol-page-tour .ant-tour-close {
+      color: #90b4ce !important;
+    }
     .arbol-page-tour .ant-tour-target-placeholder {
-      outline: 2.5px solid #094067 !important;
+      outline: 2px solid #3da9fc !important;
       outline-offset: 4px !important;
       border-radius: 12px !important;
+      box-shadow: 0 0 0 4px rgba(61,169,252,0.15) !important;
     }
+    .arbol-tour-skip-btn {
+      background: none; border: none; padding: 0;
+      font-size: 12px; font-weight: 600; color: #90b4ce;
+      cursor: pointer;
+    }
+    .arbol-tour-skip-btn:hover { color: #5f6c7b; }
   `;
   document.head.appendChild(el);
 }
 
-// ── Types ─────────────────────────────────────────────────────────────
 export interface PageTourStep {
   title: string;
   description: string;
@@ -99,30 +105,14 @@ interface PageTourProps {
   open: boolean;
   onClose: () => void;
   steps: PageTourStep[];
-  pageLabel: string;       // e.g. "Home", "Goals"
-  storageKey: string;      // from TOUR_KEYS
+  pageLabel: string;
+  storageKey: string;
   doneEmoji?: string;
   doneMessage?: string;
-  /** If provided, the last step shows a "Try it now" button that calls this + marks tour done */
   onInteract?: () => void;
   interactLabel?: string;
 }
 
-// ── Brand header bar injected at top of each step ─────────────────────
-function StepHeader({ step, total }: { step: number; total: number }) {
-  return (
-    <div style={{
-      height: 4,
-      background: `linear-gradient(90deg, ${C.primary}, #3da9fc)`,
-      margin: '-1px -1px 0',
-      borderRadius: '17px 17px 0 0',
-    }}>
-      {/* invisible, just the gradient bar */}
-    </div>
-  );
-}
-
-// ── Main component ────────────────────────────────────────────────────
 export function PageTour({
   open, onClose, steps, pageLabel, storageKey,
   doneEmoji = '✅', doneMessage,
@@ -130,49 +120,48 @@ export function PageTour({
 }: PageTourProps) {
   const [current, setCurrent] = useState(0);
   const [showDone, setShowDone] = useState(false);
-  const finished = useRef(false);
+  const dismissed = useRef(false);
 
   useEffect(() => { injectTourStyles(); }, []);
 
   useEffect(() => {
     if (open) {
       setCurrent(0);
-      finished.current = false;
+      dismissed.current = false;
     }
   }, [open]);
 
-  const handleFinish = () => {
-    finished.current = true;
+  useEffect(() => {
+    if (!open) return;
+    const timer = setTimeout(() => {
+      steps[current]?.target?.()?.scrollIntoView({
+        behavior: 'smooth', block: 'nearest', inline: 'nearest',
+      });
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [open, current, steps]);
+
+  const persistDismiss = (showCompletion = false) => {
+    if (dismissed.current) return;
+    dismissed.current = true;
     localStorage.setItem(storageKey, 'true');
     onClose();
-    setTimeout(() => setShowDone(true), 120);
+    if (showCompletion) setTimeout(() => setShowDone(true), 120);
   };
 
-  const handleClose = () => {
-    // Only show DONE if user completed (clicked Finish on last step)
-    onClose();
-  };
+  const handleFinish = () => persistDismiss(true);
 
-  // Build antd-compatible steps (inject brand header + interactive button into descriptions)
+  const handleClose = () => persistDismiss(false);
+
   const antdSteps: TourProps['steps'] = steps.map((s, i) => {
     const isLast = i === steps.length - 1;
     const showInteract = isLast && !!onInteract;
 
     return {
-      title: (
-        <div>
-          <div style={{
-            height: 3,
-            background: `linear-gradient(90deg, ${C.primary}, #3da9fc)`,
-            margin: '-14px -16px 10px',
-            borderRadius: '17px 17px 0 0',
-          }} />
-          {s.title}
-        </div>
-      ) as any,
+      title: s.title,
       description: (
         <div>
-          <div style={{ marginBottom: showInteract ? 10 : 0 }}>{s.description}</div>
+          <div style={{ marginBottom: showInteract ? 12 : 0 }}>{s.description}</div>
           {showInteract && (
             <button
               onClick={() => {
@@ -185,7 +174,6 @@ export function PageTour({
                 border: 'none', borderRadius: 10,
                 padding: '8px 14px', cursor: 'pointer',
                 color: '#fff', fontSize: 12, fontWeight: 700,
-                marginTop: 2,
               }}
             >
               {interactLabel}
@@ -198,8 +186,6 @@ export function PageTour({
     };
   });
 
-  const total = steps.length;
-
   return (
     <>
       <Tour
@@ -210,21 +196,24 @@ export function PageTour({
         onFinish={handleFinish}
         steps={antdSteps}
         className="arbol-page-tour"
-        indicatorsRender={(cur, tot) => (
-          <span style={{
-            fontSize: 10, color: C.secondary,
-            background: C.bgAlt,
-            border: `1px solid ${C.border}`,
-            borderRadius: 20,
-            padding: '2px 8px',
-            fontWeight: 600,
-          }}>
-            {cur + 1} / {tot}
-          </span>
+        mask={{ color: 'rgba(9, 64, 103, 0.45)' }}
+        scrollIntoViewOptions={{ behavior: 'smooth', block: 'nearest' }}
+        actionsRender={(originNode, { current: cur, total: tot }) => (
+          <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: 8 }}>
+            <button type="button" className="arbol-tour-skip-btn" onClick={handleClose}>
+              Skip
+            </button>
+            <span style={{
+              fontSize: 11, color: C.secondary, fontWeight: 600,
+              flex: 1, textAlign: 'center',
+            }}>
+              {cur + 1} / {tot}
+            </span>
+            {originNode}
+          </div>
         )}
       />
 
-      {/* ── DONE completion modal */}
       <Modal
         open={showDone}
         onCancel={() => setShowDone(false)}
@@ -232,32 +221,31 @@ export function PageTour({
         centered
         width={320}
         styles={{
-          content: { borderRadius: 24, padding: 0, overflow: 'hidden' },
+          content: { borderRadius: 16, padding: 0, overflow: 'hidden' },
           mask: { backdropFilter: 'blur(6px)', zIndex: 1100 },
           wrapper: { zIndex: 1100 },
         }}
       >
-        <div style={{ height: 5, background: `linear-gradient(90deg, ${C.primary}, #3da9fc)` }} />
-        <div style={{ padding: '28px 24px 26px', textAlign: 'center' }}>
-          <div style={{ fontSize: 46, marginBottom: 10 }}>{doneEmoji}</div>
-          <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 800, color: C.headline }}>
-            {pageLabel} - unlocked!
+        <div style={{ height: 4, background: `linear-gradient(90deg, ${C.primary}, #3da9fc)` }} />
+        <div style={{ padding: '24px 20px 20px', textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>{doneEmoji}</div>
+          <h3 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 800, color: C.headline }}>
+            {pageLabel} — ready!
           </h3>
-          <p style={{ margin: '0 0 22px', color: C.body, fontSize: 13, lineHeight: 1.6 }}>
-            {doneMessage ?? `You know how this page works. Tap ? anytime to revisit the tour.`}
+          <p style={{ margin: '0 0 20px', color: C.body, fontSize: 13, lineHeight: 1.55 }}>
+            {doneMessage ?? `Tap ? anytime to revisit this tour.`}
           </p>
           <Button
             type="primary"
             block
-            size="large"
             onClick={() => setShowDone(false)}
             style={{
-              borderRadius: 12, height: 46, fontWeight: 700,
+              borderRadius: 12, height: 44, fontWeight: 700,
               background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
               border: 'none', fontSize: 14,
             }}
           >
-            Got it 👍
+            Got It
           </Button>
         </div>
       </Modal>
@@ -265,7 +253,6 @@ export function PageTour({
   );
 }
 
-// ── Reusable branded tour trigger button ──────────────────────────────
 export function PageTourButton({ onClick }: { onClick: () => void }) {
   return (
     <button
@@ -280,12 +267,8 @@ export function PageTourButton({ onClick }: { onClick: () => void }) {
         fontSize: 14, fontWeight: 800, flexShrink: 0,
         transition: 'all 0.15s',
       }}
-      onMouseEnter={e => {
-        (e.currentTarget as HTMLButtonElement).style.background = `${C.primary}22`;
-      }}
-      onMouseLeave={e => {
-        (e.currentTarget as HTMLButtonElement).style.background = `${C.primary}12`;
-      }}
+      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = `${C.primary}22`; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = `${C.primary}12`; }}
     >
       ?
     </button>

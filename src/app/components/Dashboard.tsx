@@ -473,7 +473,6 @@ export function Dashboard({
       <ActiveGoalsList
         profileId={profile.id}
         onNavigateGoals={onNavigateGoals}
-        onProgressUpdated={() => forceRefresh(n => n + 1)}
       />
 
       {/* ── [3] Do Now - single most urgent task */}
@@ -652,33 +651,33 @@ export function Dashboard({
         doneMessage="You've got the Home screen down. Check your streak every day to build momentum!"
         steps={[
           {
+            title: '🎯 Your Active Goals',
+            description: 'Swipe through your active goals to see what\'s currently important. Progress here helps Arbol guide your next actions.',
+            target: () => document.querySelector('[data-tour-id="home-active-goals"]') as HTMLElement | null,
+            placement: 'bottom',
+          },
+          {
             title: '🔴 Goal Check-In',
-            description: 'Tap here daily to update your goal progress. It tracks done, in-progress, or skipped - takes under a minute.',
+            description: 'Quickly update your goal progress. Track Done, In Progress, or Skipped — takes under a minute.',
             target: () => document.querySelector('[data-tour-id="home-banner"]') as HTMLElement | null,
             placement: 'bottom',
           },
           {
             title: '🔥 Your Streak',
-            description: 'Consecutive days you\'ve completed tasks. The dots show this week at a glance - orange means you showed up!',
+            description: 'Consecutive days you\'ve completed tasks. Orange dots mean you showed up this week.',
             target: () => document.querySelector('[data-tour-id="home-streak"]') as HTMLElement | null,
             placement: 'bottom',
           },
           {
             title: '⚡ Do This Now',
-            description: 'Your single most urgent task right now, based on time of day and goal priority. Start here to build momentum.',
+            description: 'Your most urgent task right now, based on time of day and goal priority.',
             target: () => document.querySelector('[data-tour-id="home-do-now"]') as HTMLElement | null,
             placement: 'bottom',
           },
           {
             title: '📅 Streak History',
-            description: 'A heatmap of every day you\'ve been active. Darker green = more tasks done. Aim to fill the grid!',
+            description: 'A heatmap of every active day. Darker green = more tasks done.',
             target: () => document.querySelector('[data-tour-id="home-heatmap"]') as HTMLElement | null,
-            placement: 'top',
-          },
-          {
-            title: '🏅 Badges Earned',
-            description: 'Milestones you\'ve unlocked by staying consistent. Keep your streak alive to collect them all.',
-            target: () => document.querySelector('[data-tour-id="home-badges"]') as HTMLElement | null,
             placement: 'top',
           },
         ]}

@@ -101,7 +101,7 @@ export function LiveCheckInFeedbackCard({ profileId }: Props) {
         </div>
       )}
 
-      <div style={cardStyle} id="live-check-in-card">
+      <div style={cardStyle} id="live-check-in-card" data-tour-id="tasks-live-checkin">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <span style={{ fontWeight: 700, fontSize: 14, color: C.headline }}>Live check-in</span>
           {latest && (

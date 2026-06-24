@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { message } from 'antd';
-import confetti from 'canvas-confetti';
 import { getPersonalGoals, type PersonalGoal } from '../data/personalGoals';
 import {
-  getGoalAccentColor, getGoalEmoji, getGoalProgressPercent, quickCheckInGoal,
+  getGoalAccentColor, getGoalEmoji, getGoalProgressPercent,
 } from '../data/goalProgressUtils';
-import { SwipeableGoalCard } from './SwipeableGoalCard';
+import { GoalProgressCard } from './GoalProgressCard';
 import { C } from '../data/colors';
 
 interface Props {
@@ -14,21 +12,8 @@ interface Props {
   onProgressUpdated?: () => void;
 }
 
-function fireSwipeConfetti(accent: string) {
-  confetti({
-    particleCount: 55,
-    spread: 65,
-    origin: { y: 0.72, x: 0.5 },
-    colors: [accent, '#3da9fc', '#2cb67d', '#ffffff'],
-    ticks: 120,
-    gravity: 1.1,
-    scalar: 0.9,
-  });
-}
-
-export function ActiveGoalsList({ profileId, onNavigateGoals, onProgressUpdated }: Props) {
+export function ActiveGoalsList({ profileId, onNavigateGoals }: Props) {
   const [goals, setGoals] = useState<PersonalGoal[]>([]);
-  const [animatingId, setAnimatingId] = useState<string | null>(null);
 
   const loadGoals = useCallback(() => {
     setGoals(getPersonalGoals(profileId));
@@ -38,7 +23,11 @@ export function ActiveGoalsList({ profileId, onNavigateGoals, onProgressUpdated 
     loadGoals();
     const handler = () => loadGoals();
     window.addEventListener('arbol-goals-updated', handler);
-    return () => window.removeEventListener('arbol-goals-updated', handler);
+    window.addEventListener('arbol-tasks-updated', handler);
+    return () => {
+      window.removeEventListener('arbol-goals-updated', handler);
+      window.removeEventListener('arbol-tasks-updated', handler);
+    };
   }, [loadGoals]);
 
   const goalCards = useMemo(() => goals.map(goal => ({
@@ -48,26 +37,26 @@ export function ActiveGoalsList({ profileId, onNavigateGoals, onProgressUpdated 
     emoji: getGoalEmoji(goal),
   })), [goals, profileId]);
 
-  const handleSwipe = (goalId: string, accent: string) => {
-    if (animatingId) return;
-    setAnimatingId(goalId);
-    const result = quickCheckInGoal(profileId, goalId);
-    if (result.ok) {
-      fireSwipeConfetti(accent);
-      message.success('Progress updated!');
-      loadGoals();
-      onProgressUpdated?.();
-    } else {
-      message.info('Already checked in for this goal today');
-    }
-    setTimeout(() => setAnimatingId(null), 320);
-  };
+  const headerLink = onNavigateGoals ? (
+    <button
+      type="button"
+      onClick={onNavigateGoals}
+      style={{
+        background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+        fontSize: 12, fontWeight: 700, color: C.primary,
+        textDecoration: 'underline', textUnderlineOffset: 3,
+      }}
+    >
+      View All
+    </button>
+  ) : null;
 
   if (goals.length === 0) {
     return (
       <div data-tour-id="home-active-goals" style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
           <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: C.headline }}>What are we working on?</h2>
+          {headerLink}
         </div>
         <div style={{
           background: C.bgCard, border: `1.5px dashed ${C.border}`, borderRadius: 16,
@@ -96,9 +85,7 @@ export function ActiveGoalsList({ profileId, onNavigateGoals, onProgressUpdated 
     <div data-tour-id="home-active-goals" style={{ marginBottom: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10, paddingRight: 2 }}>
         <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: C.headline }}>What are we working on?</h2>
-        <span style={{ fontSize: 12, color: C.secondary, fontWeight: 600 }}>
-          {goals.length} goal{goals.length !== 1 ? 's' : ''}
-        </span>
+        {headerLink}
       </div>
 
       <div
@@ -107,25 +94,25 @@ export function ActiveGoalsList({ profileId, onNavigateGoals, onProgressUpdated 
           display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4, paddingRight: 4,
           scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch',
           scrollbarWidth: 'none', msOverflowStyle: 'none',
+          touchAction: 'pan-x',
+          overscrollBehaviorX: 'contain',
         }}
       >
         <style>{`[data-active-goals-scroll]::-webkit-scrollbar { display: none; }`}</style>
         {goalCards.map(({ goal, pct, accent, emoji }, idx) => (
-            <SwipeableGoalCard
-              key={goal.id}
-              title={goal.title}
-              pct={pct}
-              accent={accent}
-              emoji={emoji}
-              isHighlighted={idx === 0}
-              onTap={() => onNavigateGoals?.()}
-              onSwipeComplete={() => handleSwipe(goal.id, accent)}
-            />
-          ))}
+          <GoalProgressCard
+            key={goal.id}
+            title={goal.title}
+            pct={pct}
+            accent={accent}
+            emoji={emoji}
+            isHighlighted={idx === 0}
+          />
+        ))}
       </div>
 
       <div style={{ fontSize: 11, color: C.secondary, marginTop: 6, paddingLeft: 2 }}>
-        Swipe right on a card to log today&apos;s progress · Tap to open goals
+        Swipe to browse your active goals · View All for details
       </div>
     </div>
   );

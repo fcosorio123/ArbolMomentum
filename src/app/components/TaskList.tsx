@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { App, Button, Modal, Progress } from 'antd';
+import { App, Button, Progress } from 'antd';
 import { DeleteOutlined, CheckCircleFilled, PlayCircleOutlined, ArrowRightOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import {
   type Profile, type Task, type TaskStatus,
@@ -18,6 +18,7 @@ import {
   recurrenceLabel, type UserTask, type Recurrence,
 } from '../data/userTasks';
 import { ManageTaskModal } from './ManageTaskModal';
+import { DeleteTaskModal, type DeleteTaskChoice } from './DeleteTaskModal';
 import { C } from '../data/colors';
 import { trackActivity } from '../data/feedback';
 import { PageTour, PageTourButton, TOUR_KEYS } from './AppTour';
@@ -457,19 +458,17 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   const [timeFilter, setTimeFilter] = useState<'all' | 'morning' | 'evening'>('all');
   const [statuses, setStatuses] = useState<StatusMap>({});
   const [deleted, setDeleted] = useState<DeletedMap>({});
-  const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string; isUserCreated: boolean } | null>(null);
+  const [deleteChoice, setDeleteChoice] = useState<DeleteTaskChoice>('today');
   const [goals, setGoals] = useState<PersonalGoal[]>([]);
   const [userTasks, setUserTasks] = useState<UserTask[]>([]);
   // Manage tasks
   const [manageTaskOpen, setManageTaskOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<UserTask | null>(null);
   const [defaultTaskGoalId, setDefaultTaskGoalId] = useState<string | undefined>(undefined);
-  const [deleteUserTaskTarget, setDeleteUserTaskTarget] = useState<UserTask | null>(null);
-  const [deleteMode, setDeleteMode] = useState<'occurrence' | 'entire'>('occurrence');
   const [showTour, setShowTour] = useState(false);
   const [congratTask, setCongratTask] = useState<{ label: string; rows: Array<{ icon: string; label: string; value: string }> } | null>(null);
   const [editingSeedTaskId, setEditingSeedTaskId] = useState<string | null>(null);
-  const [seedDeleteMode, setSeedDeleteMode] = useState<'today' | 'permanent'>('permanent');
   const [liveCheckInEnabled, setLiveCheckInEnabled] = useState(() => isLiveCheckInEnabled());
   const [momentumEntry, setMomentumEntry] = useState<ReportEntry | null>(null);
 
@@ -594,21 +593,42 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     }
   };
 
-  const doDelete = () => {
-    if (!pendingDelete) return;
-    if (seedDeleteMode === 'permanent') {
-      permanentlyHideSeedTask(profile.id, pendingDelete.id);
-      message.info('Task permanently removed');
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    const { id, label, isUserCreated } = deleteTarget;
+    const userTask = isUserCreated ? userTasks.find(u => u.id === id) : undefined;
+
+    if (deleteChoice === 'today') {
+      if (isUserCreated && userTask && isRecurringUT(userTask)) {
+        skipTaskOccurrence(profile.id, id, today);
+        message.info('Task skipped for today');
+      } else {
+        markTaskDeleted(profile.id, id, today);
+        message.info('Task skipped for today');
+      }
+    } else if (isUserCreated) {
+      deleteUserTask(profile.id, id);
+      message.info(`"${label}" permanently removed`);
     } else {
-      markTaskDeleted(profile.id, pendingDelete.id, today);
-      message.info('Task skipped for today');
+      permanentlyHideSeedTask(profile.id, id);
+      message.info('Task permanently removed');
     }
-    const newDeleted = { ...deleted, [pendingDelete.id]: true };
+
+    const newDeleted = { ...deleted, [id]: deleteChoice === 'today' };
     setDeleted(newDeleted);
-    setPendingDelete(null);
+    setDeleteTarget(null);
     loadState();
     const newVisible = allTasksCombined.filter(t => !newDeleted[t.id]);
     onTasksChange?.(newVisible.filter(t => statuses[t.id] !== 'done').length);
+  };
+
+  const openDeleteTask = (task: UserTask_) => {
+    setDeleteChoice('today');
+    setDeleteTarget({
+      id: task.id,
+      label: task.label,
+      isUserCreated: !!task.isUserCreated,
+    });
   };
 
   // Open edit modal for ANY task (seed or user)
@@ -680,22 +700,6 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
         ],
       });
     }
-  };
-
-  const handleDeleteUserTask = () => {
-    if (!deleteUserTaskTarget) return;
-    if (isRecurringUT(deleteUserTaskTarget) && deleteMode === 'occurrence') {
-      skipTaskOccurrence(profile.id, deleteUserTaskTarget.id, today);
-    } else {
-      deleteUserTask(profile.id, deleteUserTaskTarget.id);
-    }
-    setDeleteUserTaskTarget(null);
-    loadState();
-  };
-
-  const openDeleteUserTask = (task: UserTask) => {
-    setDeleteMode(isRecurringUT(task) ? 'occurrence' : 'entire');
-    setDeleteUserTaskTarget(task);
   };
 
   const handleAddSuggestedTask = (label: string, goalId: string) => {
@@ -843,7 +847,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                 tasks={goalTaskMap[goal.id] ?? []}
                 statuses={statuses} deleted={deleted}
                 onCycle={cycleStatus}
-                onDelete={t => t.isUserCreated ? openDeleteUserTask(t as UserTask) : (setSeedDeleteMode('permanent'), setPendingDelete(t))}
+                onDelete={t => openDeleteTask(t)}
                 timeFilter={timeFilter}
                 isFirst={idx === 0}
                 onEditTask={t => handleEditAnyTask(t, goal.id)}
@@ -869,7 +873,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                     key={task.id} task={task} catColor={C.secondary}
                     status={statuses[task.id] ?? null}
                     onCycle={() => cycleStatus(task)}
-                    onDelete={() => task.isUserCreated ? openDeleteUserTask(task as UserTask) : (setSeedDeleteMode('permanent'), setPendingDelete(task))}
+                    onDelete={() => openDeleteTask(task)}
                     onEdit={() => handleEditAnyTask(task, undefined)}
                   />
                 ))}
@@ -908,133 +912,14 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
         onCancel={() => { setManageTaskOpen(false); setEditingTask(null); setDefaultTaskGoalId(undefined); setEditingSeedTaskId(null); }}
       />
 
-      {/* Delete user task confirmation */}
-      <Modal
-        open={!!deleteUserTaskTarget}
-        onCancel={() => setDeleteUserTaskTarget(null)}
-        footer={null} closable={false} centered
-        width="min(360px, calc(100vw - 24px))"
-        styles={{
-          content: { borderRadius: 20, padding: 0, overflow: 'hidden' },
-          mask: { backdropFilter: 'blur(4px)' },
-        }}
-      >
-        <div style={{ padding: '28px 24px 24px' }}>
-          <div style={{ fontSize: 36, textAlign: 'center', marginBottom: 10 }}>🗑️</div>
-          <h3 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: C.headline, textAlign: 'center' }}>Delete task?</h3>
-          <p style={{ color: C.body, fontSize: 13, margin: '0 0 16px', lineHeight: 1.5, textAlign: 'center' }}>
-            <strong style={{ color: C.headline }}>"{deleteUserTaskTarget?.label}"</strong>
-          </p>
-
-          {/* Scope selector - only for recurring tasks */}
-          {deleteUserTaskTarget && isRecurringUT(deleteUserTaskTarget) && (
-            <div style={{ marginBottom: 16 }}>
-              {([
-                { value: 'occurrence' as const, label: 'This occurrence only', sub: 'Skips today, task continues on future dates' },
-                { value: 'entire' as const, label: 'Entire recurring task', sub: 'Removes this task permanently' },
-              ]).map(opt => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setDeleteMode(opt.value)}
-                  style={{
-                    display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%', textAlign: 'left',
-                    background: deleteMode === opt.value ? `${C.tertiary}10` : C.bgCard,
-                    border: `1.5px solid ${deleteMode === opt.value ? C.tertiary + '60' : C.border}`,
-                    borderRadius: 10, padding: '9px 12px', cursor: 'pointer', marginBottom: 6,
-                  }}
-                >
-                  <div style={{
-                    width: 16, height: 16, borderRadius: '50%', flexShrink: 0, marginTop: 1,
-                    border: `2px solid ${deleteMode === opt.value ? C.tertiary : C.secondary}`,
-                    background: deleteMode === opt.value ? C.tertiary : 'transparent',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    {deleteMode === opt.value && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: deleteMode === opt.value ? C.tertiary : C.headline }}>{opt.label}</div>
-                    <div style={{ fontSize: 11, color: C.secondary, marginTop: 1 }}>{opt.sub}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Button block onClick={() => setDeleteUserTaskTarget(null)}
-              style={{ borderRadius: 12, height: 44, border: `1px solid ${C.border}`, color: C.body, flex: 1 }}>
-              Keep It
-            </Button>
-            <Button block type="primary" onClick={handleDeleteUserTask}
-              style={{ borderRadius: 12, height: 44, background: C.tertiary, border: 'none', flex: 1 }}>
-              {deleteUserTaskTarget && isRecurringUT(deleteUserTaskTarget) && deleteMode === 'occurrence' ? 'Skip Today' : 'Delete'}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Delete seed task confirmation */}
-      <Modal
-        open={!!pendingDelete} onCancel={() => setPendingDelete(null)}
-        footer={null} closable={false} centered
-        width="min(360px, calc(100vw - 24px))"
-        styles={{
-          content: { borderRadius: 20, padding: 0, overflow: 'hidden' },
-          mask: { backdropFilter: 'blur(4px)' },
-        }}
-      >
-        <div style={{ padding: '28px 24px 24px' }}>
-          <div style={{ fontSize: 36, textAlign: 'center', marginBottom: 10 }}>🗑️</div>
-          <h3 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: C.headline, textAlign: 'center' }}>Remove task?</h3>
-          <p style={{ color: C.body, fontSize: 13, margin: '0 0 16px', lineHeight: 1.5, textAlign: 'center' }}>
-            <strong style={{ color: C.headline }}>"{pendingDelete?.label}"</strong>
-          </p>
-
-          <div style={{ marginBottom: 16 }}>
-            {([
-              { value: 'today' as const, label: 'Skip just today', sub: 'Task will return tomorrow as usual' },
-              { value: 'permanent' as const, label: 'Remove forever', sub: 'Permanently hidden from your task list' },
-            ]).map(opt => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setSeedDeleteMode(opt.value)}
-                style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%', textAlign: 'left',
-                  background: seedDeleteMode === opt.value ? `${C.tertiary}10` : C.bgCard,
-                  border: `1.5px solid ${seedDeleteMode === opt.value ? C.tertiary + '60' : C.border}`,
-                  borderRadius: 10, padding: '9px 12px', cursor: 'pointer', marginBottom: 6,
-                }}
-              >
-                <div style={{
-                  width: 16, height: 16, borderRadius: '50%', flexShrink: 0, marginTop: 1,
-                  border: `2px solid ${seedDeleteMode === opt.value ? C.tertiary : C.secondary}`,
-                  background: seedDeleteMode === opt.value ? C.tertiary : 'transparent',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  {seedDeleteMode === opt.value && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: seedDeleteMode === opt.value ? C.tertiary : C.headline }}>{opt.label}</div>
-                  <div style={{ fontSize: 11, color: C.secondary, marginTop: 1 }}>{opt.sub}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Button block onClick={() => setPendingDelete(null)}
-              style={{ borderRadius: 12, height: 44, border: `1px solid ${C.border}`, color: C.body, flex: 1 }}>
-              Keep It
-            </Button>
-            <Button block type="primary" onClick={doDelete}
-              style={{ borderRadius: 12, height: 44, background: C.tertiary, border: 'none', flex: 1 }}>
-              {seedDeleteMode === 'today' ? 'Skip Today' : 'Remove Forever'}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      <DeleteTaskModal
+        open={!!deleteTarget}
+        taskLabel={deleteTarget?.label ?? ''}
+        choice={deleteChoice}
+        onChoiceChange={setDeleteChoice}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
 
       {/* ── Task created congrat modal */}
       {congratTask && (
@@ -1067,26 +952,26 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
         interactLabel="Add a task now →"
         steps={[
           {
+            title: '💬 Your Progress Coach',
+            description: 'This updates as you complete tasks and goals. Use it to understand your momentum and what to focus on next.',
+            target: () => document.querySelector('[data-tour-id="tasks-live-checkin"]') as HTMLElement | null,
+            placement: 'bottom',
+          },
+          {
             title: '📊 Overall Progress',
-            description: 'See how many tasks you\'ve completed today and your overall percentage. Done + in-progress + not started at a glance.',
+            description: 'See how many tasks you\'ve completed today at a glance.',
             target: () => document.querySelector('[data-tour-id="tasks-list"]') as HTMLElement | null,
             placement: 'bottom',
           },
           {
             title: '🏆 Goal Groups',
-            description: 'Tasks are grouped by goal, each with a circular progress ring. Tap the group header to expand or collapse the tasks inside.',
-            target: () => document.querySelector('[data-tour-id="tasks-goal-group"]') as HTMLElement | null,
-            placement: 'bottom',
-          },
-          {
-            title: '☀️ Task Items',
-            description: 'Tap any task to cycle through: Not started → In Progress → Done. Each task shows morning 🌅 or evening 🌙 timing.',
+            description: 'Tasks are grouped by goal. Tap a group header to expand or collapse.',
             target: () => document.querySelector('[data-tour-id="tasks-goal-group"]') as HTMLElement | null,
             placement: 'bottom',
           },
           {
             title: '➕ Add a Task',
-            description: 'Create daily, weekly, or one-time tasks and link them to a goal. Tap below to try adding your first task!',
+            description: 'Create daily, weekly, or one-time tasks and link them to a goal.',
             target: () => document.querySelector('[data-tour-id="tasks-add-btn"]') as HTMLElement | null,
             placement: 'left',
           },
