@@ -24,9 +24,11 @@ import { trackActivity } from '../data/feedback';
 import { PageTour, PageTourButton, TOUR_KEYS } from './AppTour';
 import { CongratModal } from './CongratModal';
 import { MomentumUpdateModal } from './MomentumUpdateModal';
+import { TaskUpdateModal, type TaskUpdateContext } from './TaskUpdateModal';
+import { TASK_STATUS_DISPLAY } from './TaskStatusSelector';
 import { LiveCheckInFeedbackCard } from './LiveCheckInFeedbackCard';
 import {
-  submitReportUpdate, type ReportEntry,
+  submitReportUpdate, saveTaskNote, dispatchFeedbackUpdated, type ReportEntry,
 } from '../data/liveCheckInFeedback';
 import { isLiveCheckInEnabled, fetchLiveCheckInSettings } from '../data/liveCheckInSettings';
 
@@ -45,82 +47,79 @@ function isRecurringUT(task: UserTask): boolean {
   return !!task.recurrence && task.recurrence.type !== 'daily' && task.recurrence.type !== 'one-time';
 }
 
-function nextStatus(s: TaskStatus | null): TaskStatus | null {
-  if (!s) return 'inprogress';
-  if (s === 'inprogress') return 'done';
-  return null;
-}
-
-const STATUS_META = {
   inprogress: { label: 'In Progress', dot: '◑', color: '#f5a623', bg: '#fff8ee', border: '#f5a62340' },
-  done:       { label: 'Done',        dot: '●', color: C.primary,  bg: `${C.primary}12`, border: `${C.primary}40` },
+  done:       { label: 'Done',        dot: '●', color: '#2cb67d', bg: '#ecfdf5', border: '#2cb67d40' },
 };
 
 
+function taskDurationLabel(task: UserTask_): string {
+  return task.timeOfDay === 'morning' ? '☀️ Morning' : '🌙 Evening';
+}
+
 // ── Task item
 function TaskItem({
-  task, catColor, status, onCycle, onDelete, onEdit,
+  task, catColor, status, onOpenUpdate, onDelete, onEdit,
 }: {
   task: UserTask_; catColor: string; status: TaskStatus | null;
-  onCycle: () => void; onDelete: () => void;
+  onOpenUpdate: () => void; onDelete: () => void;
   onEdit?: () => void;
 }) {
-  const meta = status ? STATUS_META[status] : null;
+  const display = status ? TASK_STATUS_DISPLAY[status] : TASK_STATUS_DISPLAY.null;
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
-      background: meta ? meta.bg : C.bgCard,
-      borderRadius: 14, border: `1.5px solid ${meta ? meta.border : C.border}`,
-      marginBottom: 8, transition: 'all 0.2s',
-      boxShadow: status === 'done' ? 'none' : C.shadow,
-    }}>
-      <div style={{ width: 4, height: 32, borderRadius: 2, background: catColor, flexShrink: 0 }} />
-
-      <button onClick={onCycle} style={{
-        width: 32, height: 32, borderRadius: 10, flexShrink: 0, cursor: 'pointer',
-        background: meta ? meta.color : C.bgAlt,
-        border: `1.5px solid ${meta ? meta.border : C.border}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s',
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpenUpdate}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenUpdate(); } }}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px',
+        background: display.bg,
+        borderRadius: 14, border: `1.5px solid ${status ? display.color + '35' : C.border}`,
+        marginBottom: 8, transition: 'all 0.2s', cursor: 'pointer',
+        boxShadow: status === 'done' ? 'none' : C.shadow,
+      }}
+    >
+      <div style={{
+        width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+        background: status === 'done' ? display.color : status === 'inprogress' ? display.color : '#fff',
+        border: status ? 'none' : `2px solid ${C.borderStrong}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {status === 'done'
-          ? <CheckCircleFilled style={{ color: '#fff', fontSize: 16 }} />
+          ? <CheckCircleFilled style={{ color: '#fff', fontSize: 18 }} />
           : status === 'inprogress'
           ? <PlayCircleOutlined style={{ color: '#fff', fontSize: 16 }} />
-          : <span style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${C.borderStrong}`, display: 'block' }} />
+          : null
         }
-      </button>
+      </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: 14, color: status === 'done' ? C.secondary : C.headline,
+          fontSize: 14, fontWeight: 600,
+          color: status === 'done' ? C.secondary : C.headline,
           textDecoration: status === 'done' ? 'line-through' : 'none',
           lineHeight: 1.3,
         }}>
           {task.label}
         </div>
-        <div style={{ display: 'flex', gap: 5, alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 10 }}>{task.timeOfDay === 'morning' ? '☀️' : '🌙'}</span>
-          {task.isUserCreated && task.recurrence && task.recurrence.type !== 'daily' && (
-            <span style={{ fontSize: 10, color: C.secondary, opacity: 0.75 }}>
-              {recurrenceLabel(task.recurrence)}
-            </span>
-          )}
-          {status && (
-            <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 5, background: meta!.bg, color: meta!.color }}>
-              {meta!.label}
-            </span>
-          )}
+        <div style={{ fontSize: 11, color: C.secondary, marginTop: 3 }}>
+          {taskDurationLabel(task)}
+        </div>
+        <div style={{
+          fontSize: 11, fontWeight: 700, marginTop: 4,
+          color: display.color,
+        }}>
+          {display.label}
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 2, flexShrink: 0, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 2, flexShrink: 0, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
         {onEdit && (
-          <button onClick={onEdit} style={{
+          <button onClick={onEdit} type="button" style={{
             background: 'none', border: 'none', cursor: 'pointer', color: C.secondary,
-            fontSize: 13, padding: 10, borderRadius: 6, minWidth: 44, minHeight: 44,
+            fontSize: 13, padding: 10, borderRadius: 8, minWidth: 40, minHeight: 40,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'color 0.15s, background 0.15s',
           }}
             onMouseEnter={e => { e.currentTarget.style.color = C.primary; e.currentTarget.style.background = `${C.primary}12`; }}
             onMouseLeave={e => { e.currentTarget.style.color = C.secondary; e.currentTarget.style.background = 'none'; }}
@@ -128,11 +127,10 @@ function TaskItem({
             <EditOutlined />
           </button>
         )}
-        <button onClick={onDelete} style={{
+        <button onClick={onDelete} type="button" style={{
           background: 'none', border: 'none', cursor: 'pointer', color: C.secondary,
-          fontSize: 15, padding: 10, borderRadius: 6, minWidth: 44, minHeight: 44,
+          fontSize: 15, padding: 10, borderRadius: 8, minWidth: 40, minHeight: 40,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: 'color 0.15s, background 0.15s',
         }}
           onMouseEnter={e => { e.currentTarget.style.color = C.tertiary; e.currentTarget.style.background = `${C.tertiary}12`; }}
           onMouseLeave={e => { e.currentTarget.style.color = C.secondary; e.currentTarget.style.background = 'none'; }}
@@ -248,12 +246,13 @@ function goalAccentColor(goalId: string) {
 
 // ── Goal group: goal header + flat task list
 function GoalGroup({
-  goal, tasks, statuses, deleted, onCycle, onDelete, timeFilter,
+  goal, tasks, statuses, deleted, onOpenUpdate, onDelete, timeFilter,
   onEditTask, onAddSuggestedTask, isFirst,
 }: {
   goal: PersonalGoal; tasks: UserTask_[];
   statuses: StatusMap; deleted: DeletedMap;
-  onCycle: (t: Task) => void; onDelete: (t: UserTask_) => void;
+  onOpenUpdate: (t: Task, goal: PersonalGoal, doneCount: number, totalCount: number) => void;
+  onDelete: (t: UserTask_) => void;
   timeFilter: 'all' | 'morning' | 'evening';
   onEditTask: (t: UserTask_) => void;
   onAddSuggestedTask: (label: string, goalId: string) => void;
@@ -349,7 +348,8 @@ function GoalGroup({
             <TaskItem
               key={task.id} task={task} catColor={accent}
               status={statuses[task.id] ?? null}
-              onCycle={() => onCycle(task)} onDelete={() => onDelete(task)}
+              onOpenUpdate={() => onOpenUpdate(task, goal, doneTasks, totalTasks)}
+              onDelete={() => onDelete(task)}
               onEdit={() => onEditTask(task)}
             />
           ))}
@@ -471,6 +471,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   const [editingSeedTaskId, setEditingSeedTaskId] = useState<string | null>(null);
   const [liveCheckInEnabled, setLiveCheckInEnabled] = useState(() => isLiveCheckInEnabled());
   const [momentumEntry, setMomentumEntry] = useState<ReportEntry | null>(null);
+  const [taskUpdateContext, setTaskUpdateContext] = useState<TaskUpdateContext | null>(null);
 
   const today = getTodayKey();
   const categories = getTaskCategoriesForProfile(profile.id);
@@ -514,22 +515,6 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     fetchLiveCheckInSettings().then(s => setLiveCheckInEnabled(s.enabled));
   }, []);
 
-  const runLiveFeedback = useCallback((params: {
-    taskId: string; taskTitle: string; status?: TaskStatus | null; note?: string;
-  }, opts?: { showModal?: boolean }) => {
-    if (!liveCheckInEnabled) return null;
-    const entry = submitReportUpdate({
-      profileId: profile.id,
-      taskId: params.taskId,
-      taskTitle: params.taskTitle,
-      status: params.status,
-      note: params.note,
-    });
-    loadState();
-    if (opts?.showModal !== false) setMomentumEntry(entry);
-    return entry;
-  }, [profile.id, liveCheckInEnabled, loadState]);
-
   const handleMomentumContinue = useCallback(() => {
     setMomentumEntry(null);
   }, []);
@@ -548,50 +533,6 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
       return () => clearTimeout(t);
     }
   }, []);
-
-  const cycleStatus = (task: Task) => {
-    trackActivity(profile.id);
-    const next = nextStatus(statuses[task.id]);
-    setTaskStatus(profile.id, task.id, today, next);
-    const newStatuses = { ...statuses, [task.id]: next };
-    setStatuses(newStatuses);
-
-    const newVisible = allTasksCombined.filter(t => !deleted[t.id]);
-    const newPending = newVisible.filter(t => (t.id === task.id ? next : newStatuses[t.id]) !== 'done').length;
-    onTasksChange?.(newPending);
-
-    if (next === 'done') {
-      if (task.valueType && task.estimatedValue) {
-        import('../data/valueTracking').then(({ trackValue, formatValueMessage }) => {
-          trackValue(profile.id, task.valueType!, task.estimatedValue!);
-          const { message: valueMsg, icon } = formatValueMessage(task.valueType!, task.estimatedValue!, 'immediate');
-          message.success({ content: `${icon} ${valueMsg}`, duration: 3 });
-        });
-      }
-
-      const allDone = newVisible.length > 0 && newVisible.every(t =>
-        (t.id === task.id ? next : newStatuses[t.id]) === 'done'
-      );
-      const isPerfectDay = allDone && !!onPerfectDay;
-      if (allDone) {
-        const seenKey = `badges-seen-${profile.id}`;
-        const seen = new Set<string>(JSON.parse(localStorage.getItem(seenKey) || '[]'));
-        const earned = getEarnedBadges(profile);
-        const newBadges = earned.filter(b => !seen.has(b.id));
-        earned.forEach(b => seen.add(b.id));
-        localStorage.setItem(seenKey, JSON.stringify([...seen]));
-        if (onPerfectDay) onPerfectDay(newBadges);
-        else message.success({ content: '🎉 All tasks done! Streak extended!', duration: 3 });
-      }
-
-      if (liveCheckInEnabled) {
-        runLiveFeedback(
-          { taskId: task.id, taskTitle: task.label, status: 'done' },
-          { showModal: !isPerfectDay },
-        );
-      }
-    }
-  };
 
   const confirmDelete = () => {
     if (!deleteTarget) return;
@@ -745,6 +686,91 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   const overallPct = visible.length > 0 ? Math.round((done / visible.length) * 100) : 0;
   const isEmpty = categories.length === 0 && userTasks.length === 0;
 
+  const openTaskUpdate = (
+    task: Task,
+    goal?: PersonalGoal,
+    doneCount = 0,
+    totalCount = 0,
+  ) => {
+    setTaskUpdateContext({
+      taskId: task.id,
+      taskLabel: task.label,
+      timeOfDay: task.timeOfDay,
+      goalTitle: goal?.title,
+      goalWhy: goal?.deepWhy,
+      goalProgressPct: totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : undefined,
+      goalDoneCount: doneCount,
+      goalTotalCount: totalCount,
+    });
+  };
+
+  const handleTaskUpdateSubmit = (status: TaskStatus | null, note: string) => {
+    if (!taskUpdateContext) return;
+    trackActivity(profile.id);
+    const { taskId, taskLabel } = taskUpdateContext;
+    const prevStatus = statuses[taskId] ?? null;
+
+    let entry: ReportEntry | null = null;
+    if (liveCheckInEnabled) {
+      entry = submitReportUpdate({
+        profileId: profile.id,
+        taskId,
+        taskTitle: taskLabel,
+        status,
+        note,
+        previousStatus: prevStatus,
+      });
+    } else {
+      setTaskStatus(profile.id, taskId, today, status);
+      saveTaskNote(profile.id, taskId, today, note);
+      try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
+      dispatchFeedbackUpdated();
+    }
+
+    const newStatuses = { ...statuses, [taskId]: status };
+    setStatuses(newStatuses);
+    setTaskUpdateContext(null);
+    loadState();
+
+    const newVisible = allTasksCombined.filter(t => !deleted[t.id]);
+    const newPending = newVisible.filter(t => (newStatuses[t.id] ?? null) !== 'done').length;
+    onTasksChange?.(newPending);
+    message.success({ content: 'Progress saved!', duration: 2 });
+
+    if (status === 'done') {
+      const task = allTasksCombined.find(t => t.id === taskId);
+      if (task?.valueType && task.estimatedValue) {
+        import('../data/valueTracking').then(({ trackValue, formatValueMessage }) => {
+          trackValue(profile.id, task.valueType!, task.estimatedValue!);
+          const { message: valueMsg, icon } = formatValueMessage(task.valueType!, task.estimatedValue!, 'immediate');
+          message.success({ content: `${icon} ${valueMsg}`, duration: 3 });
+        });
+      }
+
+      const allDone = newVisible.length > 0 && newVisible.every(t =>
+        (newStatuses[t.id] ?? null) === 'done',
+      );
+      const isPerfectDay = allDone && !!onPerfectDay;
+      if (allDone) {
+        const seenKey = `badges-seen-${profile.id}`;
+        const seen = new Set<string>(JSON.parse(localStorage.getItem(seenKey) || '[]'));
+        const earned = getEarnedBadges(profile);
+        const newBadges = earned.filter(b => !seen.has(b.id));
+        earned.forEach(b => seen.add(b.id));
+        localStorage.setItem(seenKey, JSON.stringify([...seen]));
+        if (onPerfectDay) onPerfectDay(newBadges);
+        else message.success({ content: '🎉 All tasks done! Streak extended!', duration: 3 });
+      }
+
+      if (liveCheckInEnabled && entry) {
+        setMomentumEntry(entry);
+        if (isPerfectDay) setMomentumEntry(null);
+      }
+    } else if (liveCheckInEnabled && entry) {
+      setMomentumEntry(entry);
+    }
+  };
+
   return (
     <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 100px', background: C.bg, minHeight: '100dvh' }}>
       {/* Header */}
@@ -846,7 +872,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                 goal={goal}
                 tasks={goalTaskMap[goal.id] ?? []}
                 statuses={statuses} deleted={deleted}
-                onCycle={cycleStatus}
+                onOpenUpdate={openTaskUpdate}
                 onDelete={t => openDeleteTask(t)}
                 timeFilter={timeFilter}
                 isFirst={idx === 0}
@@ -872,7 +898,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                   <TaskItem
                     key={task.id} task={task} catColor={C.secondary}
                     status={statuses[task.id] ?? null}
-                    onCycle={() => cycleStatus(task)}
+                    onOpenUpdate={() => openTaskUpdate(task)}
                     onDelete={() => openDeleteTask(task)}
                     onEdit={() => handleEditAnyTask(task, undefined)}
                   />
@@ -919,6 +945,16 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
         onChoiceChange={setDeleteChoice}
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <TaskUpdateModal
+        open={!!taskUpdateContext}
+        context={taskUpdateContext}
+        profileId={profile.id}
+        dateKey={today}
+        initialStatus={taskUpdateContext ? (statuses[taskUpdateContext.taskId] ?? null) : null}
+        onClose={() => setTaskUpdateContext(null)}
+        onSubmit={handleTaskUpdateSubmit}
       />
 
       {/* ── Task created congrat modal */}
