@@ -11,6 +11,7 @@ import {
 } from '../data/profiles';
 import { getUserTasks, isTaskScheduledForDate } from '../data/userTasks';
 import { getPersonalGoals } from '../data/personalGoals';
+import { ActiveGoalsList } from './ActiveGoalsList';
 import { C } from '../data/colors';
 
 interface Props {
@@ -464,6 +465,12 @@ export function Dashboard({
         </div>
       </div>
 
+      {/* ── [2] Active goals — horizontal swipe cards */}
+      <ActiveGoalsList
+        profileId={profile.id}
+        onNavigateGoals={onNavigateGoals}
+        onProgressUpdated={() => forceRefresh(n => n + 1)}
+      />
 
       {/* ── [3] Do Now - single most urgent task */}
       {doNowTask && completionPct < 100 && onNavigateTasks && (
