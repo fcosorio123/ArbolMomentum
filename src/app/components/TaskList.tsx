@@ -47,8 +47,9 @@ function isRecurringUT(task: UserTask): boolean {
   return !!task.recurrence && task.recurrence.type !== 'daily' && task.recurrence.type !== 'one-time';
 }
 
-  inprogress: { label: 'In Progress', dot: '◑', color: '#f5a623', bg: '#fff8ee', border: '#f5a62340' },
-  done:       { label: 'Done',        dot: '●', color: '#2cb67d', bg: '#ecfdf5', border: '#2cb67d40' },
+const STATUS_META: Record<TaskStatus, { label: string; dot: string; color: string }> = {
+  inprogress: { label: 'In Progress', dot: '◑', color: '#f5a623' },
+  done:       { label: 'Done',        dot: '●', color: '#2cb67d' },
 };
 
 
@@ -988,27 +989,27 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
         interactLabel="Add a task now →"
         steps={[
           {
-            title: '💬 Your Progress Coach',
-            description: 'This updates as you complete tasks and goals. Use it to understand your momentum and what to focus on next.',
-            target: () => document.querySelector('[data-tour-id="tasks-live-checkin"]') as HTMLElement | null,
+            title: '📊 Overall Progress',
+            description: 'See how many tasks you\'ve completed today at a glance.',
+            targetId: 'tasks-list',
             placement: 'bottom',
           },
           {
-            title: '📊 Overall Progress',
-            description: 'See how many tasks you\'ve completed today at a glance.',
-            target: () => document.querySelector('[data-tour-id="tasks-list"]') as HTMLElement | null,
+            title: '💬 Your Progress Coach',
+            description: 'This updates as you complete tasks and goals. Use it to understand your momentum and what to focus on next.',
+            targetId: 'tasks-live-checkin',
             placement: 'bottom',
           },
           {
             title: '🏆 Goal Groups',
             description: 'Tasks are grouped by goal. Tap a group header to expand or collapse.',
-            target: () => document.querySelector('[data-tour-id="tasks-goal-group"]') as HTMLElement | null,
+            targetId: 'tasks-goal-group',
             placement: 'bottom',
           },
           {
             title: '➕ Add a Task',
             description: 'Create daily, weekly, or one-time tasks and link them to a goal.',
-            target: () => document.querySelector('[data-tour-id="tasks-add-btn"]') as HTMLElement | null,
+            targetId: 'tasks-add-btn',
             placement: 'left',
           },
         ]}

@@ -651,33 +651,33 @@ export function Dashboard({
         doneMessage="You've got the Home screen down. Check your streak every day to build momentum!"
         steps={[
           {
-            title: '🎯 Your Active Goals',
-            description: 'Swipe through your active goals to see what\'s currently important. Progress here helps Arbol guide your next actions.',
-            target: () => document.querySelector('[data-tour-id="home-active-goals"]') as HTMLElement | null,
-            placement: 'bottom',
-          },
-          {
             title: '🔴 Goal Check-In',
             description: 'Quickly update your goal progress. Track Done, In Progress, or Skipped — takes under a minute.',
-            target: () => document.querySelector('[data-tour-id="home-banner"]') as HTMLElement | null,
+            targetId: 'home-banner',
             placement: 'bottom',
           },
           {
             title: '🔥 Your Streak',
             description: 'Consecutive days you\'ve completed tasks. Orange dots mean you showed up this week.',
-            target: () => document.querySelector('[data-tour-id="home-streak"]') as HTMLElement | null,
+            targetId: 'home-streak',
+            placement: 'bottom',
+          },
+          {
+            title: '🎯 Your Active Goals',
+            description: 'Swipe through your active goals to see what\'s currently important. Progress here helps Arbol guide your next actions.',
+            targetId: 'home-active-goals',
             placement: 'bottom',
           },
           {
             title: '⚡ Do This Now',
             description: 'Your most urgent task right now, based on time of day and goal priority.',
-            target: () => document.querySelector('[data-tour-id="home-do-now"]') as HTMLElement | null,
+            targetId: 'home-do-now',
             placement: 'bottom',
           },
           {
             title: '📅 Streak History',
             description: 'A heatmap of every active day. Darker green = more tasks done.',
-            target: () => document.querySelector('[data-tour-id="home-heatmap"]') as HTMLElement | null,
+            targetId: 'home-heatmap',
             placement: 'top',
           },
         ]}

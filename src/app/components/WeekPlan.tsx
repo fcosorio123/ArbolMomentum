@@ -387,19 +387,19 @@ export function WeekPlan({ profile }: Props) {
           {
             title: '🏆 Goals This Week',
             description: 'See how each goal is progressing today based on task completion. Aim for 100% to keep your streak alive.',
-            target: () => document.querySelector('[data-tour-id="week-goals"]') as HTMLElement | null,
+            targetId: 'week-goals',
             placement: 'bottom',
           },
           {
             title: '📆 Day Selector',
             description: 'Tap any day to see that day\'s task list. Today is highlighted with a border. Filled circles show completed days.',
-            target: () => document.querySelector('[data-tour-id="week-days"]') as HTMLElement | null,
+            targetId: 'week-days',
             placement: 'bottom',
           },
           {
             title: '☑️ Today\'s Tasks',
             description: 'Tap any task to cycle its status: not started → in-progress → done. Changes here sync everywhere in the app.',
-            target: () => document.querySelector('[data-tour-id="week-today"]') as HTMLElement | null,
+            targetId: 'week-today',
             placement: 'top',
           },
         ]}

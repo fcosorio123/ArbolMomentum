@@ -446,19 +446,19 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
           {
             title: '🎯 Your Goals',
             description: 'Each goal card shows your target, today\'s progress, and task breakdown by status - done, in-progress, or not started.',
-            target: () => document.querySelector('[data-tour-id="goals-section"]') as HTMLElement | null,
+            targetId: 'goals-section',
             placement: 'bottom',
           },
           {
             title: '📊 Task Progress',
             description: 'This section shows how many tasks are done, in-progress, and not started today for this goal.',
-            target: () => document.querySelector('[data-tour-id="goals-task-breakdown"]') as HTMLElement | null,
+            targetId: 'goals-task-breakdown',
             placement: 'bottom',
           },
           {
             title: '✨ Add a Goal',
             description: 'Tap the + button to create a goal. Be specific - "Save ₱50k by December" beats "save more money." Tap the button below to try it now!',
-            target: () => document.querySelector('[data-tour-id="goals-add-btn"]') as HTMLElement | null,
+            targetId: 'goals-add-btn',
             placement: 'left',
           },
         ]}
