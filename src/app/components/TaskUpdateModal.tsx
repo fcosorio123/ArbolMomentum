@@ -32,10 +32,11 @@ interface Props {
   initialStatus: TaskStatus | null;
   onClose: () => void;
   onSubmit: (status: TaskUpdateStatus, note: string) => void;
+  onInteractionCapture?: () => void;
 }
 
 export function TaskUpdateModal({
-  open, context, profileId, dateKey, initialStatus, onClose, onSubmit,
+  open, context, profileId, dateKey, initialStatus, onClose, onSubmit, onInteractionCapture,
 }: Props) {
   const [status, setStatus] = useState<TaskUpdateStatus>(initialStatus);
   const [note, setNote] = useState('');
@@ -103,7 +104,7 @@ export function TaskUpdateModal({
         <div style={{ fontSize: 11, fontWeight: 700, color: C.secondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
           How&apos;s it going?
         </div>
-        <TaskStatusSelector value={status} onChange={setStatus} />
+        <TaskStatusSelector value={status} onChange={v => { onInteractionCapture?.(); setStatus(v); }} />
 
         <div style={{ marginTop: 18 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.secondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
@@ -121,7 +122,10 @@ export function TaskUpdateModal({
               color: C.headline, background: C.bgCard, resize: 'vertical',
               fontFamily: 'inherit', outline: 'none',
             }}
-            onFocus={e => { e.currentTarget.style.borderColor = `${C.primary}60`; }}
+            onFocus={e => {
+              onInteractionCapture?.();
+              e.currentTarget.style.borderColor = `${C.primary}60`;
+            }}
             onBlur={e => { e.currentTarget.style.borderColor = C.border; }}
           />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>

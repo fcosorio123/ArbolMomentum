@@ -24,6 +24,7 @@ function getGoalTaskBreakdown(profileId: string, goalId: string, dateKey: string
   const count = (taskId: string) => {
     if (!isTaskActiveForDate(profileId, taskId, dateKey)) return;
     const s = getTaskStatus(profileId, taskId, dateKey);
+    if (s === 'skipped') return;
     if (s === 'done') done++;
     else if (s === 'inprogress') inprogress++;
     else notStarted++;

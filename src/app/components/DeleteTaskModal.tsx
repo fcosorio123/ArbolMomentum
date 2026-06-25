@@ -16,7 +16,7 @@ const OPTIONS: Array<{ value: DeleteTaskChoice; label: string; sub: string }> = 
   {
     value: 'today',
     label: 'Skip Just Today',
-    sub: 'Task will return on its next scheduled occurrence.',
+    sub: 'Marks the task as Skipped — it stays visible but dimmed until tomorrow.',
   },
   {
     value: 'forever',

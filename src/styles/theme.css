@@ -198,3 +198,27 @@
     line-height: 1.5;
   }
 }
+
+/* ── Global toast (Ant Design message) — Linear-style bottom placement */
+.ant-message {
+  top: auto !important;
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px) + 12px) !important;
+  z-index: 10050 !important;
+}
+.ant-message-notice-content {
+  background: rgba(22, 22, 24, 0.94) !important;
+  color: rgba(255, 255, 255, 0.96) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22) !important;
+  padding: 10px 16px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+.ant-message-notice-content a,
+.ant-message-notice-content .ant-message-notice-btn {
+  display: none !important;
+}
+.ant-message .anticon {
+  color: #2cb67d !important;
+}

@@ -146,6 +146,7 @@ export function taskStatusToPercent(
   status: TaskStatus | null,
   blocked: boolean,
 ): number {
+  if (status === 'skipped') return 0;
   if (blocked) return 25;
   if (status === 'done') return 100;
   if (status === 'inprogress') return 50;
@@ -165,6 +166,7 @@ export function calculateScopeProgress(profileId: string, dateKey: string): {
 
   for (const t of tasks) {
     const status = getTaskStatus(profileId, t.id, dateKey);
+    if (status === 'skipped') continue;
     const isBlocked = isTaskBlockedFlag(profileId, t.id, dateKey);
     if (isBlocked) blocked++;
     if (status === 'done') done++;
@@ -173,7 +175,8 @@ export function calculateScopeProgress(profileId: string, dateKey: string): {
     sum += taskStatusToPercent(status, isBlocked);
   }
 
-  const progress = tasks.length > 0 ? Math.round(sum / tasks.length) : 0;
+  const countable = tasks.filter(t => getTaskStatus(profileId, t.id, dateKey) !== 'skipped');
+  const progress = countable.length > 0 ? Math.round(sum / countable.length) : 0;
   return { progress, doneTaskCount: done, inProgressTaskCount: inProgress, notStartedTaskCount: notStarted, blockedTaskCount: blocked };
 }
 

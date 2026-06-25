@@ -1,14 +1,16 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import { Progress } from 'antd';
 import { PageTour, PageTourButton, TOUR_KEYS } from './AppTour';
-import { CheckCircleFilled, StarFilled } from '@ant-design/icons';
+import { CheckCircleFilled, StarFilled, CloseOutlined } from '@ant-design/icons';
 import {
   getWeekPlanForProfile, getAllTasksForProfile, getTaskCategoriesForProfile,
-  getTaskStatus, setTaskStatus, isTaskSkippedForDate, isTaskActiveForDate,
-  isTaskPermanentlyRemoved, getTodayKey, getDateKey, type Profile,
+  getTaskStatus, setTaskStatus, isTaskActiveForDate,
+  isTaskPermanentlyRemoved, getTodayKey, getDateKey, type Profile, type TaskStatus,
 } from '../data/profiles';
 import { getPersonalGoals, type PersonalGoal } from '../data/personalGoals';
 import { getActiveUserTasksForDate, getUserTasks, type UserTask } from '../data/userTasks';
+import { getTaskNote } from '../data/liveCheckInFeedback';
+import { truncateRemark, SKIPPED_BADGE, shouldShowRemark } from './taskCardDisplay';
 import { C } from '../data/colors';
 
 interface Props { profile: Profile }
@@ -37,23 +39,28 @@ function getGoalTaskProgress(profileId: string, goalId: string, allUserTasks: Us
     if (cat.goalId !== goalId) return;
     cat.tasks.forEach(t => {
       if (!isTaskActiveForDate(profileId, t.id, today)) return;
+      const st = getTaskStatus(profileId, t.id, today);
+      if (st === 'skipped') return;
       total++;
-      if (getTaskStatus(profileId, t.id, today) === 'done') done++;
+      if (st === 'done') done++;
     });
   });
   allUserTasks.forEach(ut => {
     if (ut.goalId !== goalId) return;
     if (!isTaskActiveForDate(profileId, ut.id, today)) return;
+    const st = getTaskStatus(profileId, ut.id, today);
+    if (st === 'skipped') return;
     total++;
-    if (getTaskStatus(profileId, ut.id, today) === 'done') done++;
+    if (st === 'done') done++;
   });
   return { done, total, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
 }
 
+type StatusMap = Record<string, Record<string, TaskStatus | null>>;
+
 export function WeekPlan({ profile }: Props) {
   const [activeDay, setActiveDay] = useState(getCurrentDay());
-  const [statuses, setStatuses] = useState<Record<string, Record<string, 'inprogress' | 'done' | null>>>({});
-  const [deletedMap, setDeletedMap] = useState<Record<string, Record<string, boolean>>>({});
+  const [statuses, setStatuses] = useState<StatusMap>({});
   const [personalGoals, setPersonalGoals] = useState<PersonalGoal[]>([]);
   const [userTasks, setUserTasks] = useState<UserTask[]>([]);
   const [showTour, setShowTour] = useState(false);
@@ -70,27 +77,22 @@ export function WeekPlan({ profile }: Props) {
 
   const loadState = useCallback(() => {
     const plan = getWeekPlanForProfile(profile.id);
-    const s: typeof statuses = {};
-    const d: typeof deletedMap = {};
+    const s: StatusMap = {};
     const uts = getUserTasks(profile.id);
     setUserTasks(uts);
 
     DAYS.forEach(day => {
       const dk = dateKey(day);
       s[day] = {};
-      d[day] = {};
       (plan[day] || []).forEach(tid => {
         if (isTaskPermanentlyRemoved(profile.id, tid)) return;
         s[day][tid] = getTaskStatus(profile.id, tid, dk);
-        d[day][tid] = isTaskSkippedForDate(profile.id, tid, dk);
       });
       getActiveUserTasksForDate(profile.id, dk).forEach(ut => {
         s[day][ut.id] = getTaskStatus(profile.id, ut.id, dk);
-        d[day][ut.id] = isTaskSkippedForDate(profile.id, ut.id, dk);
       });
     });
     setStatuses(s);
-    setDeletedMap(d);
     setPersonalGoals(getPersonalGoals(profile.id));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile.id]);
@@ -109,7 +111,6 @@ export function WeekPlan({ profile }: Props) {
     };
   }, [loadState]);
 
-  // Auto-start week tour on first visit
   useEffect(() => {
     if (!localStorage.getItem(TOUR_KEYS.week)) {
       const t = setTimeout(() => setShowTour(true), 700);
@@ -118,17 +119,20 @@ export function WeekPlan({ profile }: Props) {
   }, []);
 
   const toggleTask = (day: string, taskId: string) => {
-    if (deletedMap[day]?.[taskId]) return;
     const dk = dateKey(day);
-    const cur = statuses[day]?.[taskId];
-    const next = cur === 'done' ? null : cur === 'inprogress' ? 'done' : 'inprogress';
+    const cur = statuses[day]?.[taskId] ?? null;
+    if (cur === 'skipped') {
+      setTaskStatus(profile.id, taskId, dk, null);
+      setStatuses(prev => ({ ...prev, [day]: { ...prev[day], [taskId]: null } }));
+      return;
+    }
+    const next: TaskStatus | null = cur === 'done' ? null : cur === 'inprogress' ? 'done' : 'inprogress';
     setTaskStatus(profile.id, taskId, dk, next);
     setStatuses(prev => ({ ...prev, [day]: { ...prev[day], [taskId]: next } }));
   };
 
   const todayDay = getCurrentDay();
 
-  // All task ids for a day: permanently removed are excluded; day-skipped still listed as "Removed"
   const allDayIds = (day: string) => {
     const dk = dateKey(day);
     const seedIds = (weekPlan[day] || []).filter(id => !isTaskPermanentlyRemoved(profile.id, id));
@@ -136,9 +140,8 @@ export function WeekPlan({ profile }: Props) {
     return [...seedIds, ...userIds];
   };
 
-  // Active (non-skipped-for-day) task ids
-  const activeIds = (day: string) =>
-    allDayIds(day).filter(id => !deletedMap[day]?.[id]);
+  const countableIds = (day: string) =>
+    allDayIds(day).filter(id => (statuses[day]?.[id] ?? null) !== 'skipped');
 
   const dayTaskIds = allDayIds(activeDay);
   const seedTasks = dayTaskIds
@@ -146,24 +149,94 @@ export function WeekPlan({ profile }: Props) {
     .map(id => allTasks.find(t => t.id === id))
     .filter(Boolean) as typeof allTasks;
   const activeDayDk = dateKey(activeDay);
-  const dayUserTasks = getActiveUserTasksForDate(profile.id, activeDayDk)
-    .filter(ut => !deletedMap[activeDay]?.[ut.id]);
+  const dayUserTasks = getActiveUserTasksForDate(profile.id, activeDayDk);
 
-  const activeDayIds = activeIds(activeDay);
-  const activeDayDone = activeDayIds.filter(id => statuses[activeDay]?.[id] === 'done').length;
-  const activePct = activeDayIds.length > 0 ? Math.round((activeDayDone / activeDayIds.length) * 100) : 0;
+  const activeDayCountable = countableIds(activeDay);
+  const activeDayDone = activeDayCountable.filter(id => statuses[activeDay]?.[id] === 'done').length;
+  const activePct = activeDayCountable.length > 0 ? Math.round((activeDayDone / activeDayCountable.length) * 100) : 0;
 
   const weekStats = DAYS.map(day => {
-    const ids = activeIds(day);
+    const ids = countableIds(day);
     const done = ids.filter(id => statuses[day]?.[id] === 'done').length;
     return { day, done, total: ids.length, pct: ids.length > 0 ? Math.round((done / ids.length) * 100) : 0 };
   });
   const weekAvg = Math.round(weekStats.reduce((s, d) => s + d.pct, 0) / 7);
 
-  const STATUS_META = {
-    inprogress: { dot: '◑', color: '#f5a623' },
-    done:       { dot: '●', color: C.primary },
-    null:       { dot: '○', color: C.secondary },
+  const STATUS_META: Record<TaskStatus | 'null', { dot: string; color: string; label: string }> = {
+    inprogress: { dot: '◑', color: '#f5a623', label: 'In Progress' },
+    done:       { dot: '●', color: C.primary, label: 'Done' },
+    skipped:    { dot: '✕', color: '#90b4ce', label: 'Skipped' },
+    null:       { dot: '○', color: C.secondary, label: 'Not started' },
+  };
+
+  const renderTaskRow = (
+    taskId: string,
+    label: string,
+    timeOfDay: 'morning' | 'evening',
+    isLast: boolean,
+    extraBadges?: ReactNode,
+  ) => {
+    const status = statuses[activeDay]?.[taskId] ?? null;
+    const isSkipped = status === 'skipped';
+    const meta = STATUS_META[status ?? 'null'];
+    const remark = truncateRemark(getTaskNote(profile.id, taskId, activeDayDk));
+    const showRemark = shouldShowRemark(status, remark);
+
+    return (
+      <div key={taskId}
+        onClick={() => toggleTask(activeDay, taskId)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px',
+          borderBottom: !isLast ? `1px solid ${C.border}` : 'none',
+          cursor: 'pointer', transition: 'background 0.15s',
+          opacity: isSkipped ? 0.58 : 1,
+          background: isSkipped ? C.bgAlt : 'transparent',
+        }}
+        onMouseEnter={e => { if (!isSkipped) e.currentTarget.style.background = C.bgAlt; }}
+        onMouseLeave={e => { if (!isSkipped) e.currentTarget.style.background = isSkipped ? C.bgAlt : 'transparent'; }}
+      >
+        <span style={{
+          fontSize: 16, color: isSkipped ? C.secondary : meta.color,
+          width: 20, textAlign: 'center', flexShrink: 0,
+        }}>
+          {isSkipped ? <CloseOutlined style={{ fontSize: 12 }} /> : meta.dot}
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{
+            fontSize: 14, display: 'block',
+            color: isSkipped ? C.secondary : (status === 'done' ? C.secondary : C.headline),
+            textDecoration: status === 'done' ? 'line-through' : 'none',
+          }}>
+            {label}
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: meta.color, marginTop: 3, display: 'block' }}>
+            {meta.label}
+          </span>
+          {showRemark && (
+            <span style={{
+              fontSize: 11, color: C.secondary, marginTop: 3, display: 'block',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {remark}
+            </span>
+          )}
+        </div>
+        {isSkipped ? (
+          <span style={{
+            fontSize: 10, background: SKIPPED_BADGE.bg, color: SKIPPED_BADGE.color,
+            borderRadius: 5, padding: '2px 7px', fontWeight: 600, flexShrink: 0,
+          }}>
+            {SKIPPED_BADGE.label}
+          </span>
+        ) : (
+          extraBadges ?? (
+            <span style={{ fontSize: 10, color: C.secondary, background: C.bgAlt, borderRadius: 5, padding: '2px 6px' }}>
+              {timeOfDay === 'morning' ? '☀️' : '🌙'}
+            </span>
+          )
+        )}
+      </div>
+    );
   };
 
   const ACCENT_COLORS = ['#3da9fc', '#2cb67d', '#7c3aed', '#ef4565', '#f5a623', '#094067', '#e85d04', '#90b4ce'];
@@ -182,7 +255,6 @@ export function WeekPlan({ profile }: Props) {
         <PageTourButton onClick={() => setShowTour(true)} />
       </div>
 
-      {/* Goals Summary - task-based progress */}
       {personalGoals.length > 0 && (
         <div data-tour-id="week-goals" style={{
           background: C.bgCard, border: `1.5px solid ${C.border}`,
@@ -217,7 +289,6 @@ export function WeekPlan({ profile }: Props) {
         </div>
       )}
 
-      {/* Day selector */}
       <div data-tour-id="week-days" style={{ display: 'flex', gap: 6, marginBottom: 18, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
         {DAYS.map(day => {
           const stat = weekStats.find(s => s.day === day)!;
@@ -248,7 +319,6 @@ export function WeekPlan({ profile }: Props) {
         })}
       </div>
 
-      {/* Active day detail */}
       <div data-tour-id="week-today" style={{ background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 20, overflow: 'hidden', marginBottom: 16, boxShadow: C.shadow }}>
         <div style={{ padding: '16px 18px 12px', borderBottom: `1px solid ${C.border}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -272,88 +342,26 @@ export function WeekPlan({ profile }: Props) {
           </div>
         )}
 
-        {/* Seed / scheduled tasks */}
         {seedTasks.map((task, idx) => {
-          const removed = deletedMap[activeDay]?.[task.id] ?? false;
-          const status = removed ? null : (statuses[activeDay]?.[task.id] ?? null);
-          const meta = STATUS_META[status ?? 'null'];
           const isLast = idx === seedTasks.length - 1 && dayUserTasks.length === 0;
-          return (
-            <div key={task.id}
-              onClick={() => !removed && toggleTask(activeDay, task.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px',
-                borderBottom: !isLast ? `1px solid ${C.border}` : 'none',
-                cursor: removed ? 'default' : 'pointer', transition: 'background 0.15s',
-                opacity: removed ? 0.45 : 1,
-                background: removed ? C.bgAlt : 'transparent',
-              }}
-              onMouseEnter={e => { if (!removed) e.currentTarget.style.background = C.bgAlt; }}
-              onMouseLeave={e => { if (!removed) e.currentTarget.style.background = 'transparent'; }}
-            >
-              <span style={{ fontSize: 16, color: removed ? C.secondary : meta.color, width: 20, textAlign: 'center', flexShrink: 0 }}>
-                {removed ? '✕' : meta.dot}
-              </span>
-              <span style={{
-                fontSize: 14, flex: 1,
-                color: removed ? C.secondary : (status === 'done' ? C.secondary : C.headline),
-                textDecoration: status === 'done' ? 'line-through' : 'none',
-              }}>
-                {task.label}
-              </span>
-              {removed ? (
-                <span style={{ fontSize: 10, background: `${C.tertiary}18`, color: C.tertiary, borderRadius: 5, padding: '2px 7px', fontWeight: 600 }}>
-                  Removed
-                </span>
-              ) : (
-                <span style={{ fontSize: 10, color: C.secondary, background: C.bgAlt, borderRadius: 5, padding: '2px 6px' }}>
-                  {task.timeOfDay === 'morning' ? '☀️' : '🌙'}
-                </span>
-              )}
-            </div>
-          );
+          return renderTaskRow(task.id, task.label, task.timeOfDay, !isLast);
         })}
 
-        {/* User tasks */}
         {dayUserTasks.map((ut, idx) => {
-          const status = statuses[activeDay]?.[ut.id] ?? null;
-          const meta = STATUS_META[status ?? 'null'];
           const isLast = idx === dayUserTasks.length - 1;
-          return (
-            <div key={ut.id}
-              onClick={() => toggleTask(activeDay, ut.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px',
-                borderBottom: !isLast ? `1px solid ${C.border}` : 'none',
-                cursor: 'pointer', transition: 'background 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = C.bgAlt; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-            >
-              <span style={{ fontSize: 16, color: meta.color, width: 20, textAlign: 'center', flexShrink: 0 }}>
-                {meta.dot}
+          return renderTaskRow(ut.id, ut.label, ut.timeOfDay, !isLast, (
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <span style={{ fontSize: 10, background: `${C.primary}12`, color: C.primary, borderRadius: 5, padding: '2px 6px', fontWeight: 600 }}>
+                My Task
               </span>
-              <span style={{
-                fontSize: 14, flex: 1,
-                color: status === 'done' ? C.secondary : C.headline,
-                textDecoration: status === 'done' ? 'line-through' : 'none',
-              }}>
-                {ut.label}
+              <span style={{ fontSize: 10, color: C.secondary, background: C.bgAlt, borderRadius: 5, padding: '2px 6px' }}>
+                {ut.timeOfDay === 'morning' ? '☀️' : '🌙'}
               </span>
-              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                <span style={{ fontSize: 10, background: `${C.primary}12`, color: C.primary, borderRadius: 5, padding: '2px 6px', fontWeight: 600 }}>
-                  My Task
-                </span>
-                <span style={{ fontSize: 10, color: C.secondary, background: C.bgAlt, borderRadius: 5, padding: '2px 6px' }}>
-                  {ut.timeOfDay === 'morning' ? '☀️' : '🌙'}
-                </span>
-              </div>
             </div>
-          );
+          ));
         })}
       </div>
 
-      {/* Weekly heatmap */}
       <div style={{ background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16, padding: '16px 18px', boxShadow: C.shadow }}>
         <div style={{ fontSize: 13, color: C.body, marginBottom: 12 }}>Weekly completion</div>
         <div style={{ display: 'flex', gap: 6 }}>
@@ -375,7 +383,6 @@ export function WeekPlan({ profile }: Props) {
         </div>
       </div>
 
-      {/* ── Week Page Tour */}
       <PageTour
         open={showTour}
         onClose={() => setShowTour(false)}
@@ -398,7 +405,7 @@ export function WeekPlan({ profile }: Props) {
           },
           {
             title: '☑️ Today\'s Tasks',
-            description: 'Tap any task to cycle its status: not started → in-progress → done. Changes here sync everywhere in the app.',
+            description: 'Tap any task to cycle its status: not started → in-progress → done. Skipped tasks stay visible — tap to restore.',
             targetId: 'week-today',
             placement: 'top',
           },

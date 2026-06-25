@@ -19,6 +19,7 @@ export function getGoalTaskBreakdown(profileId: string, goalId: string, dateKey:
   const count = (taskId: string) => {
     if (!isTaskActiveForDate(profileId, taskId, dateKey)) return;
     const s = getTaskStatus(profileId, taskId, dateKey);
+    if (s === 'skipped') return;
     if (s === 'done') done++;
     else if (s === 'inprogress') inprogress++;
     else notStarted++;
@@ -63,6 +64,7 @@ function findFirstIncompleteTask(profileId: string, goalId: string, dateKey: str
     if (cat.goalId !== goalId) continue;
     for (const task of cat.tasks) {
       if (!isTaskActiveForDate(profileId, task.id, dateKey)) continue;
+      if (getTaskStatus(profileId, task.id, dateKey) === 'skipped') continue;
       if (getTaskStatus(profileId, task.id, dateKey) !== 'done') {
         return { id: task.id, label: task.label };
       }
@@ -73,6 +75,7 @@ function findFirstIncompleteTask(profileId: string, goalId: string, dateKey: str
   );
   for (const ut of userTasks) {
     if (!isTaskActiveForDate(profileId, ut.id, dateKey)) continue;
+    if (getTaskStatus(profileId, ut.id, dateKey) === 'skipped') continue;
     if (getTaskStatus(profileId, ut.id, dateKey) !== 'done') {
       return { id: ut.id, label: ut.label };
     }

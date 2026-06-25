@@ -388,8 +388,9 @@ export default function App() {
     const today = getTodayKey();
     const tasks = getTaskCategoriesForProfile(profile.id).flatMap(c => c.tasks);
     return tasks.filter(t =>
-      !isTaskActiveForDate(profile.id, t.id, today) &&
-      getTaskStatus(profile.id, t.id, today) !== 'done'
+      isTaskActiveForDate(profile.id, t.id, today) &&
+      getTaskStatus(profile.id, t.id, today) !== 'done' &&
+      getTaskStatus(profile.id, t.id, today) !== 'skipped'
     ).length;
   }, []);
 
@@ -519,7 +520,7 @@ export default function App() {
   if (showAdmin) {
     return (
       <ConfigProvider theme={arbolTheme}>
-        <AntdApp>
+        <AntdApp message={{ maxCount: 3, duration: 2.5 }}>
           {isDesktop ? (
             <div style={{ minHeight: '100dvh', background: C.bgAlt, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '32px' }}>
               <div style={{ width: '100%', maxWidth: 900, background: C.bg, borderRadius: 24, overflow: 'hidden', boxShadow: '0 8px 48px rgba(9,64,103,0.13)', minHeight: 'calc(100vh - 64px)' }}>
@@ -539,7 +540,7 @@ export default function App() {
     if (!profileSelectorUnlocked) {
       return (
         <ConfigProvider theme={arbolTheme}>
-          <AntdApp>
+          <AntdApp message={{ maxCount: 3, duration: 2.5 }}>
             {isDesktop ? (
               <div style={{ minHeight: '100dvh', background: C.bgAlt, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ width: '100%', maxWidth: 480, background: C.bg, borderRadius: 24, overflow: 'hidden', boxShadow: '0 8px 48px rgba(9,64,103,0.13)' }}>
@@ -555,7 +556,7 @@ export default function App() {
     }
     return (
       <ConfigProvider theme={arbolTheme}>
-        <AntdApp>
+        <AntdApp message={{ maxCount: 3, duration: 2.5 }}>
           {isDesktop ? (
             <div style={{ minHeight: '100dvh', background: C.bgAlt, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ width: '100%', maxWidth: 480, background: C.bg, borderRadius: 24, overflow: 'hidden', boxShadow: '0 8px 48px rgba(9,64,103,0.13)' }}>
@@ -630,7 +631,7 @@ export default function App() {
 
   return (
     <ConfigProvider theme={arbolTheme}>
-      <AntdApp>
+      <AntdApp message={{ maxCount: 3, duration: 2.5 }}>
         {isDesktop ? (
           // ── Desktop: sidebar nav + centered content card
           <div style={{ display: 'flex', minHeight: '100dvh', background: C.bgAlt, fontFamily: 'system-ui, -apple-system, sans-serif' }}>

@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { App, Button, Progress } from 'antd';
-import { DeleteOutlined, CheckCircleFilled, PlayCircleOutlined, ArrowRightOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { DeleteOutlined, CheckCircleFilled, PlayCircleOutlined, ArrowRightOutlined, EditOutlined, PlusOutlined, CloseOutlined } from '@ant-design/icons';
 import {
   type Profile, type Task, type TaskStatus,
   getTaskCategoriesForProfile, getTaskStatus, setTaskStatus,
-  isTaskSkippedForDate, markTaskDeleted, permanentlyHideSeedTask, getTodayKey,
+  skipTaskForToday, permanentlyHideSeedTask, getTodayKey,
   getEarnedBadges, type Badge,
 } from '../data/profiles';
 import {
@@ -28,9 +28,11 @@ import { TaskUpdateModal, type TaskUpdateContext } from './TaskUpdateModal';
 import { TASK_STATUS_DISPLAY } from './TaskStatusSelector';
 import { LiveCheckInFeedbackCard } from './LiveCheckInFeedbackCard';
 import {
-  submitReportUpdate, saveTaskNote, dispatchFeedbackUpdated, type ReportEntry,
+  submitReportUpdate, saveTaskNote, dispatchFeedbackUpdated, getTaskNote, type ReportEntry,
 } from '../data/liveCheckInFeedback';
 import { isLiveCheckInEnabled, fetchLiveCheckInSettings } from '../data/liveCheckInSettings';
+import { useScrollPositionLock } from '../hooks/useScrollPositionLock';
+import { truncateRemark, SKIPPED_BADGE, shouldShowRemark } from './taskCardDisplay';
 
 interface Props {
   profile: Profile;
@@ -40,7 +42,7 @@ interface Props {
 }
 
 type StatusMap = Record<string, TaskStatus | null>;
-type DeletedMap = Record<string, boolean>;
+type NotesMap = Record<string, string>;
 type UserTask_ = Task & { isUserCreated?: boolean; recurrence?: Recurrence };
 
 function isRecurringUT(task: UserTask): boolean {
@@ -50,6 +52,7 @@ function isRecurringUT(task: UserTask): boolean {
 const STATUS_META: Record<TaskStatus, { label: string; dot: string; color: string }> = {
   inprogress: { label: 'In Progress', dot: '◑', color: '#f5a623' },
   done:       { label: 'Done',        dot: '●', color: '#2cb67d' },
+  skipped:    { label: 'Skipped',     dot: '✕', color: '#90b4ce' },
 };
 
 
@@ -59,13 +62,16 @@ function taskDurationLabel(task: UserTask_): string {
 
 // ── Task item
 function TaskItem({
-  task, catColor, status, onOpenUpdate, onDelete, onEdit,
+  task, catColor, status, remark, onOpenUpdate, onDelete, onEdit,
 }: {
-  task: UserTask_; catColor: string; status: TaskStatus | null;
+  task: UserTask_; catColor: string; status: TaskStatus | null; remark?: string;
   onOpenUpdate: () => void; onDelete: () => void;
   onEdit?: () => void;
 }) {
+  const isSkipped = status === 'skipped';
   const display = status ? TASK_STATUS_DISPLAY[status] : TASK_STATUS_DISPLAY.null;
+  const remarkText = remark ? truncateRemark(remark) : '';
+  const showRemark = shouldShowRemark(status, remarkText);
 
   return (
     <div
@@ -75,19 +81,23 @@ function TaskItem({
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenUpdate(); } }}
       style={{
         display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px',
-        background: display.bg,
-        borderRadius: 14, border: `1.5px solid ${status ? display.color + '35' : C.border}`,
+        background: isSkipped ? display.bg : display.bg,
+        borderRadius: 14,
+        border: `1.5px solid ${isSkipped ? `${C.tertiary}25` : status ? display.color + '35' : C.border}`,
         marginBottom: 8, transition: 'all 0.2s', cursor: 'pointer',
-        boxShadow: status === 'done' ? 'none' : C.shadow,
+        boxShadow: status === 'done' || isSkipped ? 'none' : C.shadow,
+        opacity: isSkipped ? 0.58 : 1,
       }}
     >
       <div style={{
         width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-        background: status === 'done' ? display.color : status === 'inprogress' ? display.color : '#fff',
-        border: status ? 'none' : `2px solid ${C.borderStrong}`,
+        background: isSkipped ? C.bgAlt : status === 'done' ? display.color : status === 'inprogress' ? display.color : '#fff',
+        border: isSkipped ? `2px solid ${C.border}` : status ? 'none' : `2px solid ${C.borderStrong}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        {status === 'done'
+        {isSkipped
+          ? <CloseOutlined style={{ color: C.secondary, fontSize: 14 }} />
+          : status === 'done'
           ? <CheckCircleFilled style={{ color: '#fff', fontSize: 18 }} />
           : status === 'inprogress'
           ? <PlayCircleOutlined style={{ color: '#fff', fontSize: 16 }} />
@@ -98,7 +108,7 @@ function TaskItem({
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           fontSize: 14, fontWeight: 600,
-          color: status === 'done' ? C.secondary : C.headline,
+          color: isSkipped ? C.secondary : status === 'done' ? C.secondary : C.headline,
           textDecoration: status === 'done' ? 'line-through' : 'none',
           lineHeight: 1.3,
         }}>
@@ -113,7 +123,24 @@ function TaskItem({
         }}>
           {display.label}
         </div>
+        {showRemark && (
+          <div style={{
+            fontSize: 11, color: C.secondary, marginTop: 4, lineHeight: 1.35,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {remarkText}
+          </div>
+        )}
       </div>
+
+      {isSkipped && (
+        <span style={{
+          fontSize: 10, background: SKIPPED_BADGE.bg, color: SKIPPED_BADGE.color,
+          borderRadius: 5, padding: '2px 7px', fontWeight: 600, flexShrink: 0,
+        }}>
+          {SKIPPED_BADGE.label}
+        </span>
+      )}
 
       <div style={{ display: 'flex', gap: 2, flexShrink: 0, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
         {onEdit && (
@@ -247,11 +274,11 @@ function goalAccentColor(goalId: string) {
 
 // ── Goal group: goal header + flat task list
 function GoalGroup({
-  goal, tasks, statuses, deleted, onOpenUpdate, onDelete, timeFilter,
+  goal, tasks, statuses, notes, onOpenUpdate, onDelete, timeFilter,
   onEditTask, onAddSuggestedTask, isFirst,
 }: {
   goal: PersonalGoal; tasks: UserTask_[];
-  statuses: StatusMap; deleted: DeletedMap;
+  statuses: StatusMap; notes: NotesMap;
   onOpenUpdate: (t: Task, goal: PersonalGoal, doneCount: number, totalCount: number) => void;
   onDelete: (t: UserTask_) => void;
   timeFilter: 'all' | 'morning' | 'evening';
@@ -263,12 +290,13 @@ function GoalGroup({
   const accentColor = goalAccentColor(goal.id);
 
   const allVisibleTasks = tasks.filter(t =>
-    (timeFilter === 'all' || t.timeOfDay === timeFilter) && !deleted[t.id]
+    timeFilter === 'all' || t.timeOfDay === timeFilter
   );
   if (allVisibleTasks.length === 0) return null;
 
-  const doneTasks = allVisibleTasks.filter(t => statuses[t.id] === 'done').length;
-  const totalTasks = allVisibleTasks.length;
+  const countableTasks = allVisibleTasks.filter(t => statuses[t.id] !== 'skipped');
+  const doneTasks = countableTasks.filter(t => statuses[t.id] === 'done').length;
+  const totalTasks = countableTasks.length;
   const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
   const allDone = totalTasks > 0 && doneTasks === totalTasks;
   const accent = allDone ? C.primary : accentColor;
@@ -349,6 +377,7 @@ function GoalGroup({
             <TaskItem
               key={task.id} task={task} catColor={accent}
               status={statuses[task.id] ?? null}
+              remark={notes[task.id]}
               onOpenUpdate={() => onOpenUpdate(task, goal, doneTasks, totalTasks)}
               onDelete={() => onDelete(task)}
               onEdit={() => onEditTask(task)}
@@ -458,7 +487,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   const { message } = App.useApp();
   const [timeFilter, setTimeFilter] = useState<'all' | 'morning' | 'evening'>('all');
   const [statuses, setStatuses] = useState<StatusMap>({});
-  const [deleted, setDeleted] = useState<DeletedMap>({});
+  const [notes, setNotes] = useState<NotesMap>({});
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string; isUserCreated: boolean } | null>(null);
   const [deleteChoice, setDeleteChoice] = useState<DeleteTaskChoice>('today');
   const [goals, setGoals] = useState<PersonalGoal[]>([]);
@@ -473,6 +502,9 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   const [liveCheckInEnabled, setLiveCheckInEnabled] = useState(() => isLiveCheckInEnabled());
   const [momentumEntry, setMomentumEntry] = useState<ReportEntry | null>(null);
   const [taskUpdateContext, setTaskUpdateContext] = useState<TaskUpdateContext | null>(null);
+  const { capture: captureScroll, restore: restoreScroll, allowProgrammaticScroll } = useScrollPositionLock([
+    statuses, notes, taskUpdateContext, momentumEntry,
+  ]);
 
   const today = getTodayKey();
   const categories = getTaskCategoriesForProfile(profile.id);
@@ -486,17 +518,18 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
 
   const loadState = useCallback(() => {
     const s: StatusMap = {};
-    const d: DeletedMap = {};
+    const n: NotesMap = {};
     allTasks.forEach(task => {
       s[task.id] = getTaskStatus(profile.id, task.id, today);
-      d[task.id] = isTaskSkippedForDate(profile.id, task.id, today);
+      n[task.id] = getTaskNote(profile.id, task.id, today);
     });
     const uts = getUserTasks(profile.id);
     uts.forEach(ut => {
       s[ut.id] = getTaskStatus(profile.id, ut.id, today);
+      n[ut.id] = getTaskNote(profile.id, ut.id, today);
     });
     setStatuses(s);
-    setDeleted(d);
+    setNotes(n);
     setGoals(getPersonalGoals(profile.id));
     setUserTasks(uts);
   }, [profile.id, today]);
@@ -522,10 +555,12 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
 
   const handleViewFeedback = useCallback(() => {
     setMomentumEntry(null);
-    requestAnimationFrame(() => {
-      document.getElementById('live-check-in-card')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    allowProgrammaticScroll(() => {
+      requestAnimationFrame(() => {
+        document.getElementById('live-check-in-card')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
     });
-  }, []);
+  }, [allowProgrammaticScroll]);
 
   // Auto-start tasks tour on first visit
   useEffect(() => {
@@ -537,17 +572,12 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
 
   const confirmDelete = () => {
     if (!deleteTarget) return;
+    captureScroll();
     const { id, label, isUserCreated } = deleteTarget;
-    const userTask = isUserCreated ? userTasks.find(u => u.id === id) : undefined;
 
     if (deleteChoice === 'today') {
-      if (isUserCreated && userTask && isRecurringUT(userTask)) {
-        skipTaskOccurrence(profile.id, id, today);
-        message.info('Task skipped for today');
-      } else {
-        markTaskDeleted(profile.id, id, today);
-        message.info('Task skipped for today');
-      }
+      skipTaskForToday(profile.id, id, today);
+      message.info('Task skipped for today');
     } else if (isUserCreated) {
       deleteUserTask(profile.id, id);
       message.info(`"${label}" permanently removed`);
@@ -556,12 +586,14 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
       message.info('Task permanently removed');
     }
 
-    const newDeleted = { ...deleted, [id]: deleteChoice === 'today' };
-    setDeleted(newDeleted);
     setDeleteTarget(null);
     loadState();
-    const newVisible = allTasksCombined.filter(t => !newDeleted[t.id]);
-    onTasksChange?.(newVisible.filter(t => statuses[t.id] !== 'done').length);
+    restoreScroll();
+    const newPending = allTasksCombined.filter(t => {
+      const st = getTaskStatus(profile.id, t.id, today);
+      return st !== 'done' && st !== 'skipped';
+    }).length;
+    onTasksChange?.(newPending);
   };
 
   const openDeleteTask = (task: UserTask_) => {
@@ -681,10 +713,11 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   });
 
   const visible = allTasksCombined.filter(t =>
-    !deleted[t.id] && (timeFilter === 'all' || t.timeOfDay === timeFilter)
+    timeFilter === 'all' || t.timeOfDay === timeFilter
   );
-  const done = visible.filter(t => statuses[t.id] === 'done').length;
-  const overallPct = visible.length > 0 ? Math.round((done / visible.length) * 100) : 0;
+  const countable = visible.filter(t => statuses[t.id] !== 'skipped');
+  const done = countable.filter(t => statuses[t.id] === 'done').length;
+  const overallPct = countable.length > 0 ? Math.round((done / countable.length) * 100) : 0;
   const isEmpty = categories.length === 0 && userTasks.length === 0;
 
   const openTaskUpdate = (
@@ -693,6 +726,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     doneCount = 0,
     totalCount = 0,
   ) => {
+    captureScroll();
     setTaskUpdateContext({
       taskId: task.id,
       taskLabel: task.label,
@@ -707,6 +741,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
 
   const handleTaskUpdateSubmit = (status: TaskStatus | null, note: string) => {
     if (!taskUpdateContext) return;
+    captureScroll();
     trackActivity(profile.id);
     const { taskId, taskLabel } = taskUpdateContext;
     const prevStatus = statuses[taskId] ?? null;
@@ -732,9 +767,12 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     setStatuses(newStatuses);
     setTaskUpdateContext(null);
     loadState();
+    restoreScroll();
 
-    const newVisible = allTasksCombined.filter(t => !deleted[t.id]);
-    const newPending = newVisible.filter(t => (newStatuses[t.id] ?? null) !== 'done').length;
+    const newPending = allTasksCombined.filter(t => {
+      const st = newStatuses[t.id] ?? null;
+      return st !== 'done' && st !== 'skipped';
+    }).length;
     onTasksChange?.(newPending);
     message.success({ content: 'Progress saved!', duration: 2 });
 
@@ -748,9 +786,13 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
         });
       }
 
-      const allDone = newVisible.length > 0 && newVisible.every(t =>
-        (newStatuses[t.id] ?? null) === 'done',
-      );
+      const allDone = (() => {
+        const tasksForDay = allTasksCombined.filter(t => {
+          const st = newStatuses[t.id] ?? null;
+          return st !== 'skipped';
+        });
+        return tasksForDay.length > 0 && tasksForDay.every(t => (newStatuses[t.id] ?? null) === 'done');
+      })();
       const isPerfectDay = allDone && !!onPerfectDay;
       if (allDone) {
         const seenKey = `badges-seen-${profile.id}`;
@@ -793,7 +835,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
         <div data-tour-id="tasks-list" style={{ background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16, padding: '14px 18px', marginBottom: 16, boxShadow: C.shadow }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ color: C.body, fontSize: 13 }}>Overall today</span>
-            <span style={{ color: C.primary, fontWeight: 700, fontSize: 13 }}>{done}/{visible.length}</span>
+            <span style={{ color: C.primary, fontWeight: 700, fontSize: 13 }}>{done}/{countable.length}</span>
           </div>
           <Progress percent={overallPct} strokeColor={{ '0%': C.primary, '100%': C.headline }}
             railColor={C.bgAlt} showInfo={false} size={['100%', 8]} />
@@ -872,7 +914,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
               <GoalGroup
                 goal={goal}
                 tasks={goalTaskMap[goal.id] ?? []}
-                statuses={statuses} deleted={deleted}
+                statuses={statuses} notes={notes}
                 onOpenUpdate={openTaskUpdate}
                 onDelete={t => openDeleteTask(t)}
                 timeFilter={timeFilter}
@@ -884,7 +926,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
           ))}
 
           {/* Routines - tasks not linked to any goal */}
-          {ungroupedTasks.filter(t => (timeFilter === 'all' || t.timeOfDay === timeFilter) && !deleted[t.id]).length > 0 && (
+          {ungroupedTasks.filter(t => timeFilter === 'all' || t.timeOfDay === timeFilter).length > 0 && (
             <div style={{ marginBottom: 18 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                 <div style={{ flex: 1, height: 1, background: C.border }} />
@@ -894,11 +936,12 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                 <div style={{ flex: 1, height: 1, background: C.border }} />
               </div>
               {ungroupedTasks
-                .filter(t => (timeFilter === 'all' || t.timeOfDay === timeFilter) && !deleted[t.id])
+                .filter(t => timeFilter === 'all' || t.timeOfDay === timeFilter)
                 .map(task => (
                   <TaskItem
                     key={task.id} task={task} catColor={C.secondary}
                     status={statuses[task.id] ?? null}
+                    remark={notes[task.id]}
                     onOpenUpdate={() => openTaskUpdate(task)}
                     onDelete={() => openDeleteTask(task)}
                     onEdit={() => handleEditAnyTask(task, undefined)}
@@ -954,8 +997,9 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
         profileId={profile.id}
         dateKey={today}
         initialStatus={taskUpdateContext ? (statuses[taskUpdateContext.taskId] ?? null) : null}
-        onClose={() => setTaskUpdateContext(null)}
+        onClose={() => { setTaskUpdateContext(null); restoreScroll(); }}
         onSubmit={handleTaskUpdateSubmit}
+        onInteractionCapture={captureScroll}
       />
 
       {/* ── Task created congrat modal */}

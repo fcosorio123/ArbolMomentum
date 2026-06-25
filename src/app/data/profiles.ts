@@ -180,7 +180,7 @@ export const PROFILES: Profile[] = [
 // ──────────────────────────────────────────────
 export type TimeOfDay = 'morning' | 'evening';
 export type TaskType = 'routine' | 'priority' | 'goal';
-export type TaskStatus = 'inprogress' | 'done';
+export type TaskStatus = 'inprogress' | 'done' | 'skipped';
 export type ValueType = 'money' | 'health' | 'opportunity';
 
 export interface Task {
@@ -1766,13 +1766,18 @@ export function computeLiveStreak(profileId: string, todayHasActivity = false): 
 }
 
 export function getTaskStatus(profileId: string, taskId: string, date: string): TaskStatus | null {
-  return (localStorage.getItem(`task-${profileId}-${taskId}-${date}`) as TaskStatus) || null;
+  const stored = localStorage.getItem(`task-${profileId}-${taskId}-${date}`);
+  if (stored === 'inprogress' || stored === 'done' || stored === 'skipped') return stored;
+  if (localStorage.getItem(`task-del-${profileId}-${taskId}-${date}`) === 'true') return 'skipped';
+  return null;
 }
 
 export function setTaskStatus(profileId: string, taskId: string, date: string, status: TaskStatus | null) {
   const key = `task-${profileId}-${taskId}-${date}`;
+  const delKey = `task-del-${profileId}-${taskId}-${date}`;
   if (!status) localStorage.removeItem(key);
   else localStorage.setItem(key, status);
+  localStorage.removeItem(delKey);
 
   if (status === 'done') {
     localStorage.setItem(`streak-${profileId}-${date}`, 'true');
@@ -1802,9 +1807,9 @@ export function setTaskStatus(profileId: string, taskId: string, date: string, s
   }
 }
 
-/** Skipped for a single date only (Delete for Today). */
+/** Skipped for a single date only (Skip Just Today). */
 export function isTaskSkippedForDate(profileId: string, taskId: string, date: string): boolean {
-  return localStorage.getItem(`task-del-${profileId}-${taskId}-${date}`) === 'true';
+  return getTaskStatus(profileId, taskId, date) === 'skipped';
 }
 
 /** @deprecated Use isTaskSkippedForDate for day skips or isTaskActiveForDate for inclusion checks. */
@@ -1820,8 +1825,13 @@ export function isTaskPermanentlyRemoved(profileId: string, taskId: string): boo
 /** Single source of truth: should this task appear anywhere for this date? */
 export function isTaskActiveForDate(profileId: string, taskId: string, dateKey: string): boolean {
   if (isTaskPermanentlyRemoved(profileId, taskId)) return false;
-  if (isTaskSkippedForDate(profileId, taskId, dateKey)) return false;
   return true;
+}
+
+/** Mark a task as skipped for one day — stays visible with dimmed Skipped state. */
+export function skipTaskForToday(profileId: string, taskId: string, date: string) {
+  setTaskStatus(profileId, taskId, date, 'skipped');
+  try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch { /* ignore */ }
 }
 
 /** Remove per-task localStorage state after permanent deletion. */
@@ -1875,14 +1885,7 @@ export function permanentlyHideSeedTask(profileId: string, taskId: string) {
 }
 
 export function markTaskDeleted(profileId: string, taskId: string, date: string) {
-  localStorage.setItem(`task-del-${profileId}-${taskId}-${date}`, 'true');
-
-  // Sync to Supabase (async, non-blocking)
-  import('./supabaseSync').then(({ syncTaskDeletion }) => {
-    syncTaskDeletion(profileId, taskId, date);
-  });
-  import('./cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId));
-  try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch {}
+  skipTaskForToday(profileId, taskId, date);
 }
 
 // ──────────────────────────────────────────────

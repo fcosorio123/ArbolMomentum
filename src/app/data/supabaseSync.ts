@@ -23,7 +23,7 @@ export async function syncTaskStatus(
   profileId: string,
   taskId: string,
   date: string,
-  status: 'inprogress' | 'done' | null
+  status: 'inprogress' | 'done' | 'skipped' | null
 ): Promise<void> {
   // NOTE: localStorage is handled by profiles.ts - we only sync to Supabase here
 

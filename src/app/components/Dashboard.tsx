@@ -169,14 +169,18 @@ export function Dashboard({
     let done = 0, total = 0;
     cats.forEach(cat => cat.tasks.forEach(t => {
       if (!isTaskActiveForDate(profile.id, t.id, today)) return;
+      const st = getTaskStatus(profile.id, t.id, today);
+      if (st === 'skipped') return;
       total++;
-      if (getTaskStatus(profile.id, t.id, today) === 'done') done++;
+      if (st === 'done') done++;
     }));
     uts.forEach(ut => {
       if (!isTaskScheduledForDate(ut, today)) return;
       if (!isTaskActiveForDate(profile.id, ut.id, today)) return;
+      const st = getTaskStatus(profile.id, ut.id, today);
+      if (st === 'skipped') return;
       total++;
-      if (getTaskStatus(profile.id, ut.id, today) === 'done') done++;
+      if (st === 'done') done++;
     });
     return { todayDone: done, todayTotal: total };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -220,7 +224,7 @@ export function Dashboard({
     const seedCats = getTaskCategoriesForProfile(profile.id);
     seedCats.forEach(cat => {
       cat.tasks.forEach(task => {
-        if (isTaskActiveForDate(profile.id, task.id, today) && getTaskStatus(profile.id, task.id, today) !== 'done') {
+        if (isTaskActiveForDate(profile.id, task.id, today) && getTaskStatus(profile.id, task.id, today) !== 'done' && getTaskStatus(profile.id, task.id, today) !== 'skipped') {
           const goalTitle = cat.goalId ? goalMap[cat.goalId] : undefined;
           candidates.push({ id: task.id, label: task.label, timeOfDay: task.timeOfDay, goalTitle });
         }
@@ -229,7 +233,7 @@ export function Dashboard({
 
     // User tasks - only if scheduled for today
     getUserTasks(profile.id).filter(ut => isTaskScheduledForDate(ut, today)).forEach(ut => {
-      if (isTaskActiveForDate(profile.id, ut.id, today) && getTaskStatus(profile.id, ut.id, today) !== 'done') {
+      if (isTaskActiveForDate(profile.id, ut.id, today) && getTaskStatus(profile.id, ut.id, today) !== 'done' && getTaskStatus(profile.id, ut.id, today) !== 'skipped') {
         const goalTitle = ut.goalId ? goalMap[ut.goalId] : undefined;
         candidates.push({ id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, goalTitle });
       }
