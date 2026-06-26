@@ -1621,7 +1621,11 @@ function getTodayDayName(): string {
  * Does NOT include the "personal-goals" coming-soon placeholder -
  * TaskList renders that separately as the first section.
  */
-export function getTaskCategoriesForProfile(profileId: string, dayName?: string): TaskCategory[] {
+export function getTaskCategoriesForProfile(
+  profileId: string,
+  dayName?: string,
+  includeHidden = false,
+): TaskCategory[] {
   const day = dayName ?? getTodayDayName();
   let categories: TaskCategory[];
   switch (profileId) {
@@ -1635,7 +1639,7 @@ export function getTaskCategoriesForProfile(profileId: string, dayName?: string)
     case 'eunice': categories = EUNICE_BY_DAY[day] ?? []; break;
     default:       categories = TASK_CATEGORIES.filter(c => c.id !== 'personal-goals');
   }
-  return filterHiddenSeedCategories(profileId, categories);
+  return includeHidden ? categories : filterHiddenSeedCategories(profileId, categories);
 }
 
 export function getAllTasks(): Task[] {
@@ -1883,6 +1887,7 @@ export function permanentlyHideSeedTask(profileId: string, taskId: string) {
   import('./cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId));
   try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch { /* ignore */ }
   try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch { /* ignore */ }
+  import('./dashboardSnapshot').then(({ dispatchDashboardRefresh }) => dispatchDashboardRefresh());
 }
 
 export function markTaskDeleted(profileId: string, taskId: string, date: string) {

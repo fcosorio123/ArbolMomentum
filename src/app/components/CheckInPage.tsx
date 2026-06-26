@@ -154,6 +154,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
   const markDoneToday = () => {
     localStorage.setItem(`arbol-checkin-${profile.id}-${today}`, 'true');
     try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
+    import('../data/dashboardSnapshot').then(({ dispatchDashboardRefresh }) => dispatchDashboardRefresh());
 
     import('../data/emailSettings').then(({ isEmailTypeEnabled }) => {
       if (!isEmailTypeEnabled('checkInConfirmationEnabled')) return;

@@ -34,6 +34,66 @@ function goalAccent(goalId: string) {
   return ACCENT_COLORS[Math.abs(goalId.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % ACCENT_COLORS.length];
 }
 
+function TaskSummaryRow({ task }: { task: TodayTaskRow }) {
+  const isRemoved = task.disposition === 'removed';
+  const isSkipped = task.disposition === 'skipped';
+  const isDone = !isRemoved && !isSkipped && task.status === 'done';
+  const isIP = !isRemoved && !isSkipped && task.status === 'inprogress';
+  const disabled = isRemoved || isSkipped;
+
+  const dotColor = isRemoved ? '#ef4565' : isSkipped ? '#ef4565' : isDone ? '#22c55e' : isIP ? '#f5a623' : C.borderStrong;
+
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        opacity: disabled ? 0.65 : 1,
+        pointerEvents: 'none',
+      }}
+    >
+      <span style={{
+        width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+        background: isDone ? '#22c55e' : isIP ? '#f5a623' : isRemoved || isSkipped ? '#ef456520' : 'none',
+        border: `2px solid ${dotColor}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {isDone && <span style={{ color: '#fff', fontSize: 8, lineHeight: 1 }}>✓</span>}
+        {isIP && <span style={{ color: '#fff', fontSize: 7, lineHeight: 1 }}>◑</span>}
+        {(isSkipped || isRemoved) && <span style={{ color: '#ef4565', fontSize: 8, lineHeight: 1 }}>✕</span>}
+      </span>
+      <span style={{
+        fontSize: 12,
+        color: disabled ? C.secondary : isDone ? C.secondary : C.body,
+        textDecoration: isDone || disabled ? 'line-through' : 'none',
+        lineHeight: 1.4, flex: 1,
+      }}>
+        {task.label}
+      </span>
+      {(isSkipped || isRemoved) && (
+        <span style={{
+          fontSize: 9, fontWeight: 700, color: '#ef4565',
+          background: '#ef456512', border: '1px solid #ef456530',
+          borderRadius: 4, padding: '1px 5px', flexShrink: 0, textTransform: 'uppercase',
+        }}>
+          {isRemoved ? 'Removed' : 'Skipped'}
+        </span>
+      )}
+      <span style={{ fontSize: 10, color: C.secondary, flexShrink: 0 }}>
+        {task.timeOfDay === 'morning' ? '☀️' : '🌙'}
+      </span>
+    </div>
+  );
+}
+
+function statusSummary(snapshot: ReturnType<typeof getDashboardSnapshot>) {
+  const parts: string[] = [];
+  if (snapshot.inProgressCount > 0) parts.push(`${snapshot.inProgressCount} in progress`);
+  if (snapshot.notStartedCount > 0) parts.push(`${snapshot.notStartedCount} not started`);
+  if (snapshot.skippedCount > 0) parts.push(`${snapshot.skippedCount} skipped`);
+  if (snapshot.removedCount > 0) parts.push(`${snapshot.removedCount} removed`);
+  return parts.join(' · ') || '0 not started';
+}
+
 export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVersion = 0 }: Props) {
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [expandedGoals, setExpandedGoals] = useState<Set<string>>(new Set());
@@ -52,27 +112,27 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
   }, []);
 
   const {
-    countableTasks: visible,
+    countableTasks,
     doneCount: done,
-    inProgressCount: inProgress,
     progressPercent: pct,
     streak: displayStreak,
     goalTaskGroups,
     ungroupedTasks,
+    checkedIn,
   } = snapshot;
 
   const hour = new Date().getHours();
   const preferredTime = hour >= 17 ? 'evening' : 'morning';
   const whatNext: TodayTaskRow | undefined =
-    visible.find(t => t.status === 'inprogress' && t.timeOfDay === preferredTime)
-    ?? visible.find(t => t.status === null && t.timeOfDay === preferredTime)
-    ?? visible.find(t => t.status !== 'done');
+    countableTasks.find(t => t.status === 'inprogress' && t.timeOfDay === preferredTime)
+    ?? countableTasks.find(t => t.status === null && t.timeOfDay === preferredTime)
+    ?? countableTasks.find(t => t.status !== 'done');
 
   const whatNextGoal = whatNext?.goalId
     ? snapshot.personalGoals.find(g => g.id === whatNext.goalId)
     : undefined;
 
-  const remaining = visible.filter(t => t.status !== 'done').length;
+  const remaining = countableTasks.filter(t => t.status !== 'done').length;
 
   const handleClose = () => {
     if (dontShowAgain) localStorage.setItem(SUPPRESS_KEY(profile.id), 'true');
@@ -94,17 +154,23 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
       footer={null}
       centered
       closable={false}
-      width="min(360px, calc(100vw - 24px))"
+      width="min(400px, calc(100vw - 16px))"
       styles={{
-        content: { borderRadius: 24, padding: 0, overflow: 'hidden', maxWidth: 360, margin: '0 auto' },
+        content: {
+          borderRadius: 24, padding: 0, overflow: 'hidden',
+          maxWidth: 'min(400px, calc(100vw - 16px))',
+          maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+        },
+        body: { padding: 0, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
         mask: { backdropFilter: 'blur(6px)', background: 'rgba(9,64,103,0.3)' },
       }}
     >
-      <div>
+      <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden' }}>
         {/* Header band */}
         <div style={{
           background: `linear-gradient(135deg, ${C.headline} 0%, #1a6da8 100%)`,
-          padding: '24px 24px 20px',
+          padding: '20px 16px 18px',
+          flexShrink: 0,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
@@ -133,19 +199,23 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
             />
             <div>
               <div style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>
-                {done} of {visible.length} tasks done
+                {done} of {snapshot.totalCount} tasks done
               </div>
-              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 3 }}>
-                {inProgress > 0 && `${inProgress} in progress · `}{visible.length - done - inProgress} not started
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 3, lineHeight: 1.45 }}>
+                {statusSummary(snapshot)}
               </div>
+              {!checkedIn && (
+                <div style={{ color: '#ffc9c9', fontSize: 11, marginTop: 6, fontWeight: 600 }}>
+                  Daily check-in pending
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Body */}
-        <div style={{ padding: '20px 24px 24px', maxHeight: '60vh', overflowY: 'auto' }}>
+        {/* Scrollable body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 0', minHeight: 0 }}>
 
-          {/* Do this now */}
           {whatNext && pct < 100 && (
             <div style={{
               background: `${C.primary}10`, border: `1.5px solid ${C.primary}25`,
@@ -199,9 +269,8 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
             </div>
           )}
 
-          {/* Goals & Progress */}
           {(goalGroupsForDisplay.length > 0 || ungroupedTasks.length > 0) && (
-            <div style={{ marginBottom: 18 }}>
+            <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 12 }}>
                 <StarFilled style={{ color: C.tertiary, fontSize: 11 }} />
                 <span style={{ fontSize: 11, color: C.secondary, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>
@@ -211,10 +280,11 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
 
               {goalGroupsForDisplay.map(({ goal, tasks }) => {
                 const accentColor = goalAccent(goal.id);
-                const tasksDone = tasks.filter(t => t.status === 'done').length;
-                const goalPct = tasks.length > 0 ? Math.round((tasksDone / tasks.length) * 100) : 0;
+                const countable = tasks.filter(t => t.disposition === 'active');
+                const tasksDone = countable.filter(t => t.status === 'done').length;
+                const goalPct = countable.length > 0 ? Math.round((tasksDone / countable.length) * 100) : 0;
                 const isExpanded = expandedGoals.has(goal.id);
-                const allDone = tasks.length > 0 && tasksDone === tasks.length;
+                const allDone = countable.length > 0 && tasksDone === countable.length;
 
                 return (
                   <div key={goal.id} style={{
@@ -266,7 +336,7 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
                     >
                       <span style={{ fontSize: 10, color: C.secondary, fontWeight: 500 }}>Today:</span>
                       <span style={{ fontSize: 10, fontWeight: 700, color: allDone ? '#22c55e' : accentColor }}>
-                        {tasksDone}/{tasks.length} tasks
+                        {tasksDone}/{countable.length} tasks
                       </span>
                       {allDone && <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 700 }}>✓ Done!</span>}
                       <span style={{ flex: 1 }} />
@@ -283,41 +353,13 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
                         padding: '8px 14px 10px',
                         display: 'flex', flexDirection: 'column', gap: 6,
                       }}>
-                        {tasks.map(task => {
-                          const isDone = task.status === 'done';
-                          const isIP = task.status === 'inprogress';
-                          const dotColor = isDone ? '#22c55e' : isIP ? '#f5a623' : C.borderStrong;
-                          return (
-                            <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span style={{
-                                width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
-                                background: isDone ? '#22c55e' : isIP ? '#f5a623' : 'none',
-                                border: `2px solid ${dotColor}`,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              }}>
-                                {isDone && <span style={{ color: '#fff', fontSize: 8, lineHeight: 1 }}>✓</span>}
-                                {isIP && <span style={{ color: '#fff', fontSize: 7, lineHeight: 1 }}>◑</span>}
-                              </span>
-                              <span style={{
-                                fontSize: 12, color: isDone ? C.secondary : C.body,
-                                textDecoration: isDone ? 'line-through' : 'none',
-                                lineHeight: 1.4, flex: 1,
-                              }}>
-                                {task.label}
-                              </span>
-                              <span style={{ fontSize: 10, color: C.secondary, flexShrink: 0 }}>
-                                {task.timeOfDay === 'morning' ? '☀️' : '🌙'}
-                              </span>
-                            </div>
-                          );
-                        })}
+                        {tasks.map(task => <TaskSummaryRow key={task.id} task={task} />)}
                       </div>
                     )}
                   </div>
                 );
               })}
 
-              {/* Ungrouped tasks */}
               {ungroupedTasks.length > 0 && (
                 <div style={{ marginTop: goalGroupsForDisplay.length > 0 ? 6 : 0 }}>
                   {goalGroupsForDisplay.length > 0 && (
@@ -336,7 +378,8 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
                     >
                       <span style={{ fontSize: 10, color: C.secondary, fontWeight: 500 }}>Routines:</span>
                       <span style={{ fontSize: 10, fontWeight: 700, color: C.primary }}>
-                        {ungroupedTasks.filter(t => t.status === 'done').length}/{ungroupedTasks.length} tasks
+                        {ungroupedTasks.filter(t => t.disposition === 'active' && t.status === 'done').length}/
+                        {ungroupedTasks.filter(t => t.disposition === 'active').length} tasks
                       </span>
                       <span style={{ flex: 1 }} />
                       <span style={{
@@ -349,34 +392,7 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
                         borderTop: `1px solid ${C.border}`, padding: '8px 14px 10px',
                         display: 'flex', flexDirection: 'column', gap: 6,
                       }}>
-                        {ungroupedTasks.map(task => {
-                          const isDone = task.status === 'done';
-                          const isIP = task.status === 'inprogress';
-                          const dotColor = isDone ? '#22c55e' : isIP ? '#f5a623' : C.borderStrong;
-                          return (
-                            <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span style={{
-                                width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
-                                background: isDone ? '#22c55e' : isIP ? '#f5a623' : 'none',
-                                border: `2px solid ${dotColor}`,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              }}>
-                                {isDone && <span style={{ color: '#fff', fontSize: 8, lineHeight: 1 }}>✓</span>}
-                                {isIP && <span style={{ color: '#fff', fontSize: 7, lineHeight: 1 }}>◑</span>}
-                              </span>
-                              <span style={{
-                                fontSize: 12, color: isDone ? C.secondary : C.body,
-                                textDecoration: isDone ? 'line-through' : 'none',
-                                flex: 1, lineHeight: 1.4,
-                              }}>
-                                {task.label}
-                              </span>
-                              <span style={{ fontSize: 10, color: C.secondary, flexShrink: 0 }}>
-                                {task.timeOfDay === 'morning' ? '☀️' : '🌙'}
-                              </span>
-                            </div>
-                          );
-                        })}
+                        {ungroupedTasks.map(task => <TaskSummaryRow key={task.id} task={task} />)}
                       </div>
                     )}
                   </div>
@@ -384,9 +400,14 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
               )}
             </div>
           )}
+        </div>
 
-          {/* Don't show again */}
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 16 }}>
+        {/* Pinned footer — always reachable on small screens */}
+        <div style={{
+          flexShrink: 0, padding: '12px 16px 16px',
+          borderTop: `1px solid ${C.border}`, background: C.bg,
+        }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 12 }}>
             <input
               type="checkbox"
               checked={dontShowAgain}
@@ -396,7 +417,6 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
             <span style={{ fontSize: 13, color: C.secondary }}>Don't show this again</span>
           </label>
 
-          {/* CTAs */}
           <button
             onClick={() => { handleClose(); onStartTasks(); }}
             style={{
