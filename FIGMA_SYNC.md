@@ -1,12 +1,51 @@
-# Sync GitHub → Figma Make (private repo, no Push to GitHub)
+# Sync GitHub → Figma Make (no Push to GitHub from Figma)
 
 GitHub `main` is the source of truth. **Never click Push to GitHub in Figma.**
 
 ---
 
+## ArbolMomentum Running Backup (safety net before Publish)
+
+**Publish in Figma Make deploys to figma.site — it does not overwrite GitHub.**  
+The real risk is accidentally **Push to GitHub** from Figma (already auto-reverted) or losing track of what was last good before a publish.
+
+This repo keeps a **Running Backup** branch on GitHub:
+
+| What | Where |
+|------|--------|
+| Live code | `main` |
+| Snapshot mirror | `running-backup` (auto-updated after every push to `main`) |
+| Pre-publish tag (optional) | `running-backup/YYYY-MM-DD-HHmm` |
+
+### Automatic (after every Cursor push)
+
+GitHub Actions mirrors `main` → `running-backup` within ~1 minute.
+
+### Manual (right before Figma Publish → Update)
+
+```bash
+npm run backup:running
+```
+
+Or on Windows: `.\scripts\Update-RunningBackup.ps1`
+
+This updates `running-backup` and adds a **dated tag** so you can restore an exact moment.
+
+### Restore if something goes wrong
+
+```bash
+git fetch origin
+git checkout running-backup
+# or reset main locally: git reset --hard origin/running-backup
+```
+
+**Recommended workflow:** Cursor → push `main` → (optional) `npm run backup:running` → Figma Make pull/ZIP sync → **Publish → Update**.
+
+---
+
 ## Method 1 — ZIP upload (recommended, always works)
 
-No GitHub token in Figma. No account mismatch. Repo stays private.
+No GitHub token required in Figma. Repo can be public or private.
 
 ### Step 1 — Get a ZIP of GitHub main
 

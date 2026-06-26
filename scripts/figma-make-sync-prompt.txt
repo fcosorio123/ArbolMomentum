@@ -9,7 +9,7 @@ The repository ALREADY EXISTS (do NOT create it, do NOT push to GitHub):
 
 If you cannot see this repo, STOP and tell me. Do NOT suggest Push to GitHub or Create repository.
 
-Access: PRIVATE. I will provide a read-only PAT via Option A. The PAT must belong to GitHub user fcosorio123 OR a collaborator with read access to fcosorio123/ArbolMomentum.
+Access: PUBLIC (read-only sync). Do NOT push, commit, or write anything to GitHub.
 
 Your job:
 1. List the repository names you can access with my PAT (so we can verify ArbolMomentum is included).
