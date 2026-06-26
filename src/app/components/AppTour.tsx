@@ -58,13 +58,10 @@ export function sortTourStepsTopToBottom(steps: PageTourStep[]): PageTourStep[] 
 const HIGHLIGHT_PAD = 10;
 const MASK_COLOR = 'rgba(9, 64, 103, 0.62)';
 const MASK_ID = 'arbol-tour-spotlight-mask';
+const VIEWPORT_MARGIN = 12;
 
-interface HighlightRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  radius: number;
+function viewportHeight() {
+  return window.visualViewport?.height ?? window.innerHeight;
 }
 
 function measureHighlight(el: HTMLElement): HighlightRect {
@@ -76,6 +73,14 @@ function measureHighlight(el: HTMLElement): HighlightRect {
     height: r.height + HIGHLIGHT_PAD * 2,
     radius: 14,
   };
+}
+
+interface HighlightRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  radius: number;
 }
 
 interface TooltipLayout {
@@ -92,9 +97,9 @@ function computeTooltipLayout(
   placement: TourPlacement,
 ): TooltipLayout {
   const gap = 14;
-  const margin = 16;
+  const margin = VIEWPORT_MARGIN;
   const vw = window.innerWidth;
-  const vh = window.innerHeight;
+  const vh = viewportHeight();
 
   const candidates: TourPlacement[] =
     placement === 'auto'
@@ -117,6 +122,7 @@ function computeTooltipLayout(
       arrowOffset = holeCenterX - left;
       if (top + tooltipH <= vh - margin) {
         left = clamp(left, margin, vw - tooltipW - margin);
+        top = clamp(top, margin, vh - tooltipH - margin);
         arrowOffset = clamp(holeCenterX - left, 24, tooltipW - 24);
         return { top, left, arrowSide, arrowOffset };
       }
@@ -129,6 +135,7 @@ function computeTooltipLayout(
       arrowOffset = holeCenterX - left;
       if (top >= margin) {
         left = clamp(left, margin, vw - tooltipW - margin);
+        top = clamp(top, margin, vh - tooltipH - margin);
         arrowOffset = clamp(holeCenterX - left, 24, tooltipW - 24);
         return { top, left, arrowSide, arrowOffset };
       }
@@ -259,13 +266,25 @@ interface TourTooltipProps {
   showInteract?: boolean;
   interactLabel?: string;
   onInteract?: () => void;
+  onMeasure: (height: number) => void;
 }
 
 function TourTooltip({
   step, current, total, layout, onNext, onSkip, isLast,
-  showInteract, interactLabel, onInteract,
+  showInteract, interactLabel, onInteract, onMeasure,
 }: TourTooltipProps) {
   const cardRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const report = () => onMeasure(el.getBoundingClientRect().height);
+    report();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(report);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [step, showInteract, onMeasure]);
 
   if (!layout) return null;
 
@@ -282,28 +301,28 @@ function TourTooltip({
       top: -arrowSize,
       left: layout.arrowOffset - arrowSize,
       borderWidth: `0 ${arrowSize}px ${arrowSize}px ${arrowSize}px`,
-      borderColor: `transparent transparent #fff transparent`,
+      borderColor: 'transparent transparent #fff transparent',
     });
   } else if (layout.arrowSide === 'bottom') {
     Object.assign(arrowStyle, {
       bottom: -arrowSize,
       left: layout.arrowOffset - arrowSize,
       borderWidth: `${arrowSize}px ${arrowSize}px 0 ${arrowSize}px`,
-      borderColor: `#fff transparent transparent transparent`,
+      borderColor: '#fff transparent transparent transparent',
     });
   } else if (layout.arrowSide === 'left') {
     Object.assign(arrowStyle, {
       left: -arrowSize,
       top: layout.arrowOffset - arrowSize,
       borderWidth: `${arrowSize}px ${arrowSize}px ${arrowSize}px 0`,
-      borderColor: `transparent #fff transparent transparent`,
+      borderColor: 'transparent #fff transparent transparent',
     });
   } else {
     Object.assign(arrowStyle, {
       right: -arrowSize,
       top: layout.arrowOffset - arrowSize,
       borderWidth: `${arrowSize}px 0 ${arrowSize}px ${arrowSize}px`,
-      borderColor: `transparent transparent transparent #fff`,
+      borderColor: 'transparent transparent transparent #fff',
     });
   }
 
@@ -317,66 +336,79 @@ function TourTooltip({
         top: layout.top,
         left: layout.left,
         zIndex: 9999,
-        width: 'min(340px, calc(100vw - 32px))',
+        width: 'min(340px, calc(100vw - 24px))',
+        maxHeight: `calc(${viewportHeight()}px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - ${VIEWPORT_MARGIN * 2}px)`,
         background: '#fff',
         borderRadius: 18,
         boxShadow: '0 12px 40px rgba(9,64,103,0.22), 0 2px 8px rgba(9,64,103,0.08)',
         border: '1px solid rgba(9,64,103,0.1)',
         animation: 'arbolTourCardIn 0.22s ease',
         pointerEvents: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
       }}
     >
       <div style={arrowStyle} />
-      <div style={{ padding: '16px 18px 0' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center',
-            padding: '3px 10px', borderRadius: 999,
-            background: `${C.primary}18`, color: C.headline,
-            fontSize: 10, fontWeight: 800, letterSpacing: 0.6,
-            textTransform: 'uppercase',
-          }}>
-            Tour
-          </span>
-          <button
-            type="button"
-            onClick={onSkip}
-            aria-label="Close tour"
-            style={{
-              background: 'none', border: 'none', padding: 4, margin: -4,
-              cursor: 'pointer', color: C.secondary, lineHeight: 0,
-            }}
-          >
-            <CloseOutlined style={{ fontSize: 14 }} />
-          </button>
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        minHeight: 0,
+        WebkitOverflowScrolling: 'touch',
+      }}>
+        <div style={{ padding: '16px 18px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center',
+              padding: '3px 10px', borderRadius: 999,
+              background: `${C.primary}18`, color: C.headline,
+              fontSize: 10, fontWeight: 800, letterSpacing: 0.6,
+              textTransform: 'uppercase',
+            }}>
+              Tour
+            </span>
+            <button
+              type="button"
+              onClick={onSkip}
+              aria-label="Close tour"
+              style={{
+                background: 'none', border: 'none', padding: 4, margin: -4,
+                cursor: 'pointer', color: C.secondary, lineHeight: 0,
+              }}
+            >
+              <CloseOutlined style={{ fontSize: 14 }} />
+            </button>
+          </div>
+          <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 800, color: C.headline, lineHeight: 1.35 }}>
+            {step.title}
+          </h3>
+          <p style={{ margin: 0, fontSize: 13, color: C.body, lineHeight: 1.55 }}>
+            {step.description}
+          </p>
+          {showInteract && onInteract && (
+            <button
+              type="button"
+              onClick={onInteract}
+              style={{
+                marginTop: 14,
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                background: 'linear-gradient(135deg, #ef4565, #f5a623)',
+                border: 'none', borderRadius: 10,
+                padding: '8px 14px', cursor: 'pointer',
+                color: '#fff', fontSize: 12, fontWeight: 700,
+              }}
+            >
+              {interactLabel}
+            </button>
+          )}
         </div>
-        <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 800, color: C.headline, lineHeight: 1.35 }}>
-          {step.title}
-        </h3>
-        <p style={{ margin: 0, fontSize: 13, color: C.body, lineHeight: 1.55 }}>
-          {step.description}
-        </p>
-        {showInteract && onInteract && (
-          <button
-            type="button"
-            onClick={onInteract}
-            style={{
-              marginTop: 14,
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              background: 'linear-gradient(135deg, #ef4565, #f5a623)',
-              border: 'none', borderRadius: 10,
-              padding: '8px 14px', cursor: 'pointer',
-              color: '#fff', fontSize: 12, fontWeight: 700,
-            }}
-          >
-            {interactLabel}
-          </button>
-        )}
       </div>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        gap: 10, padding: '14px 18px 16px', marginTop: 14,
+        gap: 10, padding: '14px 18px calc(16px + env(safe-area-inset-bottom, 0px))',
         borderTop: '1px solid rgba(9,64,103,0.08)',
+        flexShrink: 0,
+        background: '#fff',
       }}>
         <button type="button" onClick={onSkip} className="arbol-tour-skip-btn">
           Skip
@@ -497,6 +529,12 @@ export function PageTour({
     setTooltipLayout(layout);
   }, [step]);
 
+  const handleTooltipMeasure = useCallback((height: number) => {
+    tooltipSize.current.h = Math.max(height, 120);
+    tooltipSize.current.w = Math.min(340, window.innerWidth - 24);
+    measureStep();
+  }, [measureStep]);
+
   useLayoutEffect(() => {
     if (!open || !step) return;
     const el = resolveTarget(step);
@@ -514,6 +552,7 @@ export function PageTour({
       parent.addEventListener('scroll', onScrollOrResize, { passive: true });
     });
     window.addEventListener('resize', onScrollOrResize);
+    window.visualViewport?.addEventListener('resize', onScrollOrResize);
 
     let ro: ResizeObserver | undefined;
     if (typeof ResizeObserver !== 'undefined') {
@@ -529,6 +568,7 @@ export function PageTour({
         parent.removeEventListener('scroll', onScrollOrResize);
       });
       window.removeEventListener('resize', onScrollOrResize);
+      window.visualViewport?.removeEventListener('resize', onScrollOrResize);
       ro?.disconnect();
     };
   }, [open, step, current, measureStep]);
@@ -575,6 +615,7 @@ export function PageTour({
             showInteract={isLast && !!onInteract}
             interactLabel={interactLabel}
             onInteract={handleInteract}
+            onMeasure={handleTooltipMeasure}
           />
         </>,
         document.body,
@@ -584,34 +625,46 @@ export function PageTour({
         onCancel={() => setShowDone(false)}
         footer={null}
         centered
-        width={320}
+        width="min(360px, calc(100vw - 24px))"
         styles={{
-          content: { borderRadius: 16, padding: 0, overflow: 'hidden' },
+          content: {
+            borderRadius: 16, padding: 0, overflow: 'hidden',
+            maxHeight: 'min(90vh, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px))',
+          },
+          body: { maxHeight: 'inherit', overflow: 'hidden' },
           mask: { zIndex: 1100 },
           wrapper: { zIndex: 1100 },
         }}
       >
-        <div style={{ height: 4, background: `linear-gradient(90deg, ${C.primary}, #3da9fc)` }} />
-        <div style={{ padding: '24px 20px 20px', textAlign: 'center' }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>{doneEmoji}</div>
-          <h3 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 800, color: C.headline }}>
-            {pageLabel} — ready!
-          </h3>
-          <p style={{ margin: '0 0 20px', color: C.body, fontSize: 13, lineHeight: 1.55 }}>
-            {doneMessage ?? `Tap ? anytime to revisit this tour.`}
-          </p>
-          <Button
-            type="primary"
-            block
-            onClick={() => setShowDone(false)}
-            style={{
-              borderRadius: 12, height: 44, fontWeight: 700,
-              background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
-              border: 'none', fontSize: 14,
-            }}
-          >
-            Got It
-          </Button>
+        <div style={{
+          display: 'flex', flexDirection: 'column',
+          maxHeight: 'min(90vh, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px))',
+        }}>
+          <div style={{ height: 4, background: `linear-gradient(90deg, ${C.primary}, #3da9fc)` }} />
+          <div style={{
+            padding: '24px 20px calc(20px + env(safe-area-inset-bottom, 0px))',
+            textAlign: 'center', overflowY: 'auto', flex: 1, minHeight: 0,
+          }}>
+            <div style={{ fontSize: 40, marginBottom: 8 }}>{doneEmoji}</div>
+            <h3 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 800, color: C.headline }}>
+              {pageLabel} — ready!
+            </h3>
+            <p style={{ margin: '0 0 20px', color: C.body, fontSize: 13, lineHeight: 1.55 }}>
+              {doneMessage ?? `Tap ? anytime to revisit this tour.`}
+            </p>
+            <Button
+              type="primary"
+              block
+              onClick={() => setShowDone(false)}
+              style={{
+                borderRadius: 12, height: 44, fontWeight: 700,
+                background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
+                border: 'none', fontSize: 14,
+              }}
+            >
+              Got It
+            </Button>
+          </div>
         </div>
       </Modal>
     </>

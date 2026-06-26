@@ -103,7 +103,7 @@ export function CoachMarks({ onDone }: Props) {
         background: 'rgba(5,30,55,0.72)',
         backdropFilter: 'blur(6px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '20px 16px',
+        padding: 'max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom))',
       }}
     >
       {/* Card - stop click-through */}
@@ -111,6 +111,7 @@ export function CoachMarks({ onDone }: Props) {
         onClick={e => e.stopPropagation()}
         style={{
           width: '100%', maxWidth: 390,
+          maxHeight: 'min(90vh, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 32px))',
           background: C.bgCard,
           borderRadius: 28,
           boxShadow: '0 24px 64px rgba(5,30,55,0.45), 0 4px 16px rgba(5,30,55,0.2)',
@@ -156,8 +157,12 @@ export function CoachMarks({ onDone }: Props) {
           }} />
         </div>
 
-        {/* Main content */}
-        <div style={{ padding: '28px 28px 0', textAlign: 'center' }}>
+        {/* Main content — scrolls on small screens */}
+        <div style={{
+          padding: '28px 28px 0', textAlign: 'center',
+          flex: 1, overflowY: 'auto', minHeight: 0,
+          WebkitOverflowScrolling: 'touch',
+        }}>
           {/* Emoji in a tinted circle */}
           <div style={{
             width: 88, height: 88, borderRadius: '50%',
@@ -199,7 +204,7 @@ export function CoachMarks({ onDone }: Props) {
         {/* Dot indicators */}
         <div style={{
           display: 'flex', justifyContent: 'center', gap: 7,
-          padding: '22px 0 4px',
+          padding: '22px 0 4px', flexShrink: 0,
         }}>
           {STEPS.map((_, i) => (
             <button
@@ -215,8 +220,13 @@ export function CoachMarks({ onDone }: Props) {
           ))}
         </div>
 
-        {/* Action buttons */}
-        <div style={{ padding: '16px 20px 24px', display: 'flex', gap: 10 }}>
+        {/* Action buttons — pinned at bottom */}
+        <div style={{
+          padding: '16px 20px calc(24px + env(safe-area-inset-bottom, 0px))',
+          display: 'flex', gap: 10, flexShrink: 0,
+          borderTop: '1px solid rgba(9,64,103,0.06)',
+          background: C.bgCard,
+        }}>
           {!isFirst && (
             <button
               onClick={() => setStep(s => s - 1)}
@@ -249,8 +259,9 @@ export function CoachMarks({ onDone }: Props) {
             onClick={onDone}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
-              color: C.secondary, fontSize: 12, paddingBottom: 20,
-              width: '100%', textAlign: 'center',
+              color: C.secondary, fontSize: 12,
+              paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
+              width: '100%', textAlign: 'center', flexShrink: 0,
             }}
           >
             Skip tour

@@ -26,6 +26,8 @@ export interface UserTask {
   recurrence?: Recurrence;
   // Dates (YYYY-MM-DD) where this occurrence is explicitly skipped
   skippedDates?: string[];
+  /** Set when a seed task was converted to a user task under a goal */
+  sourceSeedTaskId?: string;
 }
 
 // ── Scheduling helpers ────────────────────────────────────────────────

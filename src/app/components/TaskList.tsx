@@ -4,7 +4,7 @@ import { DeleteOutlined, CheckCircleFilled, PlayCircleOutlined, ArrowRightOutlin
 import {
   type Profile, type Task, type TaskStatus,
   getTaskCategoriesForProfile, getTaskStatus, setTaskStatus,
-  skipTaskForToday, permanentlyHideSeedTask, getTodayKey,
+  skipTaskForToday, permanentlyHideSeedTask, getTodayKey, getPermanentlyHiddenSeedTaskIds,
   getEarnedBadges, type Badge,
 } from '../data/profiles';
 import {
@@ -62,29 +62,38 @@ function taskDurationLabel(task: UserTask_): string {
 
 // ── Task item
 function TaskItem({
-  task, catColor, status, remark, onOpenUpdate, onDelete, onEdit,
+  task, catColor, status, remark, onOpenUpdate, onDelete, onEdit, statusLocked,
 }: {
   task: UserTask_; catColor: string; status: TaskStatus | null; remark?: string;
   onOpenUpdate: () => void; onDelete: () => void;
   onEdit?: () => void;
+  statusLocked?: boolean;
 }) {
   const isSkipped = status === 'skipped';
   const display = status ? TASK_STATUS_DISPLAY[status] : TASK_STATUS_DISPLAY.null;
   const remarkText = remark ? truncateRemark(remark) : '';
   const showRemark = shouldShowRemark(status, remarkText);
 
+  const handleActivate = () => {
+    if (statusLocked) {
+      onEdit?.();
+      return;
+    }
+    onOpenUpdate();
+  };
+
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={onOpenUpdate}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenUpdate(); } }}
+      onClick={handleActivate}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleActivate(); } }}
       style={{
         display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px',
         background: isSkipped ? display.bg : display.bg,
         borderRadius: 14,
         border: `1.5px solid ${isSkipped ? `${C.tertiary}25` : status ? display.color + '35' : C.border}`,
-        marginBottom: 8, transition: 'all 0.2s', cursor: 'pointer',
+        marginBottom: 8, transition: 'all 0.2s', cursor: statusLocked ? 'default' : 'pointer',
         boxShadow: status === 'done' || isSkipped ? 'none' : C.shadow,
         opacity: isSkipped ? 0.58 : 1,
       }}
@@ -117,12 +126,19 @@ function TaskItem({
         <div style={{ fontSize: 11, color: C.secondary, marginTop: 3 }}>
           {taskDurationLabel(task)}
         </div>
-        <div style={{
-          fontSize: 11, fontWeight: 700, marginTop: 4,
-          color: display.color,
-        }}>
-          {display.label}
-        </div>
+        {statusLocked && (
+          <div style={{ fontSize: 10, color: C.tertiary, marginTop: 4, fontWeight: 600 }}>
+            Assign to a goal to update status
+          </div>
+        )}
+        {!statusLocked && (
+          <div style={{
+            fontSize: 11, fontWeight: 700, marginTop: 4,
+            color: display.color,
+          }}>
+            {display.label}
+          </div>
+        )}
         {showRemark && (
           <div style={{
             fontSize: 11, color: C.secondary, marginTop: 4, lineHeight: 1.35,
@@ -626,15 +642,35 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   // User task management
   const handleSaveUserTask = (data: Omit<UserTask, 'id' | 'profileId' | 'createdAt'> & { applyTo?: 'this' | 'all' }) => {
     const { applyTo, ...taskData } = data;
-    const isNewTask = !editingTask && !editingSeedTaskId;
-    const isSeedConversion = !!editingSeedTaskId;
 
-    if (editingSeedTaskId) {
-      createUserTask(profile.id, taskData);
-      permanentlyHideSeedTask(profile.id, editingSeedTaskId);
+    const resolveSeedId = (): string | null => {
+      if (editingSeedTaskId) return editingSeedTaskId;
+      if (
+        editingTask &&
+        !userTasks.some(u => u.id === editingTask.id) &&
+        allTasks.some(t => t.id === editingTask.id)
+      ) {
+        return editingTask.id;
+      }
+      return null;
+    };
+
+    const seedId = resolveSeedId();
+    const isNewTask = !editingTask && !seedId;
+    const isSeedConversion = !!seedId;
+
+    if (seedId) {
+      createUserTask(profile.id, { ...taskData, sourceSeedTaskId: seedId });
+      permanentlyHideSeedTask(profile.id, seedId);
       setEditingSeedTaskId(null);
     } else if (editingTask) {
-      if (applyTo === 'this') {
+      const existing = userTasks.find(u => u.id === editingTask.id);
+      if (!existing) {
+        createUserTask(profile.id, taskData);
+      } else if (!existing.goalId && taskData.goalId) {
+        // Full move from Routines → Goal (never leave a copy in Routines)
+        updateUserTask(profile.id, editingTask.id, taskData);
+      } else if (applyTo === 'this' && isRecurringUT(existing)) {
         createUserTask(profile.id, {
           ...taskData,
           recurrence: { type: 'one-time', specificDate: today },
@@ -687,9 +723,21 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   goals.forEach(g => { goalTaskMap[g.id] = []; });
   const ungroupedTasks: UserTask_[] = [];
 
+  const hiddenSeedIds = getPermanentlyHiddenSeedTaskIds(profile.id);
+  const convertedSeedIds = new Set(
+    userTasks.map(u => u.sourceSeedTaskId).filter((id): id is string => !!id),
+  );
+  const userTaskIds = new Set(userTasks.map(u => u.id));
+
+  const shouldSkipSeedTask = (seedId: string) =>
+    hiddenSeedIds.has(seedId) || convertedSeedIds.has(seedId);
+
   // Seed tasks from categories
   categories.forEach(cat => {
     cat.tasks.forEach(t => {
+      if (shouldSkipSeedTask(t.id)) return;
+      // Skip seed if a user task already owns this row (same id from a prior conversion)
+      if (userTaskIds.has(t.id)) return;
       const taskObj: UserTask_ = { ...t };
       if (cat.goalId && goalTaskMap[cat.goalId] !== undefined) {
         goalTaskMap[cat.goalId].push(taskObj);
@@ -942,6 +990,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                     key={task.id} task={task} catColor={C.secondary}
                     status={statuses[task.id] ?? null}
                     remark={notes[task.id]}
+                    statusLocked
                     onOpenUpdate={() => openTaskUpdate(task)}
                     onDelete={() => openDeleteTask(task)}
                     onEdit={() => handleEditAnyTask(task, undefined)}
@@ -955,7 +1004,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
       {/* FAB - Add Task */}
       <button
         data-tour-id="tasks-add-btn"
-        onClick={() => { setEditingTask(null); setManageTaskOpen(true); }}
+        onClick={() => { setEditingTask(null); setEditingSeedTaskId(null); setManageTaskOpen(true); }}
         style={{
           position: 'fixed', bottom: 'calc(72px + env(safe-area-inset-bottom, 0px) + 12px)', right: 20, zIndex: 48,
           width: 52, height: 52, borderRadius: '50%',
@@ -1029,7 +1078,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
         pageLabel="Tasks"
         doneEmoji="✅"
         doneMessage="You know how Tasks work. Mark tasks done as you go - every checkmark builds your streak!"
-        onInteract={() => { setEditingTask(null); setManageTaskOpen(true); }}
+        onInteract={() => { setEditingTask(null); setEditingSeedTaskId(null); setManageTaskOpen(true); }}
         interactLabel="Add a task now →"
         steps={[
           {
