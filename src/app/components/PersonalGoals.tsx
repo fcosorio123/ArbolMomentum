@@ -168,9 +168,9 @@ export function PersonalGoals({ profileId, onBack, onNavigateTasks }: Props) {
           const goalUserTasks = userTasks.filter(ut => ut.goalId === goal.id);
           const allGoalTasks: { id: string; label: string; timeOfDay: string }[] = [
             ...goalCats.flatMap(cat =>
-              cat.tasks.filter(t => !isTaskActiveForDate(profileId, t.id, today))
+              cat.tasks.filter(t => isTaskActiveForDate(profileId, t.id, today))
             ),
-            ...goalUserTasks.filter(ut => !isTaskActiveForDate(profileId, ut.id, today)),
+            ...goalUserTasks.filter(ut => isTaskActiveForDate(profileId, ut.id, today)),
           ];
           const todayDoneCount = allGoalTasks.filter(t => taskStatuses[t.id] === 'done').length;
           const hasTodayTasks = allGoalTasks.length > 0;

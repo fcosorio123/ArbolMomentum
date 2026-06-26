@@ -1,12 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Modal, Progress } from 'antd';
 import { ArrowRightOutlined, FireOutlined, StarFilled } from '@ant-design/icons';
-import {
-  type Profile, type Task, getTaskCategoriesForProfile,
-  getTaskStatus, isTaskActiveForDate, getTodayKey, computeLiveStreak,
-} from '../data/profiles';
-import { getPersonalGoals } from '../data/personalGoals';
-import { getUserTasks, isTaskScheduledForDate, type UserTask } from '../data/userTasks';
+import { type Profile, getTodayKey } from '../data/profiles';
+import { getDashboardSnapshot, type TodayTaskRow } from '../data/dashboardSnapshot';
 import { C } from '../data/colors';
 
 interface Props {
@@ -14,6 +10,8 @@ interface Props {
   profile: Profile;
   onClose: () => void;
   onStartTasks: () => void;
+  /** Bump when tasks/goals change so modal re-reads latest data */
+  dataVersion?: number;
 }
 
 const SUPPRESS_KEY = (profileId: string) => `arbol-summary-off-${profileId}`;
@@ -36,9 +34,14 @@ function goalAccent(goalId: string) {
   return ACCENT_COLORS[Math.abs(goalId.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % ACCENT_COLORS.length];
 }
 
-export function DailySummaryModal({ open, profile, onClose, onStartTasks }: Props) {
+export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVersion = 0 }: Props) {
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [expandedGoals, setExpandedGoals] = useState<Set<string>>(new Set());
+
+  const snapshot = useMemo(
+    () => getDashboardSnapshot(profile.id),
+    [profile.id, dataVersion, open],
+  );
 
   const toggleGoal = useCallback((id: string) => {
     setExpandedGoals(prev => {
@@ -48,42 +51,28 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks }: Prop
     });
   }, []);
 
-  const today = getTodayKey();
-  const categories = getTaskCategoriesForProfile(profile.id);
-  const userTasks = getUserTasks(profile.id);
-  const personalGoals = getPersonalGoals(profile.id);
+  const {
+    countableTasks: visible,
+    doneCount: done,
+    inProgressCount: inProgress,
+    progressPercent: pct,
+    streak: displayStreak,
+    goalTaskGroups,
+    ungroupedTasks,
+  } = snapshot;
 
-  // All seed tasks
-  const seedTasks = categories.flatMap(c => c.tasks);
-  // All user tasks scheduled for today as Task-like objects
-  const userTaskLike: Task[] = userTasks.filter(ut => isTaskScheduledForDate(ut, today)).map(ut => ({
-    id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, type: ut.type, category: 'user',
-  }));
-  const allTasksCombined = [...seedTasks, ...userTaskLike];
-
-  const visible = allTasksCombined.filter(t => !isTaskActiveForDate(profile.id, t.id, today));
-  const done = visible.filter(t => getTaskStatus(profile.id, t.id, today) === 'done').length;
-  const inProgress = visible.filter(t => getTaskStatus(profile.id, t.id, today) === 'inprogress').length;
-  const pct = visible.length > 0 ? Math.round((done / visible.length) * 100) : 0;
-
-  const displayStreak = computeLiveStreak(profile.id, pct > 0);
-
-  // "Do this now" - prefer in-progress tasks, then time-of-day match
   const hour = new Date().getHours();
   const preferredTime = hour >= 17 ? 'evening' : 'morning';
-  const whatNext: Task | undefined =
-    visible.find(t => getTaskStatus(profile.id, t.id, today) === 'inprogress' && t.timeOfDay === preferredTime)
-    ?? visible.find(t => !getTaskStatus(profile.id, t.id, today) && t.timeOfDay === preferredTime)
-    ?? visible.find(t => getTaskStatus(profile.id, t.id, today) !== 'done');
+  const whatNext: TodayTaskRow | undefined =
+    visible.find(t => t.status === 'inprogress' && t.timeOfDay === preferredTime)
+    ?? visible.find(t => t.status === null && t.timeOfDay === preferredTime)
+    ?? visible.find(t => t.status !== 'done');
 
-  // Goal connected to "what next"
-  const whatNextGoalId = whatNext
-    ? (categories.find(c => c.tasks.some(t => t.id === whatNext.id))?.goalId
-      ?? userTasks.find(ut => ut.id === whatNext.id)?.goalId)
+  const whatNextGoal = whatNext?.goalId
+    ? snapshot.personalGoals.find(g => g.id === whatNext.goalId)
     : undefined;
-  const whatNextGoal = whatNextGoalId ? personalGoals.find(g => g.id === whatNextGoalId) : undefined;
 
-  const remaining = visible.filter(t => getTaskStatus(profile.id, t.id, today) !== 'done').length;
+  const remaining = visible.filter(t => t.status !== 'done').length;
 
   const handleClose = () => {
     if (dontShowAgain) localStorage.setItem(SUPPRESS_KEY(profile.id), 'true');
@@ -96,47 +85,7 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks }: Prop
     return `Keep going, ${profile.name.split(' ')[0]}! 💪`;
   })();
 
-  // Build goal → tasks map (seed + user tasks)
-  const goalTaskGroups = personalGoals.map(goal => {
-    const linkedSeedTasks = categories
-      .filter(c => c.goalId === goal.id)
-      .flatMap(c => c.tasks)
-      .filter(t => !isTaskActiveForDate(profile.id, t.id, today))
-      .map(t => ({ ...t, status: getTaskStatus(profile.id, t.id, today) }));
-
-    const linkedUserTasks = userTasks
-      .filter(ut => ut.goalId === goal.id && !isTaskActiveForDate(profile.id, ut.id, today))
-      .map(ut => ({
-        id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, type: ut.type, category: 'user',
-        status: getTaskStatus(profile.id, ut.id, today),
-      }));
-
-    const tasks = [...linkedSeedTasks, ...linkedUserTasks];
-    return { goal, tasks };
-  }).filter(g => g.tasks.length > 0);
-
-  // Tasks not linked to any goal
-  const linkedSeedTaskIds = new Set(
-    categories.filter(c => personalGoals.some(g => g.id === c.goalId)).flatMap(c => c.tasks.map(t => t.id))
-  );
-  const linkedUserTaskIds = new Set(
-    userTasks.filter(ut => ut.goalId && personalGoals.some(g => g.id === ut.goalId)).map(ut => ut.id)
-  );
-
-  const ungroupedTasks = [
-    ...categories
-      .filter(c => !c.goalId || !personalGoals.some(g => g.id === c.goalId))
-      .flatMap(c => c.tasks)
-      .filter(t => !isTaskActiveForDate(profile.id, t.id, today))
-      .map(t => ({ ...t, status: getTaskStatus(profile.id, t.id, today) })),
-    ...userTasks
-      .filter(ut => !ut.goalId || !personalGoals.some(g => g.id === ut.goalId))
-      .filter(ut => !isTaskActiveForDate(profile.id, ut.id, today))
-      .map(ut => ({
-        id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, type: ut.type, category: 'user',
-        status: getTaskStatus(profile.id, ut.id, today),
-      })),
-  ];
+  const goalGroupsForDisplay = goalTaskGroups.map(({ goal, tasks }) => ({ goal, tasks }));
 
   return (
     <Modal
@@ -251,7 +200,7 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks }: Prop
           )}
 
           {/* Goals & Progress */}
-          {(goalTaskGroups.length > 0 || ungroupedTasks.length > 0) && (
+          {(goalGroupsForDisplay.length > 0 || ungroupedTasks.length > 0) && (
             <div style={{ marginBottom: 18 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 12 }}>
                 <StarFilled style={{ color: C.tertiary, fontSize: 11 }} />
@@ -260,7 +209,7 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks }: Prop
                 </span>
               </div>
 
-              {goalTaskGroups.map(({ goal, tasks }) => {
+              {goalGroupsForDisplay.map(({ goal, tasks }) => {
                 const accentColor = goalAccent(goal.id);
                 const tasksDone = tasks.filter(t => t.status === 'done').length;
                 const goalPct = tasks.length > 0 ? Math.round((tasksDone / tasks.length) * 100) : 0;
@@ -370,8 +319,8 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks }: Prop
 
               {/* Ungrouped tasks */}
               {ungroupedTasks.length > 0 && (
-                <div style={{ marginTop: goalTaskGroups.length > 0 ? 6 : 0 }}>
-                  {goalTaskGroups.length > 0 && (
+                <div style={{ marginTop: goalGroupsForDisplay.length > 0 ? 6 : 0 }}>
+                  {goalGroupsForDisplay.length > 0 && (
                     <div style={{ fontSize: 10, color: C.secondary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>
                       Other
                     </div>

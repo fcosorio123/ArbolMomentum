@@ -1788,6 +1788,7 @@ export function setTaskStatus(profileId: string, taskId: string, date: string, s
     syncTaskStatus(profileId, taskId, date, status);
   });
   import('./cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId));
+  import('./dashboardSnapshot').then(({ dispatchDashboardRefresh }) => dispatchDashboardRefresh());
 
   if (status === 'done') {
     import('./emailSettings').then(({ isEmailTypeEnabled }) => {

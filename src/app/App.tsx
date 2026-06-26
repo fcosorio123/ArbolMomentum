@@ -16,6 +16,7 @@ import { CoachMarks } from './components/CoachMarks';
 import { AddToHomeScreen } from './components/AddToHomeScreen';
 import { CelebrationModal } from './components/CelebrationModal';
 import { DailySummaryModal, isSummaryEnabled, markSummaryShownToday, wasSummaryShownToday } from './components/DailySummaryModal';
+import { DASHBOARD_REFRESH_EVENT } from './data/dashboardSnapshot';
 import { FeedbackModal } from './components/FeedbackModal';
 import { SupabaseSyncIndicator } from './components/SupabaseSyncIndicator';
 import { shouldShowFeedbackNudge } from './data/feedback';
@@ -123,6 +124,7 @@ export default function App() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationBadges, setCelebrationBadges] = useState<Badge[]>([]);
   const [showDailySummary, setShowDailySummary] = useState(false);
+  const [summaryDataVersion, setSummaryDataVersion] = useState(0);
   const [showFeedback, setShowFeedback] = useState(false);
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
@@ -367,11 +369,27 @@ export default function App() {
     if (!isSummaryEnabled(activeProfile.id)) return;
     if (wasSummaryShownToday(activeProfile.id)) return;
     const t = setTimeout(() => {
+      setSummaryDataVersion(v => v + 1);
       markSummaryShownToday(activeProfile.id);
       setShowDailySummary(true);
     }, 800);
     return () => clearTimeout(t);
   }, [activeProfile?.id]);
+
+  // ── Keep summary modal in sync with task/goal changes
+  useEffect(() => {
+    const bump = () => setSummaryDataVersion(v => v + 1);
+    window.addEventListener(DASHBOARD_REFRESH_EVENT, bump);
+    window.addEventListener('arbol-goals-updated', bump);
+    window.addEventListener('arbol-tasks-updated', bump);
+    window.addEventListener('arbol-live-feedback-updated', bump);
+    return () => {
+      window.removeEventListener(DASHBOARD_REFRESH_EVENT, bump);
+      window.removeEventListener('arbol-goals-updated', bump);
+      window.removeEventListener('arbol-tasks-updated', bump);
+      window.removeEventListener('arbol-live-feedback-updated', bump);
+    };
+  }, []);
 
   // ── Feedback nudge
   useEffect(() => {
@@ -583,9 +601,13 @@ export default function App() {
           onCoachMark={() => setShowCoach(true)}
           onNavigateTasks={() => setActiveTab('tasks')}
           onNavigateGoals={() => setActiveTab('goals')}
-          onShowSummary={() => setShowDailySummary(true)}
+          onShowSummary={() => {
+            setSummaryDataVersion(v => v + 1);
+            setShowDailySummary(true);
+          }}
           onShowFeedback={() => setShowFeedback(true)}
           onStartCheckIn={() => setShowCheckIn(true)}
+          isActive={activeTab === 'home'}
         />
       )}
       {activeTab === 'goals' && (
@@ -688,6 +710,7 @@ export default function App() {
           <DailySummaryModal
             open={showDailySummary}
             profile={activeProfile}
+            dataVersion={summaryDataVersion}
             onClose={() => setShowDailySummary(false)}
             onStartTasks={() => { setShowDailySummary(false); setActiveTab('tasks'); }}
           />

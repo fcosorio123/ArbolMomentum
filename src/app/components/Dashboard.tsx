@@ -6,12 +6,11 @@ import {
 import { PageTour, PageTourButton, TOUR_KEYS } from './AppTour';
 import type { Profile } from '../data/profiles';
 import {
-  getTaskCategoriesForProfile, getTaskStatus, isTaskActiveForDate,
-  getTodayKey, getDateKey, hasActivityOnDate, computeLiveStreak, getEarnedBadges, BADGES,
+  getDateKey, hasActivityOnDate, getEarnedBadges, BADGES,
 } from '../data/profiles';
-import { getUserTasks, isTaskScheduledForDate } from '../data/userTasks';
-import { getPersonalGoals } from '../data/personalGoals';
 import { ActiveGoalsList } from './ActiveGoalsList';
+import { useDashboardRefresh } from '../hooks/useDashboardRefresh';
+import { pickDoNowTask } from '../data/dashboardSnapshot';
 import { C } from '../data/colors';
 
 interface Props {
@@ -26,6 +25,7 @@ interface Props {
   onShowFeedback?: () => void;
   onGoals?: () => void;
   onStartCheckIn?: () => void;
+  isActive?: boolean;
 }
 
 function getGreeting() {
@@ -105,49 +105,62 @@ function heatColor(count: number, isFuture: boolean, isToday: boolean): string {
   return '#15803d';
 }
 
+function DashboardSkeleton() {
+  const pulse = (w: string | number, h: number, mb = 12, radius = 14) => (
+    <div style={{
+      width: w, height: h, marginBottom: mb, borderRadius: radius,
+      background: `linear-gradient(90deg, ${C.bgAlt} 25%, ${C.border} 50%, ${C.bgAlt} 75%)`,
+      backgroundSize: '200% 100%',
+      animation: 'arbolDashSkel 1.2s ease-in-out infinite',
+    }} />
+  );
+  return (
+    <>
+      <style>{`
+        @keyframes arbolDashSkel {
+          0% { background-position: 100% 0; }
+          100% { background-position: -100% 0; }
+        }
+      `}</style>
+      {pulse('55%', 14, 8)}
+      {pulse('75%', 28, 20)}
+      {pulse('100%', 72, 16, 18)}
+      {pulse('100%', 120, 16, 20)}
+      {pulse('100%', 88, 16, 20)}
+      {pulse('100%', 100, 0, 20)}
+    </>
+  );
+}
+
 export function Dashboard({
   profile, installPrompt, onInstall, onCoachMark,
   onNavigateTasks, onNavigateGoals, onShowSummary, onShowFeedback, onGoals: _onGoals, onStartCheckIn,
+  isActive = true,
 }: Props) {
-  const [tasksDone, setTasksDone] = useState(0);
-  const [totalTasks, setTotalTasks] = useState(0);
+  const { snapshot, isLoading } = useDashboardRefresh(profile.id, isActive);
   const [isPwaInstalled, setIsPwaInstalled] = useState(false);
-  const [refreshTick, forceRefresh] = useState(0);
   const [showTour, setShowTour] = useState(false);
+
+  const {
+    doneCount: todayDone,
+    totalCount: todayTotal,
+    progressPercent: completionPct,
+    streak: displayStreak,
+    bannerState,
+    checkInGoalTitles: checkInGoals,
+  } = snapshot;
 
   useEffect(() => {
     setIsPwaInstalled(window.matchMedia('(display-mode: standalone)').matches);
-    const today = getTodayKey();
-    const vk = `visit-${profile.id}-${today}`;
-    localStorage.setItem(vk, String((parseInt(localStorage.getItem(vk) || '0') + 1)));
-
-    const period: 'morning' | 'evening' = new Date().getHours() >= 17 ? 'evening' : 'morning';
-    const categories = getTaskCategoriesForProfile(profile.id);
-    let done = 0, total = 0;
-    categories.forEach(cat => {
-      cat.tasks.forEach(task => {
-        if (task.timeOfDay !== period) return;
-        if (!isTaskActiveForDate(profile.id, task.id, today)) {
-          total++;
-          if (getTaskStatus(profile.id, task.id, today) === 'done') done++;
-        }
-      });
-    });
-    setTasksDone(done);
-    setTotalTasks(total);
-  }, [profile.id]);
-
-  useEffect(() => {
-    const handler = () => forceRefresh(n => n + 1);
-    window.addEventListener('arbol-goals-updated', handler);
-    window.addEventListener('arbol-tasks-updated', handler);
-    return () => {
-      window.removeEventListener('arbol-goals-updated', handler);
-      window.removeEventListener('arbol-tasks-updated', handler);
-    };
   }, []);
 
-  // Auto-start home tour on first visit
+  useEffect(() => {
+    if (!isActive) return;
+    const today = snapshot.dateKey;
+    const vk = `visit-${profile.id}-${today}`;
+    localStorage.setItem(vk, String((parseInt(localStorage.getItem(vk) || '0') + 1)));
+  }, [profile.id, isActive, snapshot.dateKey]);
+
   useEffect(() => {
     if (!localStorage.getItem(TOUR_KEYS.home)) {
       const t = setTimeout(() => setShowTour(true), 1000);
@@ -155,97 +168,13 @@ export function Dashboard({
     }
   }, []);
 
-  const completionPct = totalTasks > 0 ? Math.round((tasksDone / totalTasks) * 100) : 0;
   const todayDate = new Date();
-  const displayStreak = computeLiveStreak(profile.id, completionPct > 0);
   const weekDots = buildWeekDots(profile.id, completionPct > 0);
   const earnedBadges = getEarnedBadges(profile);
-
-  // Today's tasks count (seed + user tasks, all time periods) - refreshes on arbol-goals-updated
-  const { todayDone, todayTotal } = useMemo(() => {
-    const today = getTodayKey();
-    const cats = getTaskCategoriesForProfile(profile.id);
-    const uts = getUserTasks(profile.id);
-    let done = 0, total = 0;
-    cats.forEach(cat => cat.tasks.forEach(t => {
-      if (!isTaskActiveForDate(profile.id, t.id, today)) return;
-      const st = getTaskStatus(profile.id, t.id, today);
-      if (st === 'skipped') return;
-      total++;
-      if (st === 'done') done++;
-    }));
-    uts.forEach(ut => {
-      if (!isTaskScheduledForDate(ut, today)) return;
-      if (!isTaskActiveForDate(profile.id, ut.id, today)) return;
-      const st = getTaskStatus(profile.id, ut.id, today);
-      if (st === 'skipped') return;
-      total++;
-      if (st === 'done') done++;
-    });
-    return { todayDone: done, todayTotal: total };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile.id, refreshTick]);
-
-  // Banner state: red = not checked in today, yellow = checked in but tasks remain, green = all done
-  const { bannerState, checkInGoals } = useMemo((): { bannerState: 'red' | 'yellow' | 'green'; checkInGoals: string[] } => {
-    const today = getTodayKey();
-    const checkedIn = localStorage.getItem(`arbol-checkin-${profile.id}-${today}`) === 'true';
-    if (!checkedIn) {
-      // Collect goal titles that have at least one null-status task today
-      const goals = getPersonalGoals(profile.id);
-      const cats = getTaskCategoriesForProfile(profile.id);
-      const uts = getUserTasks(profile.id);
-      const needingGoals = goals.filter(goal => {
-        const seedTasks = cats.filter(c => c.goalId === goal.id).flatMap(c => c.tasks);
-        const userTasksForGoal = uts.filter(ut => ut.goalId === goal.id && isTaskScheduledForDate(ut, today));
-        return [...seedTasks, ...userTasksForGoal].some(
-          t => isTaskActiveForDate(profile.id, t.id, today) && getTaskStatus(profile.id, t.id, today) === null
-        );
-      });
-      return { bannerState: 'red', checkInGoals: needingGoals.map(g => g.title) };
-    }
-    if (todayDone < todayTotal) return { bannerState: 'yellow', checkInGoals: [] };
-    return { bannerState: 'green', checkInGoals: [] };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile.id, todayDone, todayTotal, refreshTick]);
-
-  // "Do Now" - find the single most urgent task for this moment
-  const doNowTask = useMemo(() => {
-    const today = getTodayKey();
-    const hour = new Date().getHours();
-    const preferredTime = hour >= 17 ? 'evening' : 'morning';
-    const goals = getPersonalGoals(profile.id);
-    const goalMap = Object.fromEntries(goals.map(g => [g.id, g.title]));
-
-    interface CandidateTask { id: string; label: string; timeOfDay: string; goalTitle?: string }
-    const candidates: CandidateTask[] = [];
-
-    // Seed tasks
-    const seedCats = getTaskCategoriesForProfile(profile.id);
-    seedCats.forEach(cat => {
-      cat.tasks.forEach(task => {
-        if (isTaskActiveForDate(profile.id, task.id, today) && getTaskStatus(profile.id, task.id, today) !== 'done' && getTaskStatus(profile.id, task.id, today) !== 'skipped') {
-          const goalTitle = cat.goalId ? goalMap[cat.goalId] : undefined;
-          candidates.push({ id: task.id, label: task.label, timeOfDay: task.timeOfDay, goalTitle });
-        }
-      });
-    });
-
-    // User tasks - only if scheduled for today
-    getUserTasks(profile.id).filter(ut => isTaskScheduledForDate(ut, today)).forEach(ut => {
-      if (isTaskActiveForDate(profile.id, ut.id, today) && getTaskStatus(profile.id, ut.id, today) !== 'done' && getTaskStatus(profile.id, ut.id, today) !== 'skipped') {
-        const goalTitle = ut.goalId ? goalMap[ut.goalId] : undefined;
-        candidates.push({ id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, goalTitle });
-      }
-    });
-
-    return (
-      candidates.find(t => getTaskStatus(profile.id, t.id, today) === 'inprogress' && t.timeOfDay === preferredTime) ??
-      candidates.find(t => t.timeOfDay === preferredTime) ??
-      candidates[0] ??
-      null
-    );
-  }, [profile.id]);
+  const doNowTask = useMemo(
+    () => pickDoNowTask(profile.id, snapshot.dateKey),
+    [profile.id, snapshot.dateKey, snapshot.doneCount, snapshot.totalCount],
+  );
 
   // Two-month grids
   const now = useMemo(() => new Date(), []);
@@ -333,6 +262,10 @@ export function Dashboard({
         </div>
       </div>
 
+      {isLoading ? (
+        <DashboardSkeleton />
+      ) : (
+      <>
       {/* ── Check-in Banner - red / yellow / green */}
       {(() => {
         if (bannerState === 'red') {
@@ -643,6 +576,9 @@ export function Dashboard({
             Install
           </Button>
         </div>
+      )}
+
+      </>
       )}
 
       {/* ── Home Page Tour */}
