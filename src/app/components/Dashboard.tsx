@@ -26,6 +26,8 @@ interface Props {
   onGoals?: () => void;
   onStartCheckIn?: () => void;
   isActive?: boolean;
+  /** False while Welcome coach or Today's Summary modal is open */
+  canStartPageTours?: boolean;
 }
 
 function getGreeting() {
@@ -136,10 +138,12 @@ export function Dashboard({
   profile, installPrompt, onInstall, onCoachMark,
   onNavigateTasks, onNavigateGoals, onShowSummary, onShowFeedback, onGoals: _onGoals, onStartCheckIn,
   isActive = true,
+  canStartPageTours = true,
 }: Props) {
   const { snapshot, isLoading } = useDashboardRefresh(profile.id, isActive);
   const [isPwaInstalled, setIsPwaInstalled] = useState(false);
   const [showTour, setShowTour] = useState(false);
+  const [showCheckInTour, setShowCheckInTour] = useState(false);
 
   const {
     doneCount: todayDone,
@@ -162,11 +166,21 @@ export function Dashboard({
   }, [profile.id, isActive, snapshot.dateKey]);
 
   useEffect(() => {
-    if (!localStorage.getItem(TOUR_KEYS.home)) {
-      const t = setTimeout(() => setShowTour(true), 1000);
-      return () => clearTimeout(t);
-    }
-  }, []);
+    if (!isActive || !canStartPageTours || isLoading) return;
+    if (localStorage.getItem(TOUR_KEYS.home)) return;
+    const t = setTimeout(() => setShowTour(true), 600);
+    return () => clearTimeout(t);
+  }, [isActive, canStartPageTours, isLoading]);
+
+  // Goal Check-In tour — after Welcome, Summary, Home tour, and Tasks tour
+  useEffect(() => {
+    if (!isActive || !canStartPageTours || isLoading) return;
+    if (localStorage.getItem(TOUR_KEYS.checkIn)) return;
+    if (!localStorage.getItem(TOUR_KEYS.home)) return;
+    if (!localStorage.getItem(TOUR_KEYS.tasks)) return;
+    const t = setTimeout(() => setShowCheckInTour(true), 600);
+    return () => clearTimeout(t);
+  }, [isActive, canStartPageTours, isLoading]);
 
   const todayDate = new Date();
   const weekDots = buildWeekDots(profile.id, completionPct > 0);
@@ -591,12 +605,6 @@ export function Dashboard({
         doneMessage="You've got the Home screen down. Check your streak every day to build momentum!"
         steps={[
           {
-            title: '🔴 Goal Check-In',
-            description: 'Quickly update your goal progress. Track Done, In Progress, or Skipped — takes under a minute.',
-            targetId: 'home-banner',
-            placement: 'bottom',
-          },
-          {
             title: '🔥 Your Streak',
             description: 'Consecutive days you\'ve completed tasks. Orange dots mean you showed up this week.',
             targetId: 'home-streak',
@@ -619,6 +627,24 @@ export function Dashboard({
             description: 'A heatmap of every active day. Darker green = more tasks done.',
             targetId: 'home-heatmap',
             placement: 'top',
+          },
+        ]}
+      />
+
+      {/* Goal Check-In tour — separate sequence, after Home + Tasks tours */}
+      <PageTour
+        open={showCheckInTour}
+        onClose={() => setShowCheckInTour(false)}
+        storageKey={TOUR_KEYS.checkIn}
+        pageLabel="Goal Check-In"
+        doneEmoji="🔴"
+        doneMessage="Use Start Check-in on the banner whenever you need to reflect on today's progress."
+        steps={[
+          {
+            title: '🔴 Goal Check-In',
+            description: 'Quickly update your goal progress. Track Done, In Progress, or Skipped — takes under a minute.',
+            targetId: 'home-banner',
+            placement: 'bottom',
           },
         ]}
       />

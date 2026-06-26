@@ -608,6 +608,7 @@ export default function App() {
           onShowFeedback={() => setShowFeedback(true)}
           onStartCheckIn={() => setShowCheckIn(true)}
           isActive={activeTab === 'home'}
+          canStartPageTours={!showCoach && !showDailySummary}
         />
       )}
       {activeTab === 'goals' && (

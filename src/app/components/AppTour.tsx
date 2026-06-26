@@ -5,10 +5,11 @@ import { CloseOutlined } from '@ant-design/icons';
 import { C } from '../data/colors';
 
 export const TOUR_KEYS = {
-  home:  'arbol-tour-home-done',
-  goals: 'arbol-tour-goals-done',
-  tasks: 'arbol-tour-tasks-done',
-  week:  'arbol-tour-week-done',
+  home:     'arbol-tour-home-done',
+  goals:    'arbol-tour-goals-done',
+  tasks:    'arbol-tour-tasks-done',
+  week:     'arbol-tour-week-done',
+  checkIn:  'arbol-tour-checkin-done',
 };
 
 export type TourPlacement = 'top' | 'bottom' | 'left' | 'right' | 'auto';
