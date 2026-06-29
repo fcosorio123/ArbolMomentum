@@ -16,24 +16,24 @@ import { CoachMarks } from './components/CoachMarks';
 import { AddToHomeScreen } from './components/AddToHomeScreen';
 import { CelebrationModal } from './components/CelebrationModal';
 import { DailySummaryModal, isSummaryEnabled, markSummaryShownToday, wasSummaryShownToday } from './components/DailySummaryModal';
-import { DASHBOARD_REFRESH_EVENT } from './data/dashboardSnapshot';
+import { DASHBOARD_REFRESH_EVENT, getBadgeCount } from './data/dashboardSnapshot';
 import { FeedbackModal } from './components/FeedbackModal';
 import { SupabaseSyncIndicator } from './components/SupabaseSyncIndicator';
 import { shouldShowFeedbackNudge } from './data/feedback';
 import {
   detectDevice, saveDeviceRecord, trackEvent,
-  saveSchedule, getSchedule, markScheduleFired,
-  type ScheduledNotif,
 } from './data/deviceAnalytics';
 import { fetchAppSettings, areNotificationsEnabled } from './data/appSettings';
-import { fetchEmailSettings, getEmailSettings } from './data/emailSettings';
+import { fetchEmailSettings } from './data/emailSettings';
 import { fetchLiveCheckInSettings } from './data/liveCheckInSettings';
-import { requestEmailSend } from './data/emailNudges';
-import { getProfileEmail } from './data/profileContact';
 import { showNotification } from './data/notifications';
+import { processDueNudges } from './data/nudgeScheduler';
+import {
+  ensurePushSubscription,
+  requestNotificationPermission,
+} from './data/pushNotifications';
 import {
   PROFILES, type Profile, type Badge,
-  getTaskCategoriesForProfile, getTaskStatus, isTaskActiveForDate, getTodayKey,
 } from './data/profiles';
 import { C } from './data/colors';
 
@@ -72,37 +72,14 @@ const arbolTheme = {
   },
 };
 
-// ── App Badge API
-// Always call from the main thread - more reliable on Android than via SW.
-// The SW also tries to set the badge (for background updates) but the main
-// thread call is the authoritative one.
-function updateAppBadge(pending: number) {
+// ── App Badge API — main thread is authoritative; SW mirrors for background
+function updateAppBadge(count: number) {
   try {
     if ('setAppBadge' in navigator) {
-      if (pending > 0) (navigator as any).setAppBadge(pending).catch(() => {});
-      else (navigator as any).clearAppBadge().catch(() => {});
+      if (count > 0) (navigator as Navigator & { setAppBadge: (n: number) => Promise<void> }).setAppBadge(count).catch(() => {});
+      else (navigator as Navigator & { clearAppBadge: () => Promise<void> }).clearAppBadge().catch(() => {});
     }
-  } catch {}
-}
-
-// ── Smart notification copy
-function buildNudge(pending: number, streak: number, firstName: string): { title: string; body: string; tag: string } | null {
-  if (pending === 0) return null;
-  if (pending === 1) return {
-    title: `You're almost there, ${firstName}! 🔥`,
-    body: '1 task left - finish strong and keep your streak going.',
-    tag: 'nudge-close',
-  };
-  if (streak > 0 && pending <= 3) return {
-    title: `${streak}-day streak on the line, ${firstName}!`,
-    body: `Just ${pending} tasks left. Don't let it slip now 💪`,
-    tag: 'nudge-streak',
-  };
-  return {
-    title: `${pending} tasks waiting, ${firstName} 📋`,
-    body: "Your daily momentum is calling. Let's get it done!",
-    tag: 'nudge-general',
-  };
+  } catch { /* ignore */ }
 }
 
 export default function App() {
@@ -293,14 +270,42 @@ export default function App() {
     return () => URL.revokeObjectURL(manifestUrl);
   }, []);
 
-  // ── Service worker
+  // ── Service worker + push subscription
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
     const appBase = import.meta.env.BASE_URL;
     navigator.serviceWorker.register(`${appBase}sw.js`, { scope: appBase })
-      .then(reg => setSwRegistration(reg))
+      .then(reg => {
+        setSwRegistration(reg);
+        if (activeProfile && Notification.permission === 'granted') {
+          ensurePushSubscription(activeProfile.id, reg);
+        }
+        if ('periodicSync' in reg) {
+          (reg as ServiceWorkerRegistration & { periodicSync: { register: (tag: string, opts: { minInterval: number }) => Promise<void> } })
+            .periodicSync.register('arbol-badge-sync', { minInterval: 60 * 60 * 1000 })
+            .catch(() => { /* not supported on all platforms */ });
+        }
+      })
       .catch(err => console.warn('[SW] Registration failed:', err));
-  }, []);
+  }, [activeProfile?.id]);
+
+  // SW → app messages (badge sync, notification clicks)
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const onMessage = (e: MessageEvent) => {
+      if (!activeProfile) return;
+      if (e.data?.type === 'SYNC_BADGE') {
+        const count = getBadgeCount(activeProfile.id);
+        updateAppBadge(count);
+        swRef.current?.active?.postMessage({ type: 'BADGE', count });
+      }
+      if (e.data?.type === 'NOTIF_CLICKED') {
+        trackEvent(activeProfile.id, 'notif_clicked', { tag: String(e.data.tag ?? '') });
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, [activeProfile?.id]);
 
   // ── Install prompt
   useEffect(() => {
@@ -401,114 +406,52 @@ export default function App() {
     return () => clearTimeout(t);
   }, [activeProfile?.id]);
 
-  // ── Compute pending tasks
-  const computePending = useCallback((profile: Profile): number => {
-    const today = getTodayKey();
-    const tasks = getTaskCategoriesForProfile(profile.id).flatMap(c => c.tasks);
-    return tasks.filter(t =>
-      isTaskActiveForDate(profile.id, t.id, today) &&
-      getTaskStatus(profile.id, t.id, today) !== 'done' &&
-      getTaskStatus(profile.id, t.id, today) !== 'skipped'
-    ).length;
+  const syncBadge = useCallback((profileId: string) => {
+    const count = getBadgeCount(profileId);
+    setPendingCount(count);
+    updateAppBadge(count);
+    swRef.current?.active?.postMessage({ type: 'BADGE', count });
+    trackEvent(profileId, 'badge_updated', { count });
   }, []);
-
-  const syncBadge = useCallback((pending: number) => {
-    setPendingCount(pending);
-    updateAppBadge(pending);
-    swRef.current?.active?.postMessage({ type: 'BADGE', count: pending });
-    if (activeProfile) trackEvent(activeProfile.id, 'badge_updated', { count: pending });
-  }, [activeProfile]);
 
   // Update badge when profile or tab changes
   useEffect(() => {
     if (!activeProfile) return;
-    syncBadge(computePending(activeProfile));
-  }, [activeProfile?.id, activeTab, syncBadge, computePending]);
+    syncBadge(activeProfile.id);
+  }, [activeProfile?.id, activeTab, syncBadge]);
 
-  // ── Smart push notifications (main-thread scheduling - reliable on all platforms)
-  // Replaces setTimeout-in-SW approach which fails when SW is killed by Android OS.
-  // Strategy: store schedule in localStorage, check every 60s + on visibilitychange.
-  const scheduleNotifications = useCallback(async () => {
-    if (!activeProfile) return;
-    if (!areNotificationsEnabled()) return;
-    if (Notification?.permission !== 'granted') return;
-
-    const today = getTodayKey();
-    const pending = computePending(activeProfile);
-    const firstName = activeProfile.name.split(' ')[0];
-
-    const now = new Date();
-    const h = now.getHours();
-    const m = now.getMinutes();
-    const nowMs = now.getTime();
-
-    const toMs = (atH: number, atM: number) => {
-      const d = new Date();
-      d.setHours(atH, atM, 0, 0);
-      return d.getTime();
-    };
-
-    // Build today's schedule
-    const existing = getSchedule(activeProfile.id);
-    const existingTags = new Set(existing.map(n => n.tag));
-    const schedule: ScheduledNotif[] = [...existing];
-
-    const addIfNew = (tag: string, title: string, body: string, atH: number, atM: number) => {
-      if (!existingTags.has(tag)) {
-        schedule.push({ tag, title, body, atMs: toMs(atH, atM) });
-        existingTags.add(tag);
-      }
-    };
-
-    if (pending > 0) {
-      addIfNew('morning', `Good morning, ${firstName}! ☀️`,
-        `You have ${pending} task${pending > 1 ? 's' : ''} to tackle today. Let's build that momentum!`, 8, 0);
-      addIfNew('midday', 'Midday check-in 📋',
-        pending === 1 ? 'Just 1 task left - you\'re almost done!' : `${pending} tasks remaining. A little focus goes a long way.`, 13, 0);
-      const nudge = buildNudge(pending, activeProfile.streak, firstName);
-      if (nudge) addIfNew(nudge.tag + '-eve', nudge.title, nudge.body, 19, 30);
-    }
-
-    saveSchedule(activeProfile.id, schedule);
-
-    // Fire any notifications whose time has come
-    for (const notif of schedule) {
-      if (nowMs >= notif.atMs) {
-        await showNotification(swRef.current, notif.title, notif.body, notif.tag);
-        trackEvent(activeProfile.id, 'notif_sent', { tag: notif.tag });
-        saveDeviceRecord(activeProfile.id, { lastNotifSent: Date.now() });
-        markScheduleFired(activeProfile.id, notif.tag);
-
-        const emailCfg = getEmailSettings();
-        if (emailCfg.enabled && emailCfg.smartNudgeEnabled && emailCfg.triggerMode !== 'manual') {
-          requestEmailSend({
-            profileId: activeProfile.id,
-            type: 'smart_nudge',
-            tag: notif.tag,
-            date: today,
-            profileName: activeProfile.name,
-            title: notif.title,
-            body: notif.body,
-            pendingCount: pending,
-            recipient: getProfileEmail(activeProfile.id) || undefined,
-          });
-        }
-      }
-    }
-  }, [activeProfile, computePending]);
-
-  // Set up interval + visibility catch-up
   useEffect(() => {
     if (!activeProfile) return;
-    scheduleNotifications();
-    const interval = setInterval(scheduleNotifications, 60_000);
-    const onVisible = () => { if (document.visibilityState === 'visible') scheduleNotifications(); };
+    const refresh = () => syncBadge(activeProfile.id);
+    window.addEventListener(DASHBOARD_REFRESH_EVENT, refresh);
+    window.addEventListener('arbol-goals-updated', refresh);
+    window.addEventListener('arbol-tasks-updated', refresh);
+    return () => {
+      window.removeEventListener(DASHBOARD_REFRESH_EVENT, refresh);
+      window.removeEventListener('arbol-goals-updated', refresh);
+      window.removeEventListener('arbol-tasks-updated', refresh);
+    };
+  }, [activeProfile?.id, syncBadge]);
+
+  // ── Smart nudges: 3 state-based slots/day + custom reminders (local + push when subscribed)
+  const runNudgeScheduler = useCallback(async () => {
+    if (!activeProfile) return;
+    await processDueNudges({ profile: activeProfile, swReg: swRef.current });
+  }, [activeProfile]);
+
+  useEffect(() => {
+    if (!activeProfile) return;
+    runNudgeScheduler();
+    const interval = setInterval(runNudgeScheduler, 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') runNudgeScheduler();
+    };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [activeProfile?.id, scheduleNotifications]);
+  }, [activeProfile?.id, runNudgeScheduler]);
 
   // Track notification permission changes
   useEffect(() => {
@@ -624,9 +567,9 @@ export default function App() {
           onPerfectDay={(newBadges) => {
             setCelebrationBadges(newBadges);
             setShowCelebration(true);
-            syncBadge(0);
+            syncBadge(activeProfile.id);
           }}
-          onTasksChange={(pending) => syncBadge(pending)}
+          onTasksChange={() => syncBadge(activeProfile.id)}
         />
       )}
       {activeTab === 'week' && <WeekPlan profile={activeProfile} />}
@@ -761,23 +704,18 @@ export default function App() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
                 <button onClick={async () => {
                   setShowPostInstallNotif(false);
-                  if ('Notification' in window) {
-                    const r = await Notification.requestPermission();
-                    if (r === 'granted') {
-                      trackEvent(activeProfile.id, 'notif_permission_granted');
-                      saveDeviceRecord(activeProfile.id, { notifPermission: 'granted' });
-                      if (swRegistration) {
-                        await showNotification(
-                          swRegistration,
-                          'Welcome to Arbol Momentum! 🌿',
-                          `Hi ${activeProfile.name.split(' ')[0]}! Reminders are set. Keep that streak going! 🔥`,
-                          'welcome',
-                        );
-                      }
-                    } else {
-                      trackEvent(activeProfile.id, 'notif_permission_denied');
-                      saveDeviceRecord(activeProfile.id, { notifPermission: r as any });
-                    }
+                  const result = await requestNotificationPermission(
+                    activeProfile.id,
+                    swRegistration,
+                    activeProfile.name,
+                  );
+                  if (result.granted && swRegistration) {
+                    await showNotification(
+                      swRegistration,
+                      'Welcome to Arbol! 🌿',
+                      `Hi ${activeProfile.name.split(' ')[0]}! You'll get up to 3 helpful funding reminders per day.`,
+                      'welcome',
+                    );
                   }
                 }} style={{
                   background: C.primary, color: '#fff', border: 'none',

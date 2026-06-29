@@ -172,6 +172,8 @@ export interface ScheduledNotif {
   title: string;
   body: string;
   atMs: number; // absolute timestamp to fire
+  kind?: 'smart' | 'custom';
+  days?: string[]; // Mon–Sun for custom reminders
 }
 
 function localDateKey(date = new Date()): string {
@@ -197,4 +199,34 @@ export function getSchedule(profileId: string): ScheduledNotif[] {
 export function markScheduleFired(profileId: string, tag: string) {
   const list = getSchedule(profileId).filter(n => n.tag !== tag);
   localStorage.setItem(scheduleKey(profileId), JSON.stringify(list));
+}
+
+function firedKey(profileId: string) {
+  return `arbol-fired-${profileId}-${localDateKey()}`;
+}
+
+/** Persistent per-day dedup — survives schedule rebuilds */
+export function wasNudgeFiredToday(profileId: string, tag: string): boolean {
+  try {
+    const fired: string[] = JSON.parse(localStorage.getItem(firedKey(profileId)) || '[]');
+    return fired.includes(tag);
+  } catch {
+    return false;
+  }
+}
+
+export function markNudgeFiredToday(profileId: string, tag: string) {
+  try {
+    const fired: string[] = JSON.parse(localStorage.getItem(firedKey(profileId)) || '[]');
+    if (!fired.includes(tag)) fired.push(tag);
+    localStorage.setItem(firedKey(profileId), JSON.stringify(fired));
+  } catch { /* ignore */ }
+}
+
+export function getFiredNudgesToday(profileId: string): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(firedKey(profileId)) || '[]');
+  } catch {
+    return [];
+  }
 }

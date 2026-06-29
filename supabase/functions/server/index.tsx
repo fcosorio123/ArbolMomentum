@@ -168,4 +168,48 @@ app.post("/make-server-5d90ddf5/run-daily-email-nudges", async (c) => {
   });
 });
 
+// Web Push subscription registration
+app.post("/make-server-5d90ddf5/register-push", async (c) => {
+  try {
+    const { profileId, subscription, tzOffset } = await c.req.json();
+    if (!profileId || !subscription?.endpoint) {
+      return c.json({ ok: false, reason: "invalid_payload" });
+    }
+    const { savePushSubscription } = await import("./pushSend.ts");
+    await savePushSubscription(profileId, subscription, Number(tzOffset) || 0);
+    return c.json({ ok: true });
+  } catch (err) {
+    console.log("[RegisterPush] Error:", err);
+    return c.json({ ok: false, reason: String(err) }, 500);
+  }
+});
+
+// Cron: run push nudges for a profile (Authorization: Bearer CRON_SECRET)
+app.post("/make-server-5d90ddf5/run-push-nudges", async (c) => {
+  try {
+    const secret = Deno.env.get("CRON_SECRET")?.trim();
+    const auth = c.req.header("Authorization")?.replace(/^Bearer\s+/i, "");
+    if (secret && auth !== secret) {
+      return c.json({ ok: false, reason: "unauthorized" }, 401);
+    }
+    const body = await c.req.json().catch(() => ({}));
+    const profileId = body?.profileId?.trim();
+    if (!profileId) {
+      return c.json({ ok: false, reason: "profileId_required" }, 400);
+    }
+    const { runPushNudgesForProfile } = await import("./pushSend.ts");
+    const result = await runPushNudgesForProfile(profileId);
+    return c.json({ ok: true, ...result });
+  } catch (err) {
+    console.log("[RunPushNudges] Error:", err);
+    return c.json({ ok: false, reason: String(err) }, 500);
+  }
+});
+
+// VAPID public key for client subscribe (safe to expose)
+app.get("/make-server-5d90ddf5/push-vapid-key", (c) => {
+  const publicKey = Deno.env.get("VAPID_PUBLIC_KEY")?.trim() ?? "";
+  return c.json({ ok: !!publicKey, publicKey });
+});
+
 Deno.serve(app.fetch);

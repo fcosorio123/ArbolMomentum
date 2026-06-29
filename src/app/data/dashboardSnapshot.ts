@@ -258,3 +258,24 @@ export function pickDoNowTask(profileId: string, dateKey = getTodayKey()): {
     null
   );
 }
+
+/** Actionable tasks still open today (seed + user, excludes skipped/removed). */
+export function getPendingTaskCount(profileId: string, dateKey = getTodayKey()): number {
+  return getTodayTaskRows(profileId, dateKey).filter(
+    r => r.disposition === 'active' && r.status !== 'done' && r.status !== 'skipped',
+  ).length;
+}
+
+export function getDoneTaskCountToday(profileId: string, dateKey = getTodayKey()): number {
+  return getTodayTaskRows(profileId, dateKey).filter(
+    r => r.disposition === 'active' && r.status === 'done',
+  ).length;
+}
+
+/** OS app-icon badge: pending tasks unless daily check-in is done or nothing left. */
+export function getBadgeCount(profileId: string, dateKey = getTodayKey()): number {
+  const pending = getPendingTaskCount(profileId, dateKey);
+  if (pending <= 0) return 0;
+  if (isDailyCheckInComplete(profileId, dateKey)) return 0;
+  return pending;
+}

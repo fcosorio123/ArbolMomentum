@@ -1,10 +1,17 @@
 import { useState, useEffect } from 'react';
 import { App, Button, Switch, Input, Modal } from 'antd';
-import { BellOutlined, BellFilled, PlusOutlined, DeleteOutlined, CheckCircleOutlined, ExclamationCircleOutlined, SendOutlined, MobileOutlined } from '@ant-design/icons';
+import { BellOutlined, BellFilled, PlusOutlined, DeleteOutlined, CheckCircleOutlined, ExclamationCircleOutlined, SendOutlined, MobileOutlined, ReloadOutlined } from '@ant-design/icons';
 import { DEFAULT_REMINDERS, type Profile } from '../data/profiles';
 import { C } from '../data/colors';
 import { areNotificationsEnabled, fetchAppSettings } from '../data/appSettings';
 import { showNotification } from '../data/notifications';
+import { rebuildDailySchedule } from '../data/nudgeScheduler';
+import {
+  getPushPlatformInfo,
+  requestNotificationPermission,
+  ensurePushSubscription,
+} from '../data/pushNotifications';
+import { getFiredNudgesToday } from '../data/deviceAnalytics';
 
 interface Reminder { id: string; label: string; time: string; days: string[]; enabled: boolean; }
 interface Props { profile: Profile; swRegistration: ServiceWorkerRegistration | null; onShowInstallTutorial: () => void; }
@@ -20,67 +27,75 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
   const [newTime, setNewTime] = useState('09:00');
   const [newDays, setNewDays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
   const [sending, setSending] = useState(false);
+  const [enabling, setEnabling] = useState(false);
   const [notifGloballyEnabled, setNotifGloballyEnabled] = useState(() => areNotificationsEnabled());
+  const platform = getPushPlatformInfo();
 
   useEffect(() => {
     if ('Notification' in window) setPermission(Notification.permission as Permission);
     const saved = localStorage.getItem(`reminders-${profile.id}`);
     setReminders(saved ? (JSON.parse(saved) as Reminder[]) : DEFAULT_REMINDERS);
     fetchAppSettings().then(() => setNotifGloballyEnabled(areNotificationsEnabled()));
+    rebuildDailySchedule(profile.id);
   }, [profile.id]);
 
   const save = (updated: Reminder[]) => {
     setReminders(updated);
     localStorage.setItem(`reminders-${profile.id}`, JSON.stringify(updated));
+    rebuildDailySchedule(profile.id);
   };
 
   const requestPermission = async () => {
     if (!notifGloballyEnabled) { message.warning('Notifications are currently disabled by admin'); return; }
-    if (!('Notification' in window)) { message.error('Notifications not supported on this device'); return; }
-    // If already granted just fire a test - re-requesting won't re-show the prompt
-    // and Android may show a confusing "already allowed" state.
-    if (Notification.permission === 'granted') { setPermission('granted'); showTest(); return; }
-    const result = await Notification.requestPermission();
-    setPermission(result as Permission);
-    if (result === 'granted') { message.success('Notifications enabled! 🔔'); showTest(); }
-    else if (result === 'denied') message.error('Blocked - open browser settings to allow notifications');
+    if (platform.needsHomeScreenInstall) {
+      message.info('Add Arbol to your Home Screen first, then enable notifications.');
+      onShowInstallTutorial();
+      return;
+    }
+    if (!platform.canRequestPermission && permission !== 'granted') {
+      message.error(platform.troubleshootingHint ?? 'Notifications are not available on this device');
+      return;
+    }
+    setEnabling(true);
+    const result = await requestNotificationPermission(profile.id, swRegistration, profile.name);
+    setPermission(result.permission as Permission);
+    setEnabling(false);
+    if (result.granted) {
+      message.success(result.pushSubscribed
+        ? 'Notifications enabled with background delivery! 🔔'
+        : 'Notifications enabled! You\'ll get up to 3 daily funding reminders.');
+      showTest();
+    } else if (result.permission === 'denied') {
+      message.error('Blocked — open browser or device settings to allow notifications');
+    }
+  };
+
+  const retryPushSubscribe = async () => {
+    setEnabling(true);
+    await ensurePushSubscription(profile.id, swRegistration);
+    setEnabling(false);
+    message.success('Push subscription refreshed');
   };
 
   const showTest = async () => {
     if (!notifGloballyEnabled) { message.warning('Notifications are currently disabled by admin'); return; }
     if (Notification.permission !== 'granted') { message.warning('Enable notifications first'); return; }
     setSending(true);
+    const firstName = profile.name.split(' ')[0];
     const title = 'Arbol Momentum 🌿';
-    const body = `Hey ${profile.name.split(' ')[0]}! Time for your home reset. Keep that streak alive! 🔥`;
+    const body = `Hey ${firstName}! You'll receive morning, midday, and evening funding check-ins — never more than 3 per day.`;
     try {
       await showNotification(swRegistration, title, body, 'test');
       message.success('Test notification sent!');
     } catch (err) {
       console.warn('Notification test failed:', err);
-      message.error('Could not send notification - check device settings');
+      message.error('Could not send notification — check device settings');
     }
     setSending(false);
   };
 
-  const scheduleReminder = (r: Reminder) => {
-    if (!notifGloballyEnabled) return;
-    if (Notification.permission !== 'granted') return;
-    const [h, m] = r.time.split(':').map(Number);
-    const now = new Date(), target = new Date();
-    target.setHours(h, m, 0, 0);
-    if (target <= now) target.setDate(target.getDate() + 1);
-    setTimeout(async () => {
-      await showNotification(swRegistration, `${r.label} ⏰`, `Time for your ${r.label.toLowerCase()}! 🔥`, `r-${r.id}`);
-    }, target.getTime() - now.getTime());
-  };
-
   const toggle = (id: string) => {
-    const updated = reminders.map(r => {
-      if (r.id !== id) return r;
-      const toggled = { ...r, enabled: !r.enabled };
-      if (toggled.enabled && permission === 'granted') scheduleReminder(toggled);
-      return toggled;
-    });
+    const updated = reminders.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r);
     save(updated);
   };
 
@@ -88,18 +103,20 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
     if (!newLabel.trim()) { message.warning('Please enter a label'); return; }
     if (!newDays.length) { message.warning('Select at least one day'); return; }
     const r: Reminder = { id: Date.now().toString(), label: newLabel, time: newTime, days: newDays, enabled: true };
-    const updated = [...reminders, r];
-    save(updated);
-    if (permission === 'granted') scheduleReminder(r);
+    save([...reminders, r]);
     setShowAdd(false); setNewLabel(''); setNewTime('09:00'); setNewDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
     message.success('Reminder added!');
   };
+
+  const firedToday = getFiredNudgesToday(profile.id);
 
   return (
     <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 16px', background: C.bg, minHeight: '100dvh' }}>
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.headline }}>Alerts & Reminders</h2>
-        <p style={{ margin: '4px 0 0', color: C.body, fontSize: 13 }}>Push notifications for your home routines</p>
+        <p style={{ margin: '4px 0 0', color: C.body, fontSize: 13 }}>
+          Up to 3 smart funding nudges per day — morning, midday, and evening
+        </p>
       </div>
 
       {/* Add to Home Screen tutorial banner */}
@@ -112,7 +129,11 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
         <MobileOutlined style={{ color: '#fff', fontSize: 22 }} />
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600, fontSize: 14, color: '#fff' }}>Add to Home Screen</div>
-          <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>Install for push notifications on iOS & Android</div>
+          <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
+            {platform.os === 'iOS'
+              ? 'Required on iPhone for reliable push notifications'
+              : 'Install for the best notification experience on Android'}
+          </div>
         </div>
         <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 18 }}>›</span>
       </button>
@@ -130,33 +151,86 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
           }
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600, fontSize: 14, color: C.headline }}>
-              {!notifGloballyEnabled ? 'Notifications disabled' : permission === 'granted' ? 'Notifications enabled' : permission === 'denied' ? 'Notifications blocked' : 'Enable notifications'}
+              {!notifGloballyEnabled ? 'Notifications disabled'
+                : permission === 'granted' ? 'Notifications enabled'
+                : permission === 'denied' ? 'Notifications blocked'
+                : platform.needsHomeScreenInstall ? 'Install app first'
+                : 'Enable notifications'}
             </div>
             <div style={{ color: C.body, fontSize: 12, marginTop: 2 }}>
               {!notifGloballyEnabled ? 'Notifications are turned off globally by admin'
-                : permission === 'granted' ? "You'll receive timely home care reminders"
-                : permission === 'denied' ? 'Open browser settings to allow notifications'
-                : 'Get reminders for your home reset routines'}
+                : permission === 'granted'
+                  ? `${platform.os} · ${platform.isPwa ? 'Installed PWA' : 'Browser tab'} · ${firedToday.length} nudge${firedToday.length === 1 ? '' : 's'} sent today`
+                : permission === 'denied' ? (platform.troubleshootingHint ?? 'Open browser settings to allow notifications')
+                : platform.needsHomeScreenInstall
+                  ? 'On iOS, add to Home Screen before enabling alerts'
+                : 'Get FAFSA, TAP, and scholarship task reminders'}
             </div>
           </div>
-          {notifGloballyEnabled && permission === 'default' && (
-            <Button type="primary" size="small" icon={<BellOutlined />} onClick={requestPermission}
+          {notifGloballyEnabled && permission === 'default' && !platform.needsHomeScreenInstall && (
+            <Button type="primary" size="small" icon={<BellOutlined />} onClick={requestPermission} loading={enabling}
               style={{ background: C.primary, border: 'none', borderRadius: 8, fontSize: 12, flexShrink: 0 }}>
               Enable
             </Button>
           )}
           {notifGloballyEnabled && permission === 'granted' && (
-            <Button size="small" icon={<SendOutlined />} onClick={showTest} loading={sending}
-              style={{ background: `${C.primary}15`, border: `1px solid ${C.primary}40`, color: C.primary, borderRadius: 8, fontSize: 12, flexShrink: 0 }}>
-              Test
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+              <Button size="small" icon={<SendOutlined />} onClick={showTest} loading={sending}
+                style={{ background: `${C.primary}15`, border: `1px solid ${C.primary}40`, color: C.primary, borderRadius: 8, fontSize: 12 }}>
+                Test
+              </Button>
+              {platform.pushSupported && (
+                <Button size="small" icon={<ReloadOutlined />} onClick={retryPushSubscribe} loading={enabling}
+                  style={{ fontSize: 11, borderRadius: 8 }}>
+                  Sync push
+                </Button>
+              )}
+            </div>
+          )}
+          {notifGloballyEnabled && platform.needsHomeScreenInstall && (
+            <Button size="small" onClick={onShowInstallTutorial}
+              style={{ borderRadius: 8, fontSize: 12, flexShrink: 0 }}>
+              How to install
             </Button>
           )}
         </div>
+        {platform.troubleshootingHint && permission !== 'granted' && (
+          <div style={{
+            marginTop: 12, padding: '10px 12px', borderRadius: 10,
+            background: C.bgAlt, fontSize: 12, color: C.body, lineHeight: 1.5,
+          }}>
+            💡 {platform.troubleshootingHint}
+          </div>
+        )}
+      </div>
+
+      {/* Daily nudge preview */}
+      <div style={{
+        background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16,
+        padding: '14px 16px', marginBottom: 16, boxShadow: C.shadow,
+      }}>
+        <div style={{ fontWeight: 700, fontSize: 13, color: C.headline, marginBottom: 10 }}>Daily smart nudges</div>
+        {[
+          { time: '8:00 AM', label: 'Morning overview', desc: 'Key financial tasks for today (FAFSA, TAP, payments)' },
+          { time: '1:00 PM', label: 'Midday check-in', desc: 'Aid and scholarship task progress' },
+          { time: '7:30 PM', label: 'Evening summary', desc: 'Celebrate completed funding tasks' },
+        ].map(slot => (
+          <div key={slot.time} style={{
+            display: 'flex', gap: 12, padding: '8px 0',
+            borderBottom: `1px solid ${C.border}`,
+          }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: C.primary, width: 58, flexShrink: 0 }}>{slot.time}</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.headline }}>{slot.label}</div>
+              <div style={{ fontSize: 11, color: C.secondary, marginTop: 2 }}>{slot.desc}</div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Reminders list */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <span style={{ color: C.secondary, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Scheduled reminders</span>
+        <span style={{ color: C.secondary, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Custom reminders</span>
         <Button type="text" icon={<PlusOutlined />} size="small" onClick={() => setShowAdd(true)} style={{ color: C.primary, fontSize: 13 }}>Add</Button>
       </div>
 
@@ -201,7 +275,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
         <div style={{ paddingTop: 8 }}>
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', color: C.body, fontSize: 12, marginBottom: 6 }}>Label</label>
-            <Input placeholder="e.g. Morning Reset" value={newLabel} onChange={e => setNewLabel(e.target.value)}
+            <Input placeholder="e.g. FAFSA deadline check" value={newLabel} onChange={e => setNewLabel(e.target.value)}
               style={{ borderRadius: 8 }} />
           </div>
           <div style={{ marginBottom: 16 }}>
