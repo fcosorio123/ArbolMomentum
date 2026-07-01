@@ -5,7 +5,7 @@ import { C } from '../data/colors';
 type Tab = 'home' | 'goals' | 'tasks' | 'week' | 'reminders' | 'profile';
 
 const TABS: { key: Tab; icon: ReactNode; label: string }[] = [
-  { key: 'home',    icon: <HomeOutlined />,       label: 'Home' },
+  { key: 'home',    icon: <HomeOutlined />,       label: 'My Crib' },
   { key: 'goals',   icon: <TrophyOutlined />,      label: 'Goals' },
   { key: 'tasks',   icon: <CheckSquareOutlined />, label: 'Tasks' },
   { key: 'week',    icon: <CalendarOutlined />,    label: 'Week' },
