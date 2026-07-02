@@ -33,6 +33,7 @@ import {
 import { isLiveCheckInEnabled, fetchLiveCheckInSettings } from '../data/liveCheckInSettings';
 import { useScrollPositionLock } from '../hooks/useScrollPositionLock';
 import { truncateRemark, SKIPPED_BADGE, shouldShowRemark } from './taskCardDisplay';
+import { TaskCalendarButton } from './TaskCalendarButton';
 
 interface Props {
   profile: Profile;
@@ -63,11 +64,14 @@ function taskDurationLabel(task: UserTask_): string {
 // ── Task item
 function TaskItem({
   task, catColor, status, remark, onOpenUpdate, onDelete, onEdit, statusLocked,
+  profileId, profileName,
 }: {
   task: UserTask_; catColor: string; status: TaskStatus | null; remark?: string;
   onOpenUpdate: () => void; onDelete: () => void;
   onEdit?: () => void;
   statusLocked?: boolean;
+  profileId: string;
+  profileName: string;
 }) {
   const isSkipped = status === 'skipped';
   const display = status ? TASK_STATUS_DISPLAY[status] : TASK_STATUS_DISPLAY.null;
@@ -159,6 +163,15 @@ function TaskItem({
       )}
 
       <div style={{ display: 'flex', gap: 2, flexShrink: 0, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+        {!isSkipped && status !== 'done' && (
+          <TaskCalendarButton
+            profileId={profileId}
+            profileName={profileName}
+            taskId={task.id}
+            scope="week"
+            title={`Add "${task.label}" to calendar this week`}
+          />
+        )}
         {onEdit && (
           <button onClick={onEdit} type="button" style={{
             background: 'none', border: 'none', cursor: 'pointer', color: C.secondary,
@@ -291,7 +304,7 @@ function goalAccentColor(goalId: string) {
 // ── Goal group: goal header + flat task list
 function GoalGroup({
   goal, tasks, statuses, notes, onOpenUpdate, onDelete, timeFilter,
-  onEditTask, onAddSuggestedTask, isFirst,
+  onEditTask, onAddSuggestedTask, isFirst, profileId, profileName,
 }: {
   goal: PersonalGoal; tasks: UserTask_[];
   statuses: StatusMap; notes: NotesMap;
@@ -301,6 +314,8 @@ function GoalGroup({
   onEditTask: (t: UserTask_) => void;
   onAddSuggestedTask: (label: string, goalId: string) => void;
   isFirst?: boolean;
+  profileId: string;
+  profileName: string;
 }) {
   const [collapsed, setCollapsed] = useState(!isFirst);
   const accentColor = goalAccentColor(goal.id);
@@ -394,6 +409,8 @@ function GoalGroup({
               key={task.id} task={task} catColor={accent}
               status={statuses[task.id] ?? null}
               remark={notes[task.id]}
+              profileId={profileId}
+              profileName={profileName}
               onOpenUpdate={() => onOpenUpdate(task, goal, doneTasks, totalTasks)}
               onDelete={() => onDelete(task)}
               onEdit={() => onEditTask(task)}
@@ -963,6 +980,8 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                 goal={goal}
                 tasks={goalTaskMap[goal.id] ?? []}
                 statuses={statuses} notes={notes}
+                profileId={profile.id}
+                profileName={profile.name}
                 onOpenUpdate={openTaskUpdate}
                 onDelete={t => openDeleteTask(t)}
                 timeFilter={timeFilter}
@@ -990,6 +1009,8 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                     key={task.id} task={task} catColor={C.secondary}
                     status={statuses[task.id] ?? null}
                     remark={notes[task.id]}
+                    profileId={profile.id}
+                    profileName={profile.name}
                     statusLocked
                     onOpenUpdate={() => openTaskUpdate(task)}
                     onDelete={() => openDeleteTask(task)}

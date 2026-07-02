@@ -11,6 +11,8 @@ import { getPersonalGoals, type PersonalGoal } from '../data/personalGoals';
 import { getActiveUserTasksForDate, getUserTasks, type UserTask } from '../data/userTasks';
 import { getTaskNote } from '../data/liveCheckInFeedback';
 import { truncateRemark, SKIPPED_BADGE, shouldShowRemark } from './taskCardDisplay';
+import { CalendarExportCard } from './CalendarExportCard';
+import { TaskCalendarButton } from './TaskCalendarButton';
 import { C } from '../data/colors';
 
 interface Props { profile: Profile }
@@ -229,11 +231,24 @@ export function WeekPlan({ profile }: Props) {
             {SKIPPED_BADGE.label}
           </span>
         ) : (
-          extraBadges ?? (
-            <span style={{ fontSize: 10, color: C.secondary, background: C.bgAlt, borderRadius: 5, padding: '2px 6px' }}>
-              {timeOfDay === 'morning' ? '☀️' : '🌙'}
-            </span>
-          )
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+            {status !== 'done' && (
+              <TaskCalendarButton
+                profileId={profile.id}
+                profileName={profile.name}
+                taskId={taskId}
+                scope="day"
+                dateKey={activeDayDk}
+                size="sm"
+                title={`Add "${label}" to calendar for ${activeDay}`}
+              />
+            )}
+            {extraBadges ?? (
+              <span style={{ fontSize: 10, color: C.secondary, background: C.bgAlt, borderRadius: 5, padding: '2px 6px' }}>
+                {timeOfDay === 'morning' ? '☀️' : '🌙'}
+              </span>
+            )}
+          </div>
         )}
       </div>
     );
@@ -254,6 +269,8 @@ export function WeekPlan({ profile }: Props) {
         </div>
         <PageTourButton onClick={() => setShowTour(true)} />
       </div>
+
+      <CalendarExportCard profileId={profile.id} profileName={profile.name} />
 
       {personalGoals.length > 0 && (
         <div data-tour-id="week-goals" style={{
