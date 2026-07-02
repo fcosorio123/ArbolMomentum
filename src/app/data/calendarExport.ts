@@ -16,11 +16,14 @@ const EVENT_DURATION_MINUTES = 30;
 export interface CalendarExportPrefs {
   morningHour: number;
   eveningHour: number;
+  /** Minutes before each event start to fire a calendar alarm (0 = at task time). */
+  alarmMinutesBefore: number;
 }
 
 export const DEFAULT_CALENDAR_PREFS: CalendarExportPrefs = {
   morningHour: 9,
   eveningHour: 18,
+  alarmMinutesBefore: 0,
 };
 
 export const CALENDAR_PREFS_KEY = (profileId: string) =>
@@ -45,6 +48,7 @@ export function getCalendarPrefs(profileId: string): CalendarExportPrefs {
     return {
       morningHour: clampHour(parsed.morningHour, DEFAULT_CALENDAR_PREFS.morningHour),
       eveningHour: clampHour(parsed.eveningHour, DEFAULT_CALENDAR_PREFS.eveningHour),
+      alarmMinutesBefore: clampAlarmMinutes(parsed.alarmMinutesBefore),
     };
   } catch {
     return { ...DEFAULT_CALENDAR_PREFS };
@@ -57,6 +61,7 @@ export function saveCalendarPrefs(profileId: string, prefs: CalendarExportPrefs)
     JSON.stringify({
       morningHour: clampHour(prefs.morningHour, DEFAULT_CALENDAR_PREFS.morningHour),
       eveningHour: clampHour(prefs.eveningHour, DEFAULT_CALENDAR_PREFS.eveningHour),
+      alarmMinutesBefore: clampAlarmMinutes(prefs.alarmMinutesBefore),
     }),
   );
 }
@@ -64,6 +69,32 @@ export function saveCalendarPrefs(profileId: string, prefs: CalendarExportPrefs)
 function clampHour(value: unknown, fallback: number): number {
   const n = typeof value === 'number' ? value : fallback;
   return Math.min(22, Math.max(6, Math.round(n)));
+}
+
+function clampAlarmMinutes(value: unknown, fallback = DEFAULT_CALENDAR_PREFS.alarmMinutesBefore): number {
+  const n = typeof value === 'number' ? value : fallback;
+  return Math.min(120, Math.max(0, Math.round(n)));
+}
+
+/** RFC 5545 TRIGGER duration before event start (e.g. -PT15M). */
+export function formatValarmTrigger(minutesBefore: number): string {
+  const mins = clampAlarmMinutes(minutesBefore);
+  if (mins === 0) return '-PT0M';
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h > 0 && m > 0) return `-PT${h}H${m}M`;
+  if (h > 0) return `-PT${h}H`;
+  return `-PT${m}M`;
+}
+
+export function buildValarmLines(label: string, minutesBefore: number): string[] {
+  return [
+    'BEGIN:VALARM',
+    foldIcsLine(`TRIGGER:${formatValarmTrigger(minutesBefore)}`),
+    'ACTION:DISPLAY',
+    foldIcsLine(`DESCRIPTION:${icsEscape(label)}`),
+    'END:VALARM',
+  ];
 }
 
 /** Mon–Sun of the current calendar week (same resolution as WeekPlan). */
@@ -262,6 +293,7 @@ export function buildIcsDocument(
       foldIcsLine(`DTEND:${dtEnd}`),
       foldIcsLine(`SUMMARY:${icsEscape(event.label)}`),
       foldIcsLine(`DESCRIPTION:${icsEscape(descriptionParts.join('\n'))}`),
+      ...buildValarmLines(event.label, prefs.alarmMinutesBefore),
       'END:VEVENT',
     ];
     lines.push(...eventLines);

@@ -578,6 +578,7 @@ export default function App() {
           profile={activeProfile}
           swRegistration={swRegistration}
           onShowInstallTutorial={() => setShowInstallTutorial(true)}
+          onGoToWeek={() => setActiveTab('week')}
         />
       )}
       {activeTab === 'profile' && (

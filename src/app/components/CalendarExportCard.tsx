@@ -42,7 +42,7 @@ export function CalendarExportCard({ profileId, profileName }: Props) {
       localStorage.setItem(CALENDAR_EXPORTED_KEY(profileId), 'true');
       message.success({
         content: isFirst
-          ? `Downloaded ${count} events for this week. Times use your morning/evening defaults — edit in Times or in your calendar. Re-export when tasks change.`
+          ? `Downloaded ${count} events with calendar alarms. Import the file — your phone will remind you even when Arbol is closed. Re-export when tasks change.`
           : `Downloaded ${count} events for this week.`,
         duration: isFirst ? 6 : 4,
       });
@@ -76,12 +76,13 @@ export function CalendarExportCard({ profileId, profileName }: Props) {
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: C.headline }}>Sync to Calendar</div>
           <p style={{ margin: '4px 0 0', fontSize: 12, color: C.body, lineHeight: 1.45 }}>
-            Export this week&apos;s open tasks, or tap the calendar icon on any task.
+            <strong style={{ fontWeight: 600 }}>Best for reminders when Arbol is closed.</strong>{' '}
+            Google or Apple Calendar will alert you — no need to keep the app open.
           </p>
           <p style={{ margin: '8px 0 0', fontSize: 11, color: C.secondary, lineHeight: 1.45 }}>
-            Morning tasks export at {formatHour(prefs.morningHour)}, evening at {formatHour(prefs.eveningHour)} (30 min each).
-            Change defaults in <strong style={{ fontWeight: 600 }}>Times</strong>, or edit events in your calendar after import.
-            This file covers <strong style={{ fontWeight: 600 }}>this week only</strong> — re-export when your plan changes.
+            Tasks export at {formatHour(prefs.morningHour)} / {formatHour(prefs.eveningHour)} with calendar alarms
+            {prefs.alarmMinutesBefore > 0 ? ` ${prefs.alarmMinutesBefore} min before` : ' at task time'}.
+            Re-export when your plan changes (this week only).
           </p>
         </div>
       </div>
@@ -112,7 +113,7 @@ export function CalendarExportCard({ profileId, profileName }: Props) {
             paddingTop: 12,
             borderTop: `1px solid ${C.border}`,
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
+            gridTemplateColumns: '1fr 1fr 1fr',
             gap: 12,
           }}
         >
@@ -145,6 +146,24 @@ export function CalendarExportCard({ profileId, profileName }: Props) {
               style={{ width: '100%' }}
             />
             <span style={{ color: C.secondary, fontSize: 11 }}>{formatHour(prefs.eveningHour)}</span>
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, color: C.body }}>
+            Alarm (min before)
+            <InputNumber
+              min={0}
+              max={120}
+              step={5}
+              value={prefs.alarmMinutesBefore}
+              onChange={value => {
+                if (typeof value === 'number') {
+                  persistPrefs({ ...prefs, alarmMinutesBefore: value });
+                }
+              }}
+              style={{ width: '100%' }}
+            />
+            <span style={{ color: C.secondary, fontSize: 11 }}>
+              {prefs.alarmMinutesBefore === 0 ? 'At task time' : `${prefs.alarmMinutesBefore} min early`}
+            </span>
           </label>
         </div>
       )}

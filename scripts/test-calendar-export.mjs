@@ -45,6 +45,31 @@ function buildEventUid(profileId, taskId, dateKey) {
   return `arbol-${profileId}-${taskId}-${dateKey}@arbolumomentum`;
 }
 
+function clampAlarmMinutes(value, fallback = 0) {
+  const n = typeof value === 'number' ? value : fallback;
+  return Math.min(120, Math.max(0, Math.round(n)));
+}
+
+function formatValarmTrigger(minutesBefore) {
+  const mins = clampAlarmMinutes(minutesBefore);
+  if (mins === 0) return '-PT0M';
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h > 0 && m > 0) return `-PT${h}H${m}M`;
+  if (h > 0) return `-PT${h}H`;
+  return `-PT${m}M`;
+}
+
+function buildValarmLines(label, minutesBefore) {
+  return [
+    'BEGIN:VALARM',
+    foldIcsLine(`TRIGGER:${formatValarmTrigger(minutesBefore)}`),
+    'ACTION:DISPLAY',
+    foldIcsLine(`DESCRIPTION:${icsEscape(label)}`),
+    'END:VALARM',
+  ];
+}
+
 function buildIcsDocument(profileId, events, prefs, now = new Date('2026-06-20T15:30:00Z')) {
   const dtStamp = `${now.toISOString().replace(/[-:]/g, '').slice(0, 15)}Z`;
   const appUrl = 'https://fcosorio123.github.io/ArbolMomentum';
@@ -73,6 +98,7 @@ function buildIcsDocument(profileId, events, prefs, now = new Date('2026-06-20T1
       foldIcsLine(`DTEND:${dtEnd}`),
       foldIcsLine(`SUMMARY:${icsEscape(event.label)}`),
       foldIcsLine(`DESCRIPTION:${icsEscape(descriptionParts.join('\n'))}`),
+      ...buildValarmLines(event.label, prefs.alarmMinutesBefore ?? 0),
       'END:VEVENT',
     );
   }
@@ -131,7 +157,7 @@ const ics = buildIcsDocument(
       timeOfDay: 'evening',
     },
   ],
-  { morningHour: 9, eveningHour: 18 },
+  { morningHour: 9, eveningHour: 18, alarmMinutesBefore: 0 },
 );
 
 assert(ics.includes('BEGIN:VCALENDAR'), 'has calendar header');
@@ -144,6 +170,19 @@ assert(ics.includes('DTSTART:20260620T180000'), 'evening start');
 assert(ics.includes('Goal: Save'), 'goal in description');
 assert(ics.includes('Open Arbol:'), 'app link in description');
 assert(ics.includes('END:VCALENDAR'), 'calendar footer');
+assert(ics.includes('BEGIN:VALARM'), 'includes VALARM block');
+assert(ics.includes('TRIGGER:-PT0M'), 'alarm at event start by default');
+assert(ics.includes('ACTION:DISPLAY'), 'display alarm action');
+
+assert(formatValarmTrigger(15) === '-PT15M', 'formatValarmTrigger 15 min');
+assert(formatValarmTrigger(90) === '-PT1H30M', 'formatValarmTrigger 1h30m');
+
+const alarmIcs = buildIcsDocument(
+  'kyle',
+  [{ taskId: 'pg-1', dateKey: '2026-06-20', label: 'Check FAFSA status', timeOfDay: 'morning' }],
+  { morningHour: 9, eveningHour: 18, alarmMinutesBefore: 15 },
+);
+assert(alarmIcs.includes('TRIGGER:-PT15M'), 'custom alarm offset');
 
 // dayNameFromDateKey
 function dayNameFromDateKey(dateKey) {
@@ -164,7 +203,7 @@ assert(taskWeek.length === 2, 'task week filter keeps all occurrences');
 const singleDay = weekEvents.filter(e => e.taskId === 'pg-2' && e.dateKey === '2026-06-20');
 assert(singleDay.length === 1, 'task day filter keeps one occurrence');
 
-const taskIcs = buildIcsDocument('kyle', singleDay, { morningHour: 9, eveningHour: 18 });
+const taskIcs = buildIcsDocument('kyle', singleDay, { morningHour: 9, eveningHour: 18, alarmMinutesBefore: 0 });
 assert(taskIcs.includes('BEGIN:VEVENT'), 'single task ICS has one event');
 assert((taskIcs.match(/BEGIN:VEVENT/g) || []).length === 1, 'single task ICS event count');
 

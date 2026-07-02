@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { App, Button, Switch, Input, Modal } from 'antd';
-import { BellOutlined, BellFilled, PlusOutlined, DeleteOutlined, CheckCircleOutlined, ExclamationCircleOutlined, SendOutlined, MobileOutlined, ReloadOutlined } from '@ant-design/icons';
+import { BellOutlined, BellFilled, PlusOutlined, DeleteOutlined, CheckCircleOutlined, ExclamationCircleOutlined, SendOutlined, MobileOutlined, ReloadOutlined, CalendarOutlined, RightOutlined } from '@ant-design/icons';
 import { DEFAULT_REMINDERS, type Profile } from '../data/profiles';
 import { C } from '../data/colors';
 import { areNotificationsEnabled, fetchAppSettings } from '../data/appSettings';
@@ -10,15 +10,21 @@ import {
   getPushPlatformInfo,
   requestNotificationPermission,
   ensurePushSubscription,
+  VAPID_PUBLIC_KEY,
 } from '../data/pushNotifications';
 import { getFiredNudgesToday } from '../data/deviceAnalytics';
 
 interface Reminder { id: string; label: string; time: string; days: string[]; enabled: boolean; }
-interface Props { profile: Profile; swRegistration: ServiceWorkerRegistration | null; onShowInstallTutorial: () => void; }
+interface Props {
+  profile: Profile;
+  swRegistration: ServiceWorkerRegistration | null;
+  onShowInstallTutorial: () => void;
+  onGoToWeek: () => void;
+}
 type Permission = 'default' | 'granted' | 'denied';
 const ALL_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial }: Props) {
+export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial, onGoToWeek }: Props) {
   const { message } = App.useApp();
   const [permission, setPermission] = useState<Permission>('default');
   const [reminders, setReminders] = useState<Reminder[]>([]);
@@ -62,8 +68,8 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
     setEnabling(false);
     if (result.granted) {
       message.success(result.pushSubscribed
-        ? 'Notifications enabled with background delivery! 🔔'
-        : 'Notifications enabled! You\'ll get up to 3 daily funding reminders.');
+        ? 'Notifications enabled with background push! 🔔'
+        : 'In-app reminders enabled while Arbol is open. For alerts when the app is closed, use Week → Add to Calendar.');
       showTest();
     } else if (result.permission === 'denied') {
       message.error('Blocked — open browser or device settings to allow notifications');
@@ -115,7 +121,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.headline }}>Alerts & Reminders</h2>
         <p style={{ margin: '4px 0 0', color: C.body, fontSize: 13 }}>
-          Up to 3 smart funding nudges per day — morning, midday, and evening
+          In-app nudges while you use Arbol, or calendar alarms when the app is closed
         </p>
       </div>
 
@@ -131,8 +137,8 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
           <div style={{ fontWeight: 600, fontSize: 14, color: '#fff' }}>Add to Home Screen</div>
           <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
             {platform.os === 'iOS'
-              ? 'Required on iPhone for reliable push notifications'
-              : 'Install for the best notification experience on Android'}
+              ? 'Required on iPhone for in-app notification alerts'
+              : 'Install for a full-screen app experience on Android'}
           </div>
         </div>
         <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 18 }}>›</span>
@@ -179,7 +185,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
                 style={{ background: `${C.primary}15`, border: `1px solid ${C.primary}40`, color: C.primary, borderRadius: 8, fontSize: 12 }}>
                 Test
               </Button>
-              {platform.pushSupported && (
+              {platform.pushSupported && VAPID_PUBLIC_KEY && (
                 <Button size="small" icon={<ReloadOutlined />} onClick={retryPushSubscribe} loading={enabling}
                   style={{ fontSize: 11, borderRadius: 8 }}>
                   Sync push
@@ -204,12 +210,81 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
         )}
       </div>
 
+      {/* Reminder options comparison */}
+      <div style={{
+        background: C.bgCard, border: `1.5px solid ${C.primary}35`, borderRadius: 16,
+        padding: '14px 16px', marginBottom: 16, boxShadow: C.shadow,
+      }}>
+        <div style={{ fontWeight: 700, fontSize: 13, color: C.headline, marginBottom: 10 }}>
+          Which reminders work when Arbol is closed?
+        </div>
+        {[
+          {
+            label: 'In-app nudges',
+            closed: 'No — while Arbol is open',
+            highlight: false,
+          },
+          {
+            label: 'Calendar sync + alarms',
+            closed: 'Yes — via Google or Apple Calendar',
+            highlight: true,
+          },
+          {
+            label: 'Web push',
+            closed: 'Yes — needs backend (not live yet)',
+            highlight: false,
+          },
+        ].map(row => (
+          <div
+            key={row.label}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr auto',
+              gap: 8,
+              padding: '8px 0',
+              borderBottom: `1px solid ${C.border}`,
+              alignItems: 'start',
+            }}
+          >
+            <span style={{
+              fontSize: 12,
+              fontWeight: row.highlight ? 700 : 600,
+              color: row.highlight ? C.primary : C.headline,
+            }}>
+              {row.label}
+            </span>
+            <span style={{
+              fontSize: 11,
+              color: row.highlight ? C.headline : C.secondary,
+              textAlign: 'right',
+              maxWidth: 168,
+              lineHeight: 1.4,
+            }}>
+              {row.closed}
+            </span>
+          </div>
+        ))}
+        <p style={{ margin: '10px 0 12px', fontSize: 11, color: C.secondary, lineHeight: 1.45 }}>
+          Calendar export is already on the Week tab — one-time import, then your phone reminds you at task time.
+        </p>
+        <Button
+          type="primary"
+          icon={<CalendarOutlined />}
+          onClick={onGoToWeek}
+          style={{ borderRadius: 10, fontWeight: 600, width: '100%' }}
+        >
+          Week → Add to Calendar
+          <RightOutlined style={{ fontSize: 11, marginLeft: 4 }} />
+        </Button>
+      </div>
+
       {/* Daily nudge preview */}
       <div style={{
         background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16,
         padding: '14px 16px', marginBottom: 16, boxShadow: C.shadow,
       }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: C.headline, marginBottom: 10 }}>Daily smart nudges</div>
+        <div style={{ fontWeight: 700, fontSize: 13, color: C.headline, marginBottom: 4 }}>Daily smart nudges</div>
+        <p style={{ margin: '0 0 10px', fontSize: 11, color: C.secondary }}>While Arbol is open — up to 3 per day</p>
         {[
           { time: '8:00 AM', label: 'Morning overview', desc: 'Key financial tasks for today (FAFSA, TAP, payments)' },
           { time: '1:00 PM', label: 'Midday check-in', desc: 'Aid and scholarship task progress' },
