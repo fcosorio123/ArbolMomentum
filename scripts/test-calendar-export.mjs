@@ -207,4 +207,67 @@ const taskIcs = buildIcsDocument('kyle', singleDay, { morningHour: 9, eveningHou
 assert(taskIcs.includes('BEGIN:VEVENT'), 'single task ICS has one event');
 assert((taskIcs.match(/BEGIN:VEVENT/g) || []).length === 1, 'single task ICS event count');
 
+function eventDateTimes(event, prefs) {
+  const hour = event.timeOfDay === 'morning' ? prefs.morningHour : prefs.eveningHour;
+  const start = formatIcsLocalDateTime(event.dateKey, hour);
+  const end = addMinutesToLocalDateTime(start, EVENT_DURATION_MINUTES);
+  const startIso = `${event.dateKey}T${String(hour).padStart(2, '0')}:00:00`;
+  const endHour = Number(end.slice(9, 11));
+  const endMin = Number(end.slice(11, 13));
+  const endIso = `${event.dateKey}T${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')}:00`;
+  return { start, end, startIso, endIso };
+}
+
+function buildGoogleCalendarUrl(event, prefs) {
+  const { start, end } = eventDateTimes(event, prefs);
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: event.label,
+    dates: `${start}/${end}`,
+    details: `Open Arbol: https://fcosorio123.github.io/ArbolMomentum`,
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+function buildOutlookCalendarUrl(event, prefs) {
+  const { startIso, endIso } = eventDateTimes(event, prefs);
+  const params = new URLSearchParams({
+    path: '/calendar/action/compose',
+    rru: 'addevent',
+    subject: event.label,
+    startdt: startIso,
+    enddt: endIso,
+    body: 'Open Arbol',
+    allday: 'false',
+  });
+  return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`;
+}
+
+const sampleEvent = {
+  taskId: 'pg-1',
+  dateKey: '2026-06-20',
+  label: 'Check FAFSA status',
+  timeOfDay: 'morning',
+};
+const prefs = { morningHour: 9, eveningHour: 18, alarmMinutesBefore: 0 };
+
+const googleUrl = buildGoogleCalendarUrl(sampleEvent, prefs);
+assert(googleUrl.includes('calendar.google.com'), 'google url host');
+assert(googleUrl.includes('action=TEMPLATE'), 'google template action');
+assert(googleUrl.includes('dates=20260620T090000%2F20260620T093000'), 'google date range');
+assert(googleUrl.includes('text=Check+FAFSA+status'), 'google title');
+
+const outlookUrl = buildOutlookCalendarUrl(sampleEvent, prefs);
+assert(outlookUrl.includes('outlook.live.com'), 'outlook url host');
+assert(outlookUrl.includes('subject=Check+FAFSA+status'), 'outlook subject');
+assert(outlookUrl.includes('startdt=2026-06-20T09%3A00%3A00'), 'outlook start');
+
+function suggestCalendarProvider(os) {
+  if (os === 'iOS' || os === 'macOS') return 'apple';
+  if (os === 'Windows') return 'outlook';
+  return 'google';
+}
+assert(suggestCalendarProvider('iOS') === 'apple', 'suggest apple on iOS');
+assert(suggestCalendarProvider('Windows') === 'outlook', 'suggest outlook on Windows');
+
 console.log('calendar export tests: all passed');

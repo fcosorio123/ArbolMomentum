@@ -32,6 +32,70 @@ export const CALENDAR_PREFS_KEY = (profileId: string) =>
 export const CALENDAR_EXPORTED_KEY = (profileId: string) =>
   `arbol-calendar-exported-${profileId}`;
 
+export const CALENDAR_PROVIDER_KEY = (profileId: string) =>
+  `arbol-calendar-provider-${profileId}`;
+
+export type CalendarProvider = 'google' | 'outlook' | 'apple' | 'ics';
+
+export interface CalendarProviderOption {
+  id: CalendarProvider;
+  label: string;
+  description: string;
+  emoji: string;
+}
+
+export const CALENDAR_PROVIDER_OPTIONS: CalendarProviderOption[] = [
+  {
+    id: 'google',
+    label: 'Google Calendar',
+    description: 'Opens Google Calendar — or downloads a file to import many events',
+    emoji: '📅',
+  },
+  {
+    id: 'outlook',
+    label: 'Outlook',
+    description: 'Opens Outlook on the web — or downloads a file to import many events',
+    emoji: '📧',
+  },
+  {
+    id: 'apple',
+    label: 'Apple Calendar',
+    description: 'Downloads a file that opens in Calendar on iPhone or Mac',
+    emoji: '🍎',
+  },
+  {
+    id: 'ics',
+    label: 'Other (.ics file)',
+    description: 'Universal format — import into any calendar app',
+    emoji: '📎',
+  },
+];
+
+export function getSavedCalendarProvider(profileId: string): CalendarProvider | null {
+  try {
+    const raw = localStorage.getItem(CALENDAR_PROVIDER_KEY(profileId));
+    if (raw === 'google' || raw === 'outlook' || raw === 'apple' || raw === 'ics') return raw;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveCalendarProvider(profileId: string, provider: CalendarProvider) {
+  localStorage.setItem(CALENDAR_PROVIDER_KEY(profileId), provider);
+}
+
+export function clearSavedCalendarProvider(profileId: string) {
+  localStorage.removeItem(CALENDAR_PROVIDER_KEY(profileId));
+}
+
+/** Suggest a default provider from device OS. */
+export function suggestCalendarProvider(os: string): CalendarProvider {
+  if (os === 'iOS' || os === 'macOS') return 'apple';
+  if (os === 'Windows') return 'outlook';
+  return 'google';
+}
+
 export interface CalendarEventRow {
   taskId: string;
   dateKey: string;
@@ -303,6 +367,121 @@ export function buildIcsDocument(
   return `${lines.join('\r\n')}\r\n`;
 }
 
+function eventDateTimes(
+  event: CalendarEventRow,
+  prefs: CalendarExportPrefs,
+): { start: string; end: string; startIso: string; endIso: string } {
+  const hour = event.timeOfDay === 'morning' ? prefs.morningHour : prefs.eveningHour;
+  const start = formatIcsLocalDateTime(event.dateKey, hour);
+  const end = addMinutesToLocalDateTime(start, EVENT_DURATION_MINUTES);
+  const startIso = `${event.dateKey}T${String(hour).padStart(2, '0')}:00:00`;
+  const endHour = Number(end.slice(9, 11));
+  const endMin = Number(end.slice(11, 13));
+  const endIso = `${event.dateKey}T${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')}:00`;
+  return { start, end, startIso, endIso };
+}
+
+function buildEventDescription(event: CalendarEventRow): string {
+  const appUrl = getCanonicalProductionUrl();
+  const parts = [
+    event.goalTitle ? `Goal: ${event.goalTitle}` : undefined,
+    `Open Arbol: ${appUrl}`,
+  ].filter(Boolean) as string[];
+  return parts.join('\n');
+}
+
+/** Google Calendar compose URL — works for a single event. */
+export function buildGoogleCalendarUrl(
+  event: CalendarEventRow,
+  prefs: CalendarExportPrefs = DEFAULT_CALENDAR_PREFS,
+): string {
+  const { start, end } = eventDateTimes(event, prefs);
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: event.label,
+    dates: `${start}/${end}`,
+    details: buildEventDescription(event),
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+/** Outlook web compose URL — works for a single event. */
+export function buildOutlookCalendarUrl(
+  event: CalendarEventRow,
+  prefs: CalendarExportPrefs = DEFAULT_CALENDAR_PREFS,
+): string {
+  const { startIso, endIso } = eventDateTimes(event, prefs);
+  const params = new URLSearchParams({
+    path: '/calendar/action/compose',
+    rru: 'addevent',
+    subject: event.label,
+    startdt: startIso,
+    enddt: endIso,
+    body: buildEventDescription(event),
+    allday: 'false',
+  });
+  return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`;
+}
+
+export interface CalendarDeliveryResult {
+  eventCount: number;
+  method: 'deeplink' | 'download';
+  provider: CalendarProvider;
+}
+
+export function deliverEventsToCalendar(
+  provider: CalendarProvider,
+  profileId: string,
+  events: CalendarEventRow[],
+  filename: string,
+): CalendarDeliveryResult {
+  const prefs = getCalendarPrefs(profileId);
+  const ics = buildIcsDocument(profileId, events, prefs);
+
+  if (provider === 'google' && events.length === 1) {
+    window.open(buildGoogleCalendarUrl(events[0], prefs), '_blank', 'noopener,noreferrer');
+    return { eventCount: 1, method: 'deeplink', provider };
+  }
+
+  if (provider === 'outlook' && events.length === 1) {
+    window.open(buildOutlookCalendarUrl(events[0], prefs), '_blank', 'noopener,noreferrer');
+    return { eventCount: 1, method: 'deeplink', provider };
+  }
+
+  downloadIcsFile(ics, filename);
+  return { eventCount: events.length, method: 'download', provider };
+}
+
+export function getCalendarDeliveryMessage(
+  result: CalendarDeliveryResult,
+  isFirstExport = false,
+): string {
+  const { eventCount, method, provider } = result;
+  const countLabel = eventCount === 1 ? '1 event' : `${eventCount} events`;
+
+  if (method === 'deeplink') {
+    if (provider === 'google') {
+      return `Opened Google Calendar with your task. Save the event — reminders can be set there.`;
+    }
+    if (provider === 'outlook') {
+      return `Opened Outlook with your task. Save the event to add it to your calendar.`;
+    }
+  }
+
+  const importHints: Record<CalendarProvider, string> = {
+    google: 'In Google Calendar: Settings → Import & export → Import → select the downloaded file.',
+    outlook: 'In Outlook: Add calendar → Upload from file → select the downloaded file.',
+    apple: 'Tap the downloaded file — it should open in Apple Calendar. Alarms are included.',
+    ics: 'Open the file in your calendar app, or use its Import option.',
+  };
+
+  const alarmNote = isFirstExport
+    ? ' Calendar alarms are included in the file.'
+    : '';
+
+  return `Downloaded ${countLabel}.${alarmNote} ${importHints[provider]}`;
+}
+
 export function downloadIcsFile(ics: string, filename: string) {
   const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -316,31 +495,17 @@ export function downloadIcsFile(ics: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-export function exportEventsToCalendar(
-  profileId: string,
-  events: CalendarEventRow[],
-  filename: string,
-): number {
-  const prefs = getCalendarPrefs(profileId);
-  const ics = buildIcsDocument(profileId, events, prefs);
-  downloadIcsFile(ics, filename);
-  return events.length;
-}
-
-export function exportWeekToCalendar(profileId: string, profileSlug: string): number {
-  const events = collectWeekCalendarEvents(profileId);
+export function buildWeekExportFilename(profileSlug: string): string {
   const slug = slugifyProfileName(profileSlug);
-  return exportEventsToCalendar(profileId, events, `arbol-week-${slug}.ics`);
+  return `arbol-week-${slug}.ics`;
 }
 
-export function exportTaskToCalendar(
-  profileId: string,
-  taskId: string,
+export function buildTaskExportFilename(
   profileSlug: string,
+  events: CalendarEventRow[],
   scope: CalendarExportScope,
   dateKey?: string,
-): number {
-  const events = collectTaskCalendarEvents(profileId, taskId, scope, dateKey);
+): string {
   const slug = slugifyProfileName(profileSlug);
   const labelSlug = events[0]?.label
     .toLowerCase()
@@ -348,5 +513,24 @@ export function exportTaskToCalendar(
     .replace(/^-|-$/g, '')
     .slice(0, 32) || 'task';
   const suffix = scope === 'day' && dateKey ? dateKey : 'week';
-  return exportEventsToCalendar(profileId, events, `arbol-${labelSlug}-${suffix}-${slug}.ics`);
+  return `arbol-${labelSlug}-${suffix}-${slug}.ics`;
+}
+
+export function prepareWeekCalendarExport(profileId: string, profileSlug: string) {
+  const events = collectWeekCalendarEvents(profileId);
+  return { events, filename: buildWeekExportFilename(profileSlug) };
+}
+
+export function prepareTaskCalendarExport(
+  profileId: string,
+  taskId: string,
+  profileSlug: string,
+  scope: CalendarExportScope,
+  dateKey?: string,
+) {
+  const events = collectTaskCalendarEvents(profileId, taskId, scope, dateKey);
+  return {
+    events,
+    filename: buildTaskExportFilename(profileSlug, events, scope, dateKey),
+  };
 }
