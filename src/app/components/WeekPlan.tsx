@@ -11,7 +11,6 @@ import { getPersonalGoals, type PersonalGoal } from '../data/personalGoals';
 import { getActiveUserTasksForDate, getUserTasks, type UserTask } from '../data/userTasks';
 import { getTaskNote } from '../data/liveCheckInFeedback';
 import { truncateRemark, SKIPPED_BADGE, shouldShowRemark } from './taskCardDisplay';
-import { CalendarExportCard } from './CalendarExportCard';
 import { TaskCalendarButton } from './TaskCalendarButton';
 import { C } from '../data/colors';
 
@@ -270,7 +269,17 @@ export function WeekPlan({ profile }: Props) {
         <PageTourButton onClick={() => setShowTour(true)} />
       </div>
 
-      <CalendarExportCard profileId={profile.id} profileName={profile.name} />
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        background: `${C.primary}10`, border: `1.5px solid ${C.primary}30`,
+        borderRadius: 12, padding: '10px 14px', marginBottom: 16,
+      }}>
+        <span style={{ fontSize: 16 }}>📅</span>
+        <p style={{ margin: 0, fontSize: 12, color: C.body, lineHeight: 1.45, flex: 1 }}>
+          <strong style={{ color: C.headline }}>Phone reminders?</strong> Use the{' '}
+          <strong style={{ color: C.primary }}>Calendar</strong> tab to sync tasks to Google, Outlook, or Apple.
+        </p>
+      </div>
 
       {personalGoals.length > 0 && (
         <div data-tour-id="week-goals" style={{

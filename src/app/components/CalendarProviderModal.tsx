@@ -11,12 +11,13 @@ import { detectOS } from '../data/deviceAnalytics';
 
 interface Props {
   open: boolean;
+  scopeDescription: string;
   eventCount: number;
   onSelect: (provider: CalendarProvider, remember: boolean) => void;
   onCancel: () => void;
 }
 
-export function CalendarProviderModal({ open, eventCount, onSelect, onCancel }: Props) {
+export function CalendarProviderModal({ open, scopeDescription, eventCount, onSelect, onCancel }: Props) {
   const [remember, setRemember] = useState(true);
   const [highlight, setHighlight] = useState<CalendarProvider>('google');
 
@@ -24,7 +25,6 @@ export function CalendarProviderModal({ open, eventCount, onSelect, onCancel }: 
     if (open) setHighlight(suggestCalendarProvider(detectOS()));
   }, [open]);
 
-  const countLabel = eventCount === 1 ? '1 task' : `${eventCount} tasks`;
   const multiEvent = eventCount > 1;
 
   return (
@@ -36,8 +36,11 @@ export function CalendarProviderModal({ open, eventCount, onSelect, onCancel }: 
       width="min(420px, calc(100vw - 24px))"
       destroyOnClose
     >
+      <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: C.headline }}>
+        {scopeDescription}
+      </p>
       <p style={{ margin: '0 0 14px', fontSize: 13, color: C.body, lineHeight: 1.5 }}>
-        Where should we send {countLabel}?
+        Pick your calendar app for {eventCount === 1 ? 'this task' : 'these tasks'}.
         {multiEvent && (
           <span style={{ display: 'block', marginTop: 6, fontSize: 12, color: C.secondary }}>
             For multiple tasks, we&apos;ll download a file you can import into your calendar.

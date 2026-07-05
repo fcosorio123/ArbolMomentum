@@ -64,7 +64,7 @@ function taskDurationLabel(task: UserTask_): string {
 // ── Task item
 function TaskItem({
   task, catColor, status, remark, onOpenUpdate, onDelete, onEdit, statusLocked,
-  profileId, profileName,
+  profileId, profileName, dateKey,
 }: {
   task: UserTask_; catColor: string; status: TaskStatus | null; remark?: string;
   onOpenUpdate: () => void; onDelete: () => void;
@@ -72,6 +72,7 @@ function TaskItem({
   statusLocked?: boolean;
   profileId: string;
   profileName: string;
+  dateKey: string;
 }) {
   const isSkipped = status === 'skipped';
   const display = status ? TASK_STATUS_DISPLAY[status] : TASK_STATUS_DISPLAY.null;
@@ -168,8 +169,9 @@ function TaskItem({
             profileId={profileId}
             profileName={profileName}
             taskId={task.id}
-            scope="week"
-            title={`Add "${task.label}" to calendar this week`}
+            scope="day"
+            dateKey={dateKey}
+            title={`Add "${task.label}" to calendar for today`}
           />
         )}
         {onEdit && (
@@ -304,7 +306,7 @@ function goalAccentColor(goalId: string) {
 // ── Goal group: goal header + flat task list
 function GoalGroup({
   goal, tasks, statuses, notes, onOpenUpdate, onDelete, timeFilter,
-  onEditTask, onAddSuggestedTask, isFirst, profileId, profileName,
+  onEditTask, onAddSuggestedTask, isFirst, profileId, profileName, dateKey,
 }: {
   goal: PersonalGoal; tasks: UserTask_[];
   statuses: StatusMap; notes: NotesMap;
@@ -316,6 +318,7 @@ function GoalGroup({
   isFirst?: boolean;
   profileId: string;
   profileName: string;
+  dateKey: string;
 }) {
   const [collapsed, setCollapsed] = useState(!isFirst);
   const accentColor = goalAccentColor(goal.id);
@@ -411,6 +414,7 @@ function GoalGroup({
               remark={notes[task.id]}
               profileId={profileId}
               profileName={profileName}
+              dateKey={dateKey}
               onOpenUpdate={() => onOpenUpdate(task, goal, doneTasks, totalTasks)}
               onDelete={() => onDelete(task)}
               onEdit={() => onEditTask(task)}
@@ -982,6 +986,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                 statuses={statuses} notes={notes}
                 profileId={profile.id}
                 profileName={profile.name}
+                dateKey={today}
                 onOpenUpdate={openTaskUpdate}
                 onDelete={t => openDeleteTask(t)}
                 timeFilter={timeFilter}
@@ -1011,6 +1016,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                     remark={notes[task.id]}
                     profileId={profile.id}
                     profileName={profile.name}
+                    dateKey={today}
                     statusLocked
                     onOpenUpdate={() => openTaskUpdate(task)}
                     onDelete={() => openDeleteTask(task)}

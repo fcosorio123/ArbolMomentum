@@ -4,6 +4,7 @@ import {
   CALENDAR_EXPORTED_KEY,
   clearSavedCalendarProvider,
   deliverEventsToCalendar,
+  describeExportScope,
   getCalendarDeliveryMessage,
   getSavedCalendarProvider,
   type CalendarEventRow,
@@ -14,6 +15,7 @@ import { CalendarProviderModal, persistCalendarProviderChoice } from '../compone
 interface PendingExport {
   events: CalendarEventRow[];
   filename: string;
+  scopeDescription: string;
 }
 
 export function useCalendarExport(profileId: string) {
@@ -28,6 +30,7 @@ export function useCalendarExport(profileId: string) {
     events: CalendarEventRow[],
     filename: string,
     remember: boolean,
+    scopeDescription: string,
   ) => {
     persistCalendarProviderChoice(profileId, provider, remember);
     if (remember) setSavedProvider(provider);
@@ -36,7 +39,7 @@ export function useCalendarExport(profileId: string) {
     if (result.eventCount > 0) {
       localStorage.setItem(CALENDAR_EXPORTED_KEY(profileId), 'true');
       message.success({
-        content: getCalendarDeliveryMessage(result, isFirst),
+        content: getCalendarDeliveryMessage(result, isFirst, scopeDescription),
         duration: result.method === 'download' ? 7 : 5,
       });
     }
@@ -45,25 +48,27 @@ export function useCalendarExport(profileId: string) {
   const requestExport = useCallback((events: CalendarEventRow[], filename: string) => {
     if (events.length === 0) return false;
 
+    const scopeDescription = describeExportScope(events);
     const saved = getSavedCalendarProvider(profileId);
     if (saved) {
-      finishExport(saved, events, filename, true);
+      finishExport(saved, events, filename, true, scopeDescription);
       return true;
     }
 
-    setPending({ events, filename });
+    setPending({ events, filename, scopeDescription });
     return true;
   }, [finishExport, profileId]);
 
   const handleProviderSelect = useCallback((provider: CalendarProvider, remember: boolean) => {
     if (!pending) return;
-    finishExport(provider, pending.events, pending.filename, remember);
+    finishExport(provider, pending.events, pending.filename, remember, pending.scopeDescription);
     setPending(null);
   }, [finishExport, pending]);
 
   const modal = (
     <CalendarProviderModal
       open={!!pending}
+      scopeDescription={pending?.scopeDescription ?? ''}
       eventCount={pending?.events.length ?? 0}
       onSelect={handleProviderSelect}
       onCancel={() => setPending(null)}

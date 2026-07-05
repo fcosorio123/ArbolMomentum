@@ -270,4 +270,22 @@ function suggestCalendarProvider(os) {
 assert(suggestCalendarProvider('iOS') === 'apple', 'suggest apple on iOS');
 assert(suggestCalendarProvider('Windows') === 'outlook', 'suggest outlook on Windows');
 
+function describeExportScope(events) {
+  if (events.length === 0) return 'No open tasks';
+  const uniqueDates = [...new Set(events.map(e => e.dateKey))];
+  const taskWord = events.length === 1 ? 'task' : 'tasks';
+  if (uniqueDates.length === 1) {
+    const when = uniqueDates[0];
+    if (events.length === 1) return `1 task · ${when}`;
+    return `${events.length} ${taskWord} · ${when}`;
+  }
+  return `${events.length} ${taskWord} · this week`;
+}
+
+assert(describeExportScope([{ dateKey: '2026-06-20' }]) === '1 task · 2026-06-20', 'single day scope');
+assert(describeExportScope([
+  { dateKey: '2026-06-20' },
+  { dateKey: '2026-06-22' },
+]) === '2 tasks · this week', 'multi-day week scope');
+
 console.log('calendar export tests: all passed');

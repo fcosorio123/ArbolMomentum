@@ -7,6 +7,7 @@ import { GoalsPage } from './components/GoalsPage';
 import { TaskList } from './components/TaskList';
 import { WeekPlan } from './components/WeekPlan';
 import { RemindersScreen } from './components/RemindersScreen';
+import { CalendarScreen } from './components/CalendarScreen';
 import { ProfileScreen } from './components/ProfileScreen';
 import { AdminView } from './components/AdminView';
 import { CheckInPage } from './components/CheckInPage';
@@ -37,7 +38,7 @@ import {
 } from './data/profiles';
 import { C } from './data/colors';
 
-type Tab = 'home' | 'goals' | 'tasks' | 'week' | 'reminders' | 'profile';
+type Tab = 'home' | 'goals' | 'tasks' | 'week' | 'calendar' | 'reminders' | 'profile';
 
 const arbolTheme = {
   algorithm: antTheme.defaultAlgorithm,
@@ -573,12 +574,18 @@ export default function App() {
         />
       )}
       {activeTab === 'week' && <WeekPlan profile={activeProfile} />}
+      {activeTab === 'calendar' && (
+        <CalendarScreen
+          profile={activeProfile}
+          onOpenReminders={() => setActiveTab('reminders')}
+        />
+      )}
       {activeTab === 'reminders' && (
         <RemindersScreen
           profile={activeProfile}
           swRegistration={swRegistration}
           onShowInstallTutorial={() => setShowInstallTutorial(true)}
-          onGoToWeek={() => setActiveTab('week')}
+          onGoToCalendar={() => setActiveTab('calendar')}
         />
       )}
       {activeTab === 'profile' && (

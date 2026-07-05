@@ -5,6 +5,7 @@ import {
   getTaskStatus,
   isTaskPermanentlyRemoved,
   getDateKey,
+  getTodayKey,
 } from './profiles';
 import { getPersonalGoals } from './personalGoals';
 import { getActiveUserTasksForDate, getUserTasks } from './userTasks';
@@ -238,6 +239,35 @@ function buildCalendarEventRow(
 /**
  * Tasks to export — mirrors Week tab task IDs, excludes done/skipped/removed seeds.
  */
+export function formatShortDateKey(dateKey: string): string {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+/** Human-readable scope for provider modal and toasts. */
+export function describeExportScope(events: CalendarEventRow[]): string {
+  if (events.length === 0) return 'No open tasks';
+  const uniqueDates = [...new Set(events.map(e => e.dateKey))];
+  const taskWord = events.length === 1 ? 'task' : 'tasks';
+  if (uniqueDates.length === 1) {
+    const when = formatShortDateKey(uniqueDates[0]);
+    if (events.length === 1) return `1 task · ${when}`;
+    return `${events.length} ${taskWord} · ${when}`;
+  }
+  return `${events.length} ${taskWord} · this week`;
+}
+
+export function collectTodayCalendarEvents(
+  profileId: string,
+  dateKey = getTodayKey(),
+): CalendarEventRow[] {
+  return collectWeekCalendarEvents(profileId).filter(event => event.dateKey === dateKey);
+}
+
 export function collectWeekCalendarEvents(profileId: string): CalendarEventRow[] {
   const weekPlan = getWeekPlanForProfile(profileId);
   const allTasks = getAllTasksForProfile(profileId);
@@ -455,16 +485,18 @@ export function deliverEventsToCalendar(
 export function getCalendarDeliveryMessage(
   result: CalendarDeliveryResult,
   isFirstExport = false,
+  scopeDescription?: string,
 ): string {
   const { eventCount, method, provider } = result;
+  const scopePrefix = scopeDescription ? `${scopeDescription}. ` : '';
   const countLabel = eventCount === 1 ? '1 event' : `${eventCount} events`;
 
   if (method === 'deeplink') {
     if (provider === 'google') {
-      return `Opened Google Calendar with your task. Save the event — reminders can be set there.`;
+      return `${scopePrefix}Opened Google Calendar — save the event to add it.`;
     }
     if (provider === 'outlook') {
-      return `Opened Outlook with your task. Save the event to add it to your calendar.`;
+      return `${scopePrefix}Opened Outlook — save the event to add it.`;
     }
   }
 
@@ -479,7 +511,7 @@ export function getCalendarDeliveryMessage(
     ? ' Calendar alarms are included in the file.'
     : '';
 
-  return `Downloaded ${countLabel}.${alarmNote} ${importHints[provider]}`;
+  return `${scopePrefix}Downloaded ${countLabel}.${alarmNote} ${importHints[provider]}`;
 }
 
 export function downloadIcsFile(ics: string, filename: string) {
@@ -519,6 +551,16 @@ export function buildTaskExportFilename(
 export function prepareWeekCalendarExport(profileId: string, profileSlug: string) {
   const events = collectWeekCalendarEvents(profileId);
   return { events, filename: buildWeekExportFilename(profileSlug) };
+}
+
+export function prepareTodayCalendarExport(
+  profileId: string,
+  profileSlug: string,
+  dateKey = getTodayKey(),
+) {
+  const events = collectTodayCalendarEvents(profileId, dateKey);
+  const slug = slugifyProfileName(profileSlug);
+  return { events, filename: `arbol-today-${dateKey}-${slug}.ics` };
 }
 
 export function prepareTaskCalendarExport(

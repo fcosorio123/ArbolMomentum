@@ -19,12 +19,12 @@ interface Props {
   profile: Profile;
   swRegistration: ServiceWorkerRegistration | null;
   onShowInstallTutorial: () => void;
-  onGoToWeek: () => void;
+  onGoToCalendar: () => void;
 }
 type Permission = 'default' | 'granted' | 'denied';
 const ALL_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial, onGoToWeek }: Props) {
+export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial, onGoToCalendar }: Props) {
   const { message } = App.useApp();
   const [permission, setPermission] = useState<Permission>('default');
   const [reminders, setReminders] = useState<Reminder[]>([]);
@@ -69,7 +69,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
     if (result.granted) {
       message.success(result.pushSubscribed
         ? 'Notifications enabled with background push! 🔔'
-        : 'In-app reminders enabled while Arbol is open. For alerts when the app is closed, use Week → Add to Calendar.');
+        : 'In-app reminders enabled while Arbol is open. For alerts when the app is closed, use the Calendar tab.');
       showTest();
     } else if (result.permission === 'denied') {
       message.error('Blocked — open browser or device settings to allow notifications');
@@ -265,15 +265,15 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
           </div>
         ))}
         <p style={{ margin: '10px 0 12px', fontSize: 11, color: C.secondary, lineHeight: 1.45 }}>
-          Calendar export is already on the Week tab — one-time import, then your phone reminds you at task time.
+          Open the Calendar tab to sync tasks — your phone reminds you even when Arbol is closed.
         </p>
         <Button
           type="primary"
           icon={<CalendarOutlined />}
-          onClick={onGoToWeek}
+          onClick={onGoToCalendar}
           style={{ borderRadius: 10, fontWeight: 600, width: '100%' }}
         >
-          Week → Add to Calendar
+          Open Calendar tab
           <RightOutlined style={{ fontSize: 11, marginLeft: 4 }} />
         </Button>
       </div>
