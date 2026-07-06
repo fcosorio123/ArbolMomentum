@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Button, InputNumber, message } from 'antd';
+import { Button, InputNumber, Switch, message } from 'antd';
 import {
   CalendarOutlined,
   SettingOutlined,
@@ -8,13 +8,13 @@ import {
 } from '@ant-design/icons';
 import { C } from '../data/colors';
 import type { Profile } from '../data/profiles';
-import { getTodayKey } from '../data/profiles';
 import {
   CALENDAR_PROVIDER_OPTIONS,
   DEFAULT_CALENDAR_PREFS,
   collectTodayCalendarEvents,
   formatShortDateKey,
   getCalendarPrefs,
+  getDaySyncContext,
   prepareTaskCalendarExport,
   prepareTodayCalendarExport,
   prepareWeekCalendarExport,
@@ -22,8 +22,8 @@ import {
   type CalendarExportPrefs,
 } from '../data/calendarExport';
 import { useCalendarExport } from '../hooks/useCalendarExport';
+import { PageTour, PageTourButton, TOUR_KEYS } from './AppTour';
 
-// Re-export key from calendarExport - need to add CALENDAR_INTRO_KEY to calendarExport
 interface Props {
   profile: Profile;
   onOpenReminders?: () => void;
@@ -40,11 +40,13 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
   const [prefs, setPrefs] = useState<CalendarExportPrefs>(DEFAULT_CALENDAR_PREFS);
   const [exporting, setExporting] = useState<'week' | 'today' | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [showTour, setShowTour] = useState(false);
   const { requestExport, modal, savedProvider, clearSavedProvider } = useCalendarExport(profile.id);
 
-  const today = getTodayKey();
-  const introKey = `arbol-calendar-intro-${profile.id}`;
-  const [showIntro, setShowIntro] = useState(() => !localStorage.getItem(introKey));
+  const daySync = useMemo(
+    () => getDaySyncContext(profile.id),
+    [profile.id, prefs.eveningHour, prefs.afterEveningTarget, refreshTick],
+  );
 
   useEffect(() => {
     setPrefs(getCalendarPrefs(profile.id));
@@ -60,13 +62,20 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!localStorage.getItem(TOUR_KEYS.calendar)) {
+      const t = setTimeout(() => setShowTour(true), 700);
+      return () => clearTimeout(t);
+    }
+  }, []);
+
   const weekEvents = useMemo(
     () => prepareWeekCalendarExport(profile.id, profile.name).events,
     [profile.id, profile.name, refreshTick],
   );
-  const todayEvents = useMemo(
-    () => collectTodayCalendarEvents(profile.id, today),
-    [profile.id, today, refreshTick],
+  const dayEvents = useMemo(
+    () => collectTodayCalendarEvents(profile.id, daySync.dateKey),
+    [profile.id, daySync.dateKey, refreshTick],
   );
 
   const persistPrefs = (next: CalendarExportPrefs) => {
@@ -79,32 +88,28 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
     try {
       const prepared = mode === 'week'
         ? prepareWeekCalendarExport(profile.id, profile.name)
-        : prepareTodayCalendarExport(profile.id, profile.name, today);
+        : prepareTodayCalendarExport(profile.id, profile.name, daySync.dateKey);
       if (prepared.events.length === 0) {
         message.info(mode === 'week'
           ? 'No open tasks this week to export.'
-          : 'No open tasks for today to export.');
+          : `No open tasks for ${daySync.calendarDayLabel} to export.`);
         return;
       }
       requestExport(prepared.events, prepared.filename);
-      if (showIntro) {
-        localStorage.setItem(introKey, 'true');
-        setShowIntro(false);
-      }
     } catch {
       message.error('Could not export to calendar. Try again.');
     } finally {
       setExporting(null);
     }
-  }, [introKey, profile.id, profile.name, requestExport, showIntro, today]);
+  }, [daySync.calendarDayLabel, daySync.dateKey, profile.id, profile.name, requestExport]);
 
   const addOneTask = (taskId: string) => {
     try {
       const { events, filename } = prepareTaskCalendarExport(
-        profile.id, taskId, profile.name, 'day', today,
+        profile.id, taskId, profile.name, 'day', daySync.dateKey,
       );
       if (events.length === 0) {
-        message.info('This task is done or skipped for today.');
+        message.info(`This task is not scheduled for ${daySync.calendarDayLabel}.`);
         return;
       }
       requestExport(events, filename);
@@ -114,7 +119,8 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
   };
 
   const savedLabel = CALENDAR_PROVIDER_OPTIONS.find(o => o.id === savedProvider)?.label;
-  const todayLabel = formatShortDateKey(today);
+  const dayLabel = formatShortDateKey(daySync.dateKey);
+  const dayButtonLabel = daySync.calendarDayLabel === 'tomorrow' ? 'Sync tomorrow' : 'Sync today';
 
   return (
     <div style={{
@@ -124,12 +130,25 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
     }}>
       {modal}
 
-      <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.headline }}>Calendar</h2>
-        <p style={{ margin: '4px 0 0', color: C.body, fontSize: 13 }}>
-          Put funding tasks on your real calendar — reminders even when Arbol is closed
-        </p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.headline }}>Calendar</h2>
+          <p style={{ margin: '4px 0 0', color: C.body, fontSize: 13 }}>
+            Put funding tasks on your real calendar — reminders even when Arbol is closed
+          </p>
+        </div>
+        <PageTourButton onClick={() => setShowTour(true)} />
       </div>
+
+      {daySync.rolledForward && (
+        <div style={{
+          background: `${C.streak}15`, border: `1.5px solid ${C.streak}40`,
+          borderRadius: 12, padding: '10px 14px', marginBottom: 14, fontSize: 12, color: C.body, lineHeight: 1.45,
+        }}>
+          It&apos;s past {formatHour(daySync.eveningHour)} — we&apos;re syncing <strong>tomorrow</strong> so
+          calendar alerts still fire. Change this under Times &amp; alarms.
+        </div>
+      )}
 
       {/* Hero */}
       <div
@@ -147,14 +166,13 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
           <div style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>Sync your tasks</div>
         </div>
 
-        {showIntro && (
-          <div style={{
-            marginBottom: 14, padding: '10px 12px', borderRadius: 10,
-            background: 'rgba(255,255,255,0.12)', fontSize: 12, color: 'rgba(255,255,255,0.9)', lineHeight: 1.5,
-          }}>
-            <strong style={{ color: '#fff' }}>3 steps:</strong> Pick your calendar app → Import or save → Phone reminds you
-          </div>
-        )}
+        <div style={{
+          marginBottom: 14, padding: '10px 12px', borderRadius: 10,
+          background: 'rgba(255,255,255,0.12)', fontSize: 12, color: 'rgba(255,255,255,0.9)', lineHeight: 1.5,
+        }}>
+          <strong style={{ color: '#fff' }}>How it works:</strong> Pick Google, Outlook, or Apple →
+          import the file (or save the event) → your phone reminds you
+        </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <Button
@@ -178,7 +196,7 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
               background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)',
             }}
           >
-            Sync today — {todayEvents.length} {todayEvents.length === 1 ? 'task' : 'tasks'}
+            {dayButtonLabel} — {dayEvents.length} {dayEvents.length === 1 ? 'task' : 'tasks'}
           </Button>
         </div>
         <p style={{ margin: '10px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.65)' }}>
@@ -187,10 +205,13 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
       </div>
 
       {/* Times + provider */}
-      <div style={{
-        background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16,
-        padding: '14px 16px', marginBottom: 16, boxShadow: C.shadow,
-      }}>
+      <div
+        data-tour-id="calendar-times"
+        style={{
+          background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16,
+          padding: '14px 16px', marginBottom: 16, boxShadow: C.shadow,
+        }}
+      >
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <Button
             icon={<SettingOutlined />}
@@ -219,6 +240,7 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
           <p style={{ margin: '10px 0 0', fontSize: 11, color: C.secondary }}>
             Morning {formatHour(prefs.morningHour)} · Evening {formatHour(prefs.eveningHour)}
             {prefs.alarmMinutesBefore > 0 ? ` · alarm ${prefs.alarmMinutesBefore} min early` : ''}
+            {prefs.afterEveningTarget === 'tomorrow' ? ' · after evening → tomorrow' : ''}
           </p>
         )}
         {showTimes && (
@@ -257,25 +279,47 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
             </label>
           </div>
         )}
+        {showTimes && (
+          <div style={{
+            marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.border}`,
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12,
+          }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.headline }}>
+                After {formatHour(prefs.eveningHour)}, sync tomorrow
+              </div>
+              <div style={{ fontSize: 11, color: C.secondary, marginTop: 4, lineHeight: 1.45 }}>
+                Avoids adding events that are already in the past so reminders still work.
+              </div>
+            </div>
+            <Switch
+              checked={prefs.afterEveningTarget === 'tomorrow'}
+              onChange={checked => persistPrefs({
+                ...prefs,
+                afterEveningTarget: checked ? 'tomorrow' : 'today',
+              })}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Today's tasks */}
-      <div style={{ marginBottom: 16 }}>
+      {/* Day tasks */}
+      <div data-tour-id="calendar-day-tasks" style={{ marginBottom: 16 }}>
         <div style={{
           fontSize: 11, textTransform: 'uppercase', letterSpacing: 1,
           color: C.secondary, marginBottom: 10, fontWeight: 600,
         }}>
-          Today — {todayLabel}
+          {daySync.calendarDayLabel === 'tomorrow' ? 'Tomorrow' : 'Today'} — {dayLabel}
         </div>
-        {todayEvents.length === 0 ? (
+        {dayEvents.length === 0 ? (
           <div style={{
             background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16,
             padding: '20px 16px', textAlign: 'center', color: C.secondary, fontSize: 13,
           }}>
-            No open tasks today. You can still sync the full week above.
+            No open tasks for {daySync.calendarDayLabel}. You can still sync the full week above.
           </div>
         ) : (
-          todayEvents.map((event, i) => (
+          dayEvents.map(event => (
             <div
               key={`${event.taskId}-${event.dateKey}`}
               style={{
@@ -289,6 +333,8 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
               </span>
               <span style={{ fontSize: 10, color: C.secondary }}>
                 {event.timeOfDay === 'morning' ? '☀️' : '🌙'}
+                {' '}
+                {formatHour(event.timeOfDay === 'morning' ? prefs.morningHour : prefs.eveningHour)}
               </span>
               <Button
                 size="small"
@@ -324,6 +370,35 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
           <RightOutlined style={{ color: C.secondary, fontSize: 12 }} />
         </button>
       )}
+
+      <PageTour
+        open={showTour}
+        onClose={() => setShowTour(false)}
+        storageKey={TOUR_KEYS.calendar}
+        pageLabel="Calendar"
+        doneEmoji="📅"
+        doneMessage="You're set! Sync tasks to your phone calendar and get reminders even when Arbol is closed."
+        steps={[
+          {
+            title: '📅 Sync your week',
+            description: 'Tap Sync this week to download all open tasks. Pick Google, Outlook, or Apple — then import the file once.',
+            targetId: 'calendar-hero',
+            placement: 'bottom',
+          },
+          {
+            title: '⏰ Times & reminders',
+            description: 'Set morning/evening times and alarms. After evening, Arbol can auto-sync tomorrow so alerts are not missed.',
+            targetId: 'calendar-times',
+            placement: 'bottom',
+          },
+          {
+            title: '➕ Add one task',
+            description: 'Or add tasks one at a time. Each exports with a calendar alarm at your chosen time.',
+            targetId: 'calendar-day-tasks',
+            placement: 'top',
+          },
+        ]}
+      />
     </div>
   );
 }

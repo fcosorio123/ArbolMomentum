@@ -288,4 +288,52 @@ assert(describeExportScope([
   { dateKey: '2026-06-22' },
 ]) === '2 tasks · this week', 'multi-day week scope');
 
+// Evening rollover: after eveningHour, single-day sync uses tomorrow by default
+function getDateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function addDaysToDateKey(dateKey, days) {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() + days);
+  return getDateKey(date);
+}
+
+function getDaySyncContext(prefs, todayKey, now) {
+  const pastEveningCutoff = now.getHours() >= prefs.eveningHour;
+  const rolledForward = pastEveningCutoff && prefs.afterEveningTarget === 'tomorrow';
+  return {
+    dateKey: rolledForward ? addDaysToDateKey(todayKey, 1) : todayKey,
+    calendarDayLabel: rolledForward ? 'tomorrow' : 'today',
+    rolledForward,
+  };
+}
+
+const eveningPrefs = { morningHour: 9, eveningHour: 18, afterEveningTarget: 'tomorrow' };
+const todayKey = '2026-07-06';
+
+const beforeEvening = getDaySyncContext(eveningPrefs, todayKey, new Date('2026-07-06T17:30:00'));
+assert(beforeEvening.dateKey === todayKey, 'before evening uses today');
+assert(!beforeEvening.rolledForward, 'not rolled before evening');
+
+const afterEvening = getDaySyncContext(eveningPrefs, todayKey, new Date('2026-07-06T19:00:00'));
+assert(afterEvening.dateKey === '2026-07-07', 'after evening rolls to tomorrow');
+assert(afterEvening.calendarDayLabel === 'tomorrow', 'label is tomorrow');
+assert(afterEvening.rolledForward, 'rolled forward flag set');
+
+const afterEveningTodayPref = getDaySyncContext(
+  { ...eveningPrefs, afterEveningTarget: 'today' },
+  todayKey,
+  new Date('2026-07-06T21:00:00'),
+);
+assert(afterEveningTodayPref.dateKey === todayKey, 'today pref keeps today after evening');
+assert(!afterEveningTodayPref.rolledForward, 'no rollover when pref is today');
+
+const atEveningHour = getDaySyncContext(eveningPrefs, todayKey, new Date('2026-07-06T18:00:00'));
+assert(atEveningHour.dateKey === '2026-07-07', 'at evening hour rolls forward');
+
 console.log('calendar export tests: all passed');

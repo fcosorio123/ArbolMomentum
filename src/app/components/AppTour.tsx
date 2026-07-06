@@ -9,6 +9,7 @@ export const TOUR_KEYS = {
   goals:    'arbol-tour-goals-done',
   tasks:    'arbol-tour-tasks-done',
   week:     'arbol-tour-week-done',
+  calendar: 'arbol-tour-calendar-done',
   checkIn:  'arbol-tour-checkin-done',
 };
 

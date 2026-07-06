@@ -34,6 +34,7 @@ import { isLiveCheckInEnabled, fetchLiveCheckInSettings } from '../data/liveChec
 import { useScrollPositionLock } from '../hooks/useScrollPositionLock';
 import { truncateRemark, SKIPPED_BADGE, shouldShowRemark } from './taskCardDisplay';
 import { TaskCalendarButton } from './TaskCalendarButton';
+import { getEffectiveDaySyncDateKey } from '../data/calendarExport';
 
 interface Props {
   profile: Profile;
@@ -64,7 +65,7 @@ function taskDurationLabel(task: UserTask_): string {
 // ── Task item
 function TaskItem({
   task, catColor, status, remark, onOpenUpdate, onDelete, onEdit, statusLocked,
-  profileId, profileName, dateKey,
+  profileId, profileName, calendarDateKey,
 }: {
   task: UserTask_; catColor: string; status: TaskStatus | null; remark?: string;
   onOpenUpdate: () => void; onDelete: () => void;
@@ -72,7 +73,7 @@ function TaskItem({
   statusLocked?: boolean;
   profileId: string;
   profileName: string;
-  dateKey: string;
+  calendarDateKey: string;
 }) {
   const isSkipped = status === 'skipped';
   const display = status ? TASK_STATUS_DISPLAY[status] : TASK_STATUS_DISPLAY.null;
@@ -170,8 +171,8 @@ function TaskItem({
             profileName={profileName}
             taskId={task.id}
             scope="day"
-            dateKey={dateKey}
-            title={`Add "${task.label}" to calendar for today`}
+            dateKey={calendarDateKey}
+            title={`Add "${task.label}" to calendar for ${calendarDateKey === getTodayKey() ? 'today' : 'tomorrow'}`}
           />
         )}
         {onEdit && (
@@ -306,7 +307,7 @@ function goalAccentColor(goalId: string) {
 // ── Goal group: goal header + flat task list
 function GoalGroup({
   goal, tasks, statuses, notes, onOpenUpdate, onDelete, timeFilter,
-  onEditTask, onAddSuggestedTask, isFirst, profileId, profileName, dateKey,
+  onEditTask, onAddSuggestedTask, isFirst, profileId, profileName, calendarDateKey,
 }: {
   goal: PersonalGoal; tasks: UserTask_[];
   statuses: StatusMap; notes: NotesMap;
@@ -318,7 +319,7 @@ function GoalGroup({
   isFirst?: boolean;
   profileId: string;
   profileName: string;
-  dateKey: string;
+  calendarDateKey: string;
 }) {
   const [collapsed, setCollapsed] = useState(!isFirst);
   const accentColor = goalAccentColor(goal.id);
@@ -414,7 +415,7 @@ function GoalGroup({
               remark={notes[task.id]}
               profileId={profileId}
               profileName={profileName}
-              dateKey={dateKey}
+              calendarDateKey={calendarDateKey}
               onOpenUpdate={() => onOpenUpdate(task, goal, doneTasks, totalTasks)}
               onDelete={() => onDelete(task)}
               onEdit={() => onEditTask(task)}
@@ -544,6 +545,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   ]);
 
   const today = getTodayKey();
+  const calendarDateKey = getEffectiveDaySyncDateKey(profile.id);
   const categories = getTaskCategoriesForProfile(profile.id);
   const allTasks = categories.flatMap(c => c.tasks);
   const allTasksCombined = [
@@ -986,7 +988,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                 statuses={statuses} notes={notes}
                 profileId={profile.id}
                 profileName={profile.name}
-                dateKey={today}
+                calendarDateKey={calendarDateKey}
                 onOpenUpdate={openTaskUpdate}
                 onDelete={t => openDeleteTask(t)}
                 timeFilter={timeFilter}
@@ -1016,7 +1018,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                     remark={notes[task.id]}
                     profileId={profile.id}
                     profileName={profile.name}
-                    dateKey={today}
+                    calendarDateKey={calendarDateKey}
                     statusLocked
                     onOpenUpdate={() => openTaskUpdate(task)}
                     onDelete={() => openDeleteTask(task)}

@@ -19,12 +19,15 @@ export interface CalendarExportPrefs {
   eveningHour: number;
   /** Minutes before each event start to fire a calendar alarm (0 = at task time). */
   alarmMinutesBefore: number;
+  /** When syncing a single day after eveningHour, use tomorrow instead of today. */
+  afterEveningTarget: 'tomorrow' | 'today';
 }
 
 export const DEFAULT_CALENDAR_PREFS: CalendarExportPrefs = {
   morningHour: 9,
   eveningHour: 18,
   alarmMinutesBefore: 0,
+  afterEveningTarget: 'tomorrow',
 };
 
 export const CALENDAR_PREFS_KEY = (profileId: string) =>
@@ -114,6 +117,7 @@ export function getCalendarPrefs(profileId: string): CalendarExportPrefs {
       morningHour: clampHour(parsed.morningHour, DEFAULT_CALENDAR_PREFS.morningHour),
       eveningHour: clampHour(parsed.eveningHour, DEFAULT_CALENDAR_PREFS.eveningHour),
       alarmMinutesBefore: clampAlarmMinutes(parsed.alarmMinutesBefore),
+      afterEveningTarget: parsed.afterEveningTarget === 'today' ? 'today' : 'tomorrow',
     };
   } catch {
     return { ...DEFAULT_CALENDAR_PREFS };
@@ -127,6 +131,7 @@ export function saveCalendarPrefs(profileId: string, prefs: CalendarExportPrefs)
       morningHour: clampHour(prefs.morningHour, DEFAULT_CALENDAR_PREFS.morningHour),
       eveningHour: clampHour(prefs.eveningHour, DEFAULT_CALENDAR_PREFS.eveningHour),
       alarmMinutesBefore: clampAlarmMinutes(prefs.alarmMinutesBefore),
+      afterEveningTarget: prefs.afterEveningTarget === 'today' ? 'today' : 'tomorrow',
     }),
   );
 }
@@ -182,6 +187,40 @@ export function getCurrentWeekDateKeys(ref = new Date()): { day: string; dateKey
 export function dayNameFromDateKey(dateKey: string): string {
   const [y, m, d] = dateKey.split('-').map(Number);
   return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(y, m - 1, d).getDay()];
+}
+
+export function addDaysToDateKey(dateKey: string, days: number): string {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() + days);
+  return getDateKey(date);
+}
+
+export interface DaySyncContext {
+  dateKey: string;
+  calendarDayLabel: 'today' | 'tomorrow';
+  rolledForward: boolean;
+  eveningHour: number;
+  afterEveningTarget: CalendarExportPrefs['afterEveningTarget'];
+}
+
+/** Pick today or tomorrow for single-day calendar sync so events are not already in the past. */
+export function getDaySyncContext(profileId: string, now = new Date()): DaySyncContext {
+  const prefs = getCalendarPrefs(profileId);
+  const todayKey = getTodayKey();
+  const pastEveningCutoff = now.getHours() >= prefs.eveningHour;
+  const rolledForward = pastEveningCutoff && prefs.afterEveningTarget === 'tomorrow';
+  return {
+    dateKey: rolledForward ? addDaysToDateKey(todayKey, 1) : todayKey,
+    calendarDayLabel: rolledForward ? 'tomorrow' : 'today',
+    rolledForward,
+    eveningHour: prefs.eveningHour,
+    afterEveningTarget: prefs.afterEveningTarget,
+  };
+}
+
+export function getEffectiveDaySyncDateKey(profileId: string, now = new Date()): string {
+  return getDaySyncContext(profileId, now).dateKey;
 }
 
 function slugifyProfileName(profileSlug: string): string {
@@ -556,11 +595,12 @@ export function prepareWeekCalendarExport(profileId: string, profileSlug: string
 export function prepareTodayCalendarExport(
   profileId: string,
   profileSlug: string,
-  dateKey = getTodayKey(),
+  dateKey?: string,
 ) {
-  const events = collectTodayCalendarEvents(profileId, dateKey);
+  const syncKey = dateKey ?? getEffectiveDaySyncDateKey(profileId);
+  const events = collectTodayCalendarEvents(profileId, syncKey);
   const slug = slugifyProfileName(profileSlug);
-  return { events, filename: `arbol-today-${dateKey}-${slug}.ics` };
+  return { events, filename: `arbol-today-${syncKey}-${slug}.ics` };
 }
 
 export function prepareTaskCalendarExport(
@@ -570,9 +610,12 @@ export function prepareTaskCalendarExport(
   scope: CalendarExportScope,
   dateKey?: string,
 ) {
-  const events = collectTaskCalendarEvents(profileId, taskId, scope, dateKey);
+  const syncDateKey = scope === 'day'
+    ? (dateKey ?? getEffectiveDaySyncDateKey(profileId))
+    : dateKey;
+  const events = collectTaskCalendarEvents(profileId, taskId, scope, syncDateKey);
   return {
     events,
-    filename: buildTaskExportFilename(profileSlug, events, scope, dateKey),
+    filename: buildTaskExportFilename(profileSlug, events, scope, syncDateKey),
   };
 }
