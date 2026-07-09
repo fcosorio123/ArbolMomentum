@@ -557,8 +557,8 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   const [notes, setNotes] = useState<NotesMap>({});
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string; isUserCreated: boolean } | null>(null);
   const [deleteChoice, setDeleteChoice] = useState<DeleteTaskChoice>('today');
-  const [goals, setGoals] = useState<PersonalGoal[]>([]);
-  const [userTasks, setUserTasks] = useState<UserTask[]>([]);
+  const [goals, setGoals] = useState<PersonalGoal[]>(() => getPersonalGoals(profile.id));
+  const [userTasks, setUserTasks] = useState<UserTask[]>(() => getUserTasks(profile.id));
   // Manage tasks
   const [manageTaskOpen, setManageTaskOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<UserTask | null>(null);
