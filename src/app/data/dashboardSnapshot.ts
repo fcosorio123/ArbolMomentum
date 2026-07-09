@@ -5,6 +5,7 @@ import {
 } from './profiles';
 import { getPersonalGoals, type PersonalGoal } from './personalGoals';
 import { getUserTasks, isTaskScheduledForDate, type UserTask } from './userTasks';
+import { getPrimaryGoalIdForTask } from './taskGoalLinks';
 
 export const DASHBOARD_REFRESH_EVENT = 'arbol-dashboard-refresh';
 export const DAILY_CHECKIN_KEY = (profileId: string, dateKey: string) =>
@@ -98,13 +99,14 @@ export function getTodayTaskRows(profileId: string, dateKey = getTodayKey()): To
       if (seen.has(task.id)) continue;
       seen.add(task.id);
       const status = getTaskStatus(profileId, task.id, dateKey);
+      const goalId = getPrimaryGoalIdForTask(profileId, task.id, cat.goalId);
       rows.push({
         id: task.id,
         label: task.label,
         timeOfDay: task.timeOfDay,
         type: task.type,
         category: task.category,
-        goalId: cat.goalId,
+        goalId,
         status,
         disposition: rowDisposition(status),
       });
@@ -130,7 +132,7 @@ export function getTodayTaskRows(profileId: string, dateKey = getTodayKey()): To
           timeOfDay: task.timeOfDay,
           type: task.type,
           category: task.category,
-          goalId: cat.goalId,
+          goalId: getPrimaryGoalIdForTask(profileId, task.id, cat.goalId),
           status: null,
           disposition: 'removed',
         });
@@ -154,7 +156,9 @@ export function calculateBannerState(
     const cats = getTaskCategoriesForProfile(profileId);
     const uts = getUserTasks(profileId);
     const needingGoals = goals.filter(goal => {
-      const seedTasks = cats.filter(c => c.goalId === goal.id).flatMap(c => c.tasks);
+      const seedTasks = cats.flatMap(c =>
+        c.tasks.filter(t => getPrimaryGoalIdForTask(profileId, t.id, c.goalId) === goal.id),
+      );
       const userTasksForGoal = uts.filter(ut => ut.goalId === goal.id && isTaskScheduledForDate(ut, dateKey));
       return [...seedTasks, ...userTasksForGoal].some(t => {
         if (!isTaskActiveForDate(profileId, t.id, dateKey)) return false;

@@ -1223,6 +1223,7 @@ export function createUserGoal(profileId: string, data: { title: string; deepWhy
   savePersonalGoals(profileId, [...goals, newGoal]);
   localStorage.setItem(goalsVersionKey(profileId), GOALS_DATA_VERSION);
   try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
+  import('./cloudBackup').then(({ saveToCloud }) => saveToCloud(profileId));
   return newGoal;
 }
 

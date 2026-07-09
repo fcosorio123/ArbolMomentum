@@ -3,11 +3,11 @@ import { Progress } from 'antd';
 import { CloseOutlined, CheckOutlined, RightOutlined, LeftOutlined } from '@ant-design/icons';
 import { getPersonalGoals, type PersonalGoal } from '../data/personalGoals';
 import {
-  getTaskCategoriesForProfile, getTaskStatus, setTaskStatus,
-  isTaskActiveForDate, getTodayKey, getEarnedBadges,
+  getTaskStatus, setTaskStatus,
+  getTodayKey, getEarnedBadges,
   type TaskStatus,
 } from '../data/profiles';
-import { getActiveUserTasksForDate } from '../data/userTasks';
+import { getTodayTaskRows } from '../data/dashboardSnapshot';
 import { C } from '../data/colors';
 import type { Profile } from '../data/profiles';
 
@@ -87,32 +87,29 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
     };
   }, []);
 
-  // Build a flat ordered list of tasks that need answering
+  // Build a flat ordered list of tasks that need answering (all scheduled tasks today)
   const { allTasks, goalMeta } = useMemo(() => {
     const goals = getPersonalGoals(profile.id);
-    const cats = getTaskCategoriesForProfile(profile.id);
-    const uts = getActiveUserTasksForDate(profile.id, today);
+    const rows = getTodayTaskRows(profile.id, today).filter(r => r.disposition === 'active');
 
     const goalMeta: Record<string, { title: string; deepWhy?: string; accentColor: string }> = {};
     goals.forEach(g => {
       goalMeta[g.id] = { title: g.title, deepWhy: g.deepWhy, accentColor: goalAccent(g.id) };
     });
+    goalMeta.__routines__ = { title: 'Routines', accentColor: '#90b4ce' };
 
-    const flat: FlatTask[] = [];
-    goals.forEach(goal => {
-      const ac = goalAccent(goal.id);
-      cats.forEach(cat => {
-        if (cat.goalId !== goal.id) return;
-        cat.tasks.forEach(t => {
-          if (!isTaskActiveForDate(profile.id, t.id, today)) return;
-          flat.push({ id: t.id, label: t.label, timeOfDay: t.timeOfDay, goalId: goal.id, goalTitle: goal.title, accentColor: ac, preExisting: getTaskStatus(profile.id, t.id, today) });
-        });
-      });
-      uts.forEach(ut => {
-        if (ut.goalId !== goal.id) return;
-        if (!isTaskActiveForDate(profile.id, ut.id, today)) return;
-        flat.push({ id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, goalId: goal.id, goalTitle: goal.title, accentColor: ac, preExisting: getTaskStatus(profile.id, ut.id, today) });
-      });
+    const flat: FlatTask[] = rows.map(r => {
+      const goalId = r.goalId ?? '__routines__';
+      const meta = goalMeta[goalId] ?? goalMeta.__routines__;
+      return {
+        id: r.id,
+        label: r.label,
+        timeOfDay: r.timeOfDay,
+        goalId,
+        goalTitle: meta.title,
+        accentColor: meta.accentColor,
+        preExisting: getTaskStatus(profile.id, r.id, today),
+      };
     });
 
     // Tasks that need check-in (no status yet) come first; already-answered ones trail

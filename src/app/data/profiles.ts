@@ -1807,6 +1807,28 @@ export function computeLiveStreak(profileId: string, todayHasActivity = false): 
   }
 }
 
+/** Longest consecutive days with ≥1 completed task (same rule as live streak). */
+export function computeBestStreak(profileId: string): number {
+  try {
+    const stored = JSON.parse(localStorage.getItem(`streak-best-${profileId}`) || 'null');
+    if (stored?.daily && typeof stored.daily === 'number') return stored.daily;
+  } catch { /* ignore */ }
+
+  let best = 0;
+  let current = 0;
+  for (let i = 365; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    if (hasActivityOnDate(profileId, getDateKey(d))) {
+      current++;
+      if (current > best) best = current;
+    } else {
+      current = 0;
+    }
+  }
+  return best;
+}
+
 export function getTaskStatus(profileId: string, taskId: string, date: string): TaskStatus | null {
   const stored = localStorage.getItem(`task-${profileId}-${taskId}-${date}`);
   if (stored === 'inprogress' || stored === 'done' || stored === 'skipped') return stored;

@@ -332,7 +332,7 @@ export default function App() {
     trackEvent(activeProfile.id, 'app_opened');
   }, [activeProfile?.id]);
 
-  // ── Cloud restore: if local data is absent, pull from cloud backup ──
+  // ── Cloud sync: merge profile data from cloud on every session ──
   useEffect(() => {
     if (!activeProfile) return;
     const sessionKey = `arbol-restore-attempted-${activeProfile.id}`;
@@ -340,19 +340,6 @@ export default function App() {
     sessionStorage.setItem(sessionKey, 'true');
 
     const profileId = activeProfile.id;
-    let hasTaskKeys = false;
-    let hasGoals = !!localStorage.getItem(`arbol-personal-goals-${profileId}`)
-      || !!localStorage.getItem(`arbol-goals-${profileId}`);
-    let hasHiddenSeeds = !!localStorage.getItem(`arbol-hidden-seed-${profileId}`);
-
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k) continue;
-      if (k.startsWith(`task-${profileId}-`) || k.startsWith(`streak-${profileId}-`)) {
-        hasTaskKeys = true;
-        break;
-      }
-    }
 
     const tryHydrate = () => {
       import('./data/supabaseSync').then(({ hydrateProfileFromSupabase }) => {
@@ -362,19 +349,14 @@ export default function App() {
       });
     };
 
-    if (hasTaskKeys) {
-      tryHydrate();
-      return;
-    }
-
-    const needsPartialRestore = !hasGoals && !hasHiddenSeeds;
-    if (!needsPartialRestore && hasTaskKeys) return;
-
-    import('./data/cloudBackup').then(({ restoreFromCloud }) => {
-      restoreFromCloud(profileId).then(restored => {
-        if (restored) {
+    import('./data/cloudBackup').then(({ syncProfileFromCloud }) => {
+      syncProfileFromCloud(profileId).then(result => {
+        if (result === 'full-restore') {
           window.location.reload();
           return;
+        }
+        if (result === 'merged') {
+          try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
         }
         tryHydrate();
       });

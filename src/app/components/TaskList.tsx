@@ -35,6 +35,11 @@ import { useScrollPositionLock } from '../hooks/useScrollPositionLock';
 import { truncateRemark, SKIPPED_BADGE, shouldShowRemark } from './taskCardDisplay';
 import { TaskCalendarButton } from './TaskCalendarButton';
 import { getEffectiveDaySyncDateKey } from '../data/calendarExport';
+import {
+  getPrimaryGoalIdForTask,
+  setPrimaryGoalLinkForTask,
+  clearUserGoalLinksForTask,
+} from '../data/taskGoalLinks';
 
 interface Props {
   profile: Profile;
@@ -712,7 +717,8 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
       setEditingTask({
         id: task.id, profileId: profile.id,
         label: task.label, timeOfDay: task.timeOfDay, type: task.type,
-        goalId: currentGoalId, createdAt: 0,
+        goalId: currentGoalId ?? getPrimaryGoalIdForTask(profile.id, task.id),
+        createdAt: 0,
       } as UserTask);
       setEditingSeedTaskId(task.id);
     }
@@ -737,12 +743,28 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
 
     const seedId = resolveSeedId();
     const isNewTask = !editingTask && !seedId;
-    const isSeedConversion = !!seedId;
+    let didSeedConversion = false;
 
     if (seedId) {
-      createUserTask(profile.id, { ...taskData, sourceSeedTaskId: seedId });
-      permanentlyHideSeedTask(profile.id, seedId);
-      setEditingSeedTaskId(null);
+      const seedTask = categories.flatMap(c => c.tasks).find(t => t.id === seedId);
+      const onlyGoalAssignment = seedTask
+        && taskData.label.trim() === seedTask.label
+        && taskData.timeOfDay === seedTask.timeOfDay
+        && taskData.type === seedTask.type
+        && !taskData.recurrence;
+
+      if (onlyGoalAssignment && taskData.goalId) {
+        setPrimaryGoalLinkForTask(profile.id, seedId, taskData.goalId);
+        setEditingSeedTaskId(null);
+      } else if (onlyGoalAssignment && !taskData.goalId) {
+        clearUserGoalLinksForTask(profile.id, seedId);
+        setEditingSeedTaskId(null);
+      } else {
+        createUserTask(profile.id, { ...taskData, sourceSeedTaskId: seedId });
+        permanentlyHideSeedTask(profile.id, seedId);
+        setEditingSeedTaskId(null);
+        didSeedConversion = true;
+      }
     } else if (editingTask) {
       const existing = userTasks.find(u => u.id === editingTask.id);
       if (!existing) {
@@ -767,7 +789,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     loadState();
 
     // Show congrat modal for new task creation (not edits)
-    if (isNewTask || isSeedConversion) {
+    if (isNewTask || didSeedConversion) {
       const linkedGoal = goals.find(g => g.id === taskData.goalId);
       setCongratTask({
         label: taskData.label,
@@ -819,8 +841,9 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
       // Skip seed if a user task already owns this row (same id from a prior conversion)
       if (userTaskIds.has(t.id)) return;
       const taskObj: UserTask_ = { ...t };
-      if (cat.goalId && goalTaskMap[cat.goalId] !== undefined) {
-        goalTaskMap[cat.goalId].push(taskObj);
+      const effectiveGoalId = getPrimaryGoalIdForTask(profile.id, t.id, cat.goalId);
+      if (effectiveGoalId && goalTaskMap[effectiveGoalId] !== undefined) {
+        goalTaskMap[effectiveGoalId].push(taskObj);
       } else {
         ungroupedTasks.push(taskObj);
       }
@@ -1117,6 +1140,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                     onOpenUpdate={() => openTaskUpdate(task)}
                     onDelete={() => openDeleteTask(task)}
                     onEdit={() => handleEditAnyTask(task, undefined)}
+                    statusLocked
                   />
                 ))}
             </div>

@@ -6,7 +6,7 @@ import {
   BarChart, Bar, LineChart, Line,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
-import { PROFILES, getTodayKey, getDateKey, computeLiveStreak, isProfileArchived, setProfileArchived, getActiveProfiles } from '../data/profiles';
+import { PROFILES, getTodayKey, getDateKey, computeLiveStreak, computeBestStreak, hasActivityOnDate, isProfileArchived, setProfileArchived, getActiveProfiles } from '../data/profiles';
 import {
   computeDayStatsFromPersisted,
   buildRemoteDayOverlay,
@@ -143,7 +143,7 @@ function OverviewTab() {
             ? Math.round(prevWeekDays.reduce((s, d) => s + d.pct, 0) / prevWeekDays.length)
             : 0;
 
-          return { ...p, todayVisits, todayDetail, weekDays, weekAvg, prevWeekDays, prevWeekAvg, liveStreak: computeLiveStreak(p.id, todayDetail.pct > 0) };
+          return { ...p, todayVisits, todayDetail, weekDays, weekAvg, prevWeekDays, prevWeekAvg, liveStreak: computeLiveStreak(p.id, hasActivityOnDate(p.id, today)) };
         });
 
         setStats(profileStats);
@@ -181,7 +181,7 @@ function OverviewTab() {
       });
       const prevWeekAvg = Math.round(prevWeekDays.reduce((s, d) => s + d.pct, 0) / prevWeekDays.length);
 
-      return { ...p, todayVisits, todayDetail, weekDays, weekAvg, prevWeekDays, prevWeekAvg, liveStreak: computeLiveStreak(p.id, todayDetail.pct > 0) };
+      return { ...p, todayVisits, todayDetail, weekDays, weekAvg, prevWeekDays, prevWeekAvg, liveStreak: computeLiveStreak(p.id, hasActivityOnDate(p.id, today)) };
     }));
   };
 
@@ -422,7 +422,8 @@ function AnalyticsTab() {
   const hourlyData = getActivityChartData(selectedId, today);
   const todayDetail = computeDayStatsFromPersisted(selectedId, today);
   const todayVisits = parseInt(localStorage.getItem(`visit-${selectedId}-${today}`) || '0');
-  const liveStreak = computeLiveStreak(selectedId, todayDetail.pct > 0);
+  const liveStreak = computeLiveStreak(selectedId, hasActivityOnDate(selectedId, today));
+  const bestStreak = Math.max(computeBestStreak(selectedId), liveStreak, profile.bestStreak);
 
   // Peak hour
   const allHours: number[] = JSON.parse(localStorage.getItem(`arbol-activity-${selectedId}-${today}`) || '[]') || [];
@@ -674,7 +675,7 @@ function AnalyticsTab() {
 
     const avgCompletion = Math.round(engagementData.reduce((sum, d) => sum + d.pct, 0) / engagementData.length);
     const totalCompletions = engagementData.reduce((sum, d) => sum + d.done, 0);
-    const activeDays = engagementData.filter(d => d.done > 0).length;
+    const activeDays = engagementData.filter(d => hasActivityOnDate(selectedId, d.date)).length;
     const peakDay = engagementData.reduce((max, d) => d.pct > max.pct ? d : max, engagementData[0]);
 
     // Calculate trend (comparing first half vs second half)
@@ -688,7 +689,7 @@ function AnalyticsTab() {
     const trend = secondAvg - firstAvg;
 
     return { avgCompletion, totalCompletions, activeDays, peakDay, trend };
-  }, [engagementData]);
+  }, [engagementData, selectedId]);
 
   // Load data when period or profile changes
   useEffect(() => {
@@ -977,12 +978,15 @@ function AnalyticsTab() {
           <span style={{ color: C.body }}>Current streak</span>
           <span style={{ color: C.streak, fontWeight: 700 }}>{liveStreak} days</span>
         </div>
-        <Progress percent={Math.min(100, Math.round((liveStreak / profile.bestStreak) * 100))}
+        <Progress percent={Math.min(100, bestStreak > 0 ? Math.round((liveStreak / bestStreak) * 100) : 0)}
           strokeColor={{ '0%': C.streak, '100%': '#f5d020' }}
           railColor={C.bgAlt} showInfo={false} size={['100%', 6]} />
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: C.secondary }}>
           <span>0</span>
-          <span>Best: {profile.bestStreak} days</span>
+          <span>Best: {bestStreak} days</span>
+        </div>
+        <div style={{ marginTop: 8, fontSize: 10, color: C.secondary, lineHeight: 1.4 }}>
+          Streaks count days with ≥1 completed task. Completion % uses done ÷ active tasks for that day.
         </div>
       </div>
     </div>

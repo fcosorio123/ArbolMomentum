@@ -88,6 +88,45 @@ export function getLinksForTask(profileId: string, taskId: string): TaskGoalLink
   return links.filter(l => l.taskId === taskId);
 }
 
+/** Resolve goal for a seed or routine task: user link overrides category default. */
+export function getPrimaryGoalIdForTask(
+  profileId: string,
+  taskId: string,
+  categoryGoalId?: string,
+): string | undefined {
+  const links = getLinksForTask(profileId, taskId);
+  const userLinks = links.filter(l => l.isUserCreated);
+  const pool = userLinks.length > 0 ? userLinks : links;
+  if (pool.length > 0) {
+    return pool.sort((a, b) => b.createdAt - a.createdAt)[0].goalId;
+  }
+  return categoryGoalId;
+}
+
+/** Assign a seed/routine task to a goal without converting it to a user task. */
+export function setPrimaryGoalLinkForTask(profileId: string, taskId: string, goalId: string) {
+  const links = getTaskGoalLinks(profileId).filter(
+    l => !(l.taskId === taskId && l.isUserCreated),
+  );
+  links.push({
+    taskId,
+    goalId,
+    profileId,
+    isUserCreated: true,
+    createdAt: Date.now(),
+  });
+  saveTaskGoalLinks(profileId, links);
+  import('./cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId));
+}
+
+export function clearUserGoalLinksForTask(profileId: string, taskId: string) {
+  const links = getTaskGoalLinks(profileId).filter(
+    l => !(l.taskId === taskId && l.isUserCreated),
+  );
+  saveTaskGoalLinks(profileId, links);
+  import('./cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId));
+}
+
 // Track rejected suggestions to avoid re-suggesting
 export function markSuggestionRejected(profileId: string, taskId: string, goalId: string) {
   const stored = localStorage.getItem(rejectedKey(profileId));
