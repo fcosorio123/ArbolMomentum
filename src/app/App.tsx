@@ -14,6 +14,7 @@ import { CheckInPage } from './components/CheckInPage';
 
 import { BottomNav } from './components/BottomNav';
 import { CoachMarks } from './components/CoachMarks';
+import { coachStorageKey } from './components/AppTour';
 import { AddToHomeScreen } from './components/AddToHomeScreen';
 import { CelebrationModal } from './components/CelebrationModal';
 import { DailySummaryModal, isSummaryEnabled, markSummaryShownToday, wasSummaryShownToday } from './components/DailySummaryModal';
@@ -332,38 +333,57 @@ export default function App() {
   }, [activeProfile?.id]);
 
   // ── Cloud restore: if local data is absent, pull from cloud backup ──
-  // Runs once per session per profile. Reloads the page after a successful
-  // restore so all components read the recovered localStorage data.
   useEffect(() => {
     if (!activeProfile) return;
     const sessionKey = `arbol-restore-attempted-${activeProfile.id}`;
     if (sessionStorage.getItem(sessionKey)) return;
+    sessionStorage.setItem(sessionKey, 'true');
 
-    // Check whether this profile has any local activity data
-    let hasLocal = false;
+    const profileId = activeProfile.id;
+    let hasTaskKeys = false;
+    let hasGoals = !!localStorage.getItem(`arbol-personal-goals-${profileId}`)
+      || !!localStorage.getItem(`arbol-goals-${profileId}`);
+    let hasHiddenSeeds = !!localStorage.getItem(`arbol-hidden-seed-${profileId}`);
+
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       if (!k) continue;
-      if (k.startsWith(`streak-${activeProfile.id}-`) || k.startsWith(`task-${activeProfile.id}-`)) {
-        hasLocal = true;
+      if (k.startsWith(`task-${profileId}-`) || k.startsWith(`streak-${profileId}-`)) {
+        hasTaskKeys = true;
         break;
       }
     }
-    if (hasLocal) return;
 
-    // Mark attempted so we don't loop on failed restores
-    sessionStorage.setItem(sessionKey, 'true');
+    const tryHydrate = () => {
+      import('./data/supabaseSync').then(({ hydrateProfileFromSupabase }) => {
+        hydrateProfileFromSupabase(profileId).then(hydrated => {
+          if (hydrated) window.location.reload();
+        });
+      });
+    };
+
+    if (hasTaskKeys) {
+      tryHydrate();
+      return;
+    }
+
+    const needsPartialRestore = !hasGoals && !hasHiddenSeeds;
+    if (!needsPartialRestore && hasTaskKeys) return;
 
     import('./data/cloudBackup').then(({ restoreFromCloud }) => {
-      restoreFromCloud(activeProfile.id).then(restored => {
-        if (restored) window.location.reload();
+      restoreFromCloud(profileId).then(restored => {
+        if (restored) {
+          window.location.reload();
+          return;
+        }
+        tryHydrate();
       });
     });
   }, [activeProfile?.id]);
 
   // ── Coach marks for first-time users
   useEffect(() => {
-    if (activeProfile && !localStorage.getItem('arbol-coach-done')) {
+    if (activeProfile && !localStorage.getItem(coachStorageKey(activeProfile.id))) {
       setTimeout(() => setShowCoach(true), 600);
     }
   }, [activeProfile]);
@@ -476,7 +496,7 @@ export default function App() {
 
   const handleCoachDone = () => {
     setShowCoach(false);
-    localStorage.setItem('arbol-coach-done', 'true');
+    localStorage.setItem(coachStorageKey(activeProfile!.id), 'true');
   };
 
   if (showAdmin) {

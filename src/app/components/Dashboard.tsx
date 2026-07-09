@@ -3,7 +3,7 @@ import { Button } from 'antd';
 import {
   FireOutlined, DownloadOutlined, ArrowRightOutlined,
 } from '@ant-design/icons';
-import { PageTour, PageTourButton, TOUR_KEYS } from './AppTour';
+import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey } from './AppTour';
 import type { Profile } from '../data/profiles';
 import {
   getDateKey, hasActivityOnDate, getEarnedBadges, BADGES,
@@ -167,7 +167,7 @@ export function Dashboard({
 
   useEffect(() => {
     if (!isActive || !canStartPageTours || isLoading) return;
-    if (localStorage.getItem(TOUR_KEYS.home)) return;
+    if (localStorage.getItem(tourStorageKey(TOUR_KEYS.home, profile.id))) return;
     const t = setTimeout(() => setShowTour(true), 600);
     return () => clearTimeout(t);
   }, [isActive, canStartPageTours, isLoading]);
@@ -175,9 +175,9 @@ export function Dashboard({
   // Goal Check-In tour — after Welcome, Summary, Home tour, and Tasks tour
   useEffect(() => {
     if (!isActive || !canStartPageTours || isLoading) return;
-    if (localStorage.getItem(TOUR_KEYS.checkIn)) return;
-    if (!localStorage.getItem(TOUR_KEYS.home)) return;
-    if (!localStorage.getItem(TOUR_KEYS.tasks)) return;
+    if (localStorage.getItem(tourStorageKey(TOUR_KEYS.checkIn, profile.id))) return;
+    if (!localStorage.getItem(tourStorageKey(TOUR_KEYS.home, profile.id))) return;
+    if (!localStorage.getItem(tourStorageKey(TOUR_KEYS.tasks, profile.id))) return;
     const t = setTimeout(() => setShowCheckInTour(true), 600);
     return () => clearTimeout(t);
   }, [isActive, canStartPageTours, isLoading]);
@@ -599,7 +599,7 @@ export function Dashboard({
       <PageTour
         open={showTour}
         onClose={() => setShowTour(false)}
-        storageKey={TOUR_KEYS.home}
+        storageKey={tourStorageKey(TOUR_KEYS.home, profile.id)}
         pageLabel="Home"
         doneEmoji="🏠"
         doneMessage="You've got the Home screen down. Check your streak every day to build momentum!"
@@ -635,7 +635,7 @@ export function Dashboard({
       <PageTour
         open={showCheckInTour}
         onClose={() => setShowCheckInTour(false)}
-        storageKey={TOUR_KEYS.checkIn}
+        storageKey={tourStorageKey(TOUR_KEYS.checkIn, profile.id)}
         pageLabel="Goal Check-In"
         doneEmoji="🔴"
         doneMessage="Use Start Check-in on the banner whenever you need to reflect on today's progress."

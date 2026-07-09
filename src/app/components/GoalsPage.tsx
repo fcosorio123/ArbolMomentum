@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Progress, Modal, Button } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, ArrowRightOutlined } from '@ant-design/icons';
-import { PageTour, PageTourButton, TOUR_KEYS } from './AppTour';
+import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey } from './AppTour';
 import { CongratModal } from './CongratModal';
 import {
   getPersonalGoals, createUserGoal, updateUserGoal, deleteUserGoal,
@@ -10,7 +10,7 @@ import {
 import {
   getTaskCategoriesForProfile, getTaskStatus, isTaskActiveForDate, getTodayKey,
 } from '../data/profiles';
-import { getUserTasks, createUserTask, orphanUserTasksForGoal, isTaskScheduledForDate } from '../data/userTasks';
+import { getUserTasks, createUserTask, orphanUserTasksForGoal, deleteUserTask, isTaskScheduledForDate } from '../data/userTasks';
 import { ManageGoalModal } from './ManageGoalModal';
 import { C } from '../data/colors';
 import type { Profile } from '../data/profiles';
@@ -150,6 +150,9 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
   const [manageGoalOpen, setManageGoalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<PersonalGoal | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PersonalGoal | null>(null);
+  const [goalDeleteTaskMode, setGoalDeleteTaskMode] = useState<'detach' | 'delete_tasks'>('detach');
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedGoalIds, setSelectedGoalIds] = useState<Set<string>>(new Set());
   const [suggestionGoal, setSuggestionGoal] = useState<PersonalGoal | null>(null);
   const [suggestionTasks, setSuggestionTasks] = useState<Array<{ label: string; timeOfDay: 'morning' | 'evening' }>>([]);
   const [addedSuggestions, setAddedSuggestions] = useState<Set<string>>(new Set());
@@ -170,7 +173,7 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
 
   // Auto-start goals tour on first visit to this page
   useEffect(() => {
-    if (!localStorage.getItem(TOUR_KEYS.goals)) {
+    if (!localStorage.getItem(tourStorageKey(TOUR_KEYS.goals, profile.id))) {
       const t = setTimeout(() => setShowTour(true), 700);
       return () => clearTimeout(t);
     }
@@ -199,11 +202,34 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
 
   const handleDeleteGoal = () => {
     if (!deleteTarget) return;
-    orphanUserTasksForGoal(profile.id, deleteTarget.id);
+    if (goalDeleteTaskMode === 'delete_tasks') {
+      getUserTasks(profile.id)
+        .filter(t => t.goalId === deleteTarget.id)
+        .forEach(t => deleteUserTask(profile.id, t.id));
+    } else {
+      orphanUserTasksForGoal(profile.id, deleteTarget.id);
+    }
     deleteUserGoal(profile.id, deleteTarget.id);
     setDeleteTarget(null);
     loadGoals();
     try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch {}
+  };
+
+  const deleteGoalsByIds = (ids: string[], taskMode: 'detach' | 'delete_tasks') => {
+    ids.forEach(goalId => {
+      if (taskMode === 'delete_tasks') {
+        getUserTasks(profile.id).filter(t => t.goalId === goalId).forEach(t => deleteUserTask(profile.id, t.id));
+      } else {
+        orphanUserTasksForGoal(profile.id, goalId);
+      }
+      deleteUserGoal(profile.id, goalId);
+    });
+    setSelectedGoalIds(new Set());
+    setSelectMode(false);
+    loadGoals();
+    try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch {}
   };
 
   const closeSuggestions = () => {
@@ -231,6 +257,24 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
         Define where you want to go. Your tasks will follow.
       </p>
 
+      {goals.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+          <button type="button" onClick={() => { setSelectMode(m => !m); setSelectedGoalIds(new Set()); }} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.border}`, background: selectMode ? `${C.primary}15` : C.bgCard, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            {selectMode ? 'Cancel select' : 'Select goals'}
+          </button>
+          {selectMode && selectedGoalIds.size > 0 && (
+            <>
+              <button type="button" onClick={() => deleteGoalsByIds([...selectedGoalIds], 'detach')} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.border}`, background: C.bgCard, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                Delete & detach tasks ({selectedGoalIds.size})
+              </button>
+              <button type="button" onClick={() => deleteGoalsByIds([...selectedGoalIds], 'delete_tasks')} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.tertiary}40`, background: `${C.tertiary}10`, color: C.tertiary, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                Delete goals + tasks ({selectedGoalIds.size})
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {goals.length === 0 ? (
         <div data-tour-id="goals-section" style={{
           background: C.bgCard, border: `1.5px dashed ${C.border}`,
@@ -257,14 +301,31 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
       ) : (
         <div data-tour-id="goals-section" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {goals.map((goal, idx) => (
-            <GoalCard
-              key={goal.id}
-              goal={goal}
-              profileId={profile.id}
-              isFirst={idx === 0}
-              onEdit={() => { setEditingGoal(goal); setManageGoalOpen(true); }}
-              onDelete={() => setDeleteTarget(goal)}
-            />
+            <div key={goal.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              {selectMode && (
+                <input
+                  type="checkbox"
+                  checked={selectedGoalIds.has(goal.id)}
+                  onChange={() => setSelectedGoalIds(prev => {
+                    const next = new Set(prev);
+                    if (next.has(goal.id)) next.delete(goal.id);
+                    else next.add(goal.id);
+                    return next;
+                  })}
+                  style={{ marginTop: 18, width: 18, height: 18, flexShrink: 0 }}
+                />
+              )}
+              <div style={{ flex: 1 }}>
+                <GoalCard
+                  key={goal.id}
+                  goal={goal}
+                  profileId={profile.id}
+                  isFirst={idx === 0}
+                  onEdit={() => { setEditingGoal(goal); setManageGoalOpen(true); }}
+                  onDelete={() => { setGoalDeleteTaskMode('detach'); setDeleteTarget(goal); }}
+                />
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -327,9 +388,17 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
         centered
         width="min(400px, calc(100vw - 24px))"
       >
-        <p style={{ color: C.body }}>
-          <strong>"{deleteTarget?.title}"</strong> will be removed. Tasks linked to this goal won't be deleted - they'll become unlinked routines.
+        <p style={{ color: C.body, marginBottom: 12 }}>
+          <strong>"{deleteTarget?.title}"</strong> will be removed.
         </p>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8, cursor: 'pointer', fontSize: 13, color: C.body }}>
+          <input type="radio" checked={goalDeleteTaskMode === 'detach'} onChange={() => setGoalDeleteTaskMode('detach')} />
+          Detach linked user tasks (they become routines)
+        </label>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 13, color: C.body }}>
+          <input type="radio" checked={goalDeleteTaskMode === 'delete_tasks'} onChange={() => setGoalDeleteTaskMode('delete_tasks')} />
+          Delete linked user-created tasks too
+        </label>
       </Modal>
 
       {/* Congratulatory modal - shown immediately after goal creation */}
@@ -437,7 +506,7 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
       <PageTour
         open={showTour}
         onClose={() => setShowTour(false)}
-        storageKey={TOUR_KEYS.goals}
+        storageKey={tourStorageKey(TOUR_KEYS.goals, profile.id)}
         pageLabel="Goals"
         doneEmoji="🎯"
         doneMessage="You're ready to set and track goals. A goal without tasks is just a wish - add tasks to make it real!"

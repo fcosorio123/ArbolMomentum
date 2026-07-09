@@ -6,7 +6,11 @@ import {
   BarChart, Bar, LineChart, Line,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
-import { PROFILES, getTaskCategoriesForProfile, isTaskActiveForDate, getTaskStatus, computeLiveStreak, getTodayKey, getDateKey } from '../data/profiles';
+import { PROFILES, getTodayKey, getDateKey, computeLiveStreak, isProfileArchived, setProfileArchived, getActiveProfiles } from '../data/profiles';
+import {
+  computeDayStatsFromPersisted,
+  buildRemoteDayOverlay,
+} from '../data/dashboardSnapshot';
 import {
   getAllFeedbackAll, getActivityChartData, getWeeklyEngagement,
   generateInsight, RATING_EMOJIS, type FeedbackEntry,
@@ -60,27 +64,6 @@ function getDateForWeekday(dayName: string) {
   return getDateKey(t);
 }
 
-function computeCompletion(profileId: string, date: string): number {
-  const cats = getTaskCategoriesForProfile(profileId);
-  const tasks = cats.flatMap(c => c.tasks);
-  const visible = tasks.filter(t => isTaskActiveForDate(profileId, t.id, date));
-  if (visible.length === 0) return 0;
-  const done = visible.filter(t => getTaskStatus(profileId, t.id, date) === 'done').length;
-  return Math.round((done / visible.length) * 100);
-}
-
-function computeDayDetail(profileId: string, date: string) {
-  const cats = getTaskCategoriesForProfile(profileId);
-  const tasks = cats.flatMap(c => c.tasks);
-  const visible = tasks.filter(t => isTaskActiveForDate(profileId, t.id, date));
-  const deleted = tasks.length - visible.length;
-  const done = visible.filter(t => getTaskStatus(profileId, t.id, date) === 'done').length;
-  const inprog = visible.filter(t => getTaskStatus(profileId, t.id, date) === 'inprogress').length;
-  const notStarted = visible.length - done - inprog;
-  const pct = visible.length > 0 ? Math.round((done / visible.length) * 100) : 0;
-  return { done, inprog, notStarted, deleted, total: visible.length, pct };
-}
-
 // ── Sub-components ────────────────────────────
 
 function TabBar({ tab, onChange }: { tab: string; onChange: (t: string) => void }) {
@@ -114,6 +97,7 @@ function OverviewTab() {
   const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'comparison'>('daily');
   const [stats, setStats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showArchived, setShowArchived] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -128,43 +112,11 @@ function OverviewTab() {
         const profileStats = PROFILES.map(p => {
           const todayVisits = parseInt(localStorage.getItem(`visit-${p.id}-${today}`) || '0');
 
-          // Helper function to calculate stats for a given date
           const calculateDayStats = (date: string) => {
-            // Get the full task list for this profile/date
-            const cats = getTaskCategoriesForProfile(p.id);
-            const allTasks = cats.flatMap(c => c.tasks);
-
-            // Get deletions for this date
-            const dayDeletions = deletions.filter(d => d.profile_id === p.id && d.date === date);
-            const deletedTaskIds = new Set(dayDeletions.map(d => d.task_id));
-
-            // Filter out deleted tasks
-            const visibleTasks = allTasks.filter(t => !deletedTaskIds.has(t.id));
-
-            // Get completions for this date
-            const dayCompletions = completions.filter(c => c.profile_id === p.id && c.date === date);
-            const completionMap = new Map(dayCompletions.map(c => [c.task_id, c.status]));
-
-            // Count statuses
-            let done = 0;
-            let inprog = 0;
-            let notStarted = 0;
-
-            visibleTasks.forEach(task => {
-              const status = completionMap.get(task.id);
-              if (status === 'done') done++;
-              else if (status === 'inprogress') inprog++;
-              else notStarted++;
-            });
-
-            const total = visibleTasks.length;
-            const deleted = deletedTaskIds.size;
-            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-
-            return { done, inprog, notStarted, deleted, total, pct };
+            const overlay = buildRemoteDayOverlay(p.id, date, completions, deletions);
+            return computeDayStatsFromPersisted(p.id, date, overlay);
           };
 
-          // Calculate today's detail
           const todayDetail = calculateDayStats(today);
 
           // Calculate week stats
@@ -191,7 +143,7 @@ function OverviewTab() {
             ? Math.round(prevWeekDays.reduce((s, d) => s + d.pct, 0) / prevWeekDays.length)
             : 0;
 
-          return { ...p, todayVisits, todayDetail, weekDays, weekAvg, prevWeekDays, prevWeekAvg };
+          return { ...p, todayVisits, todayDetail, weekDays, weekAvg, prevWeekDays, prevWeekAvg, liveStreak: computeLiveStreak(p.id, todayDetail.pct > 0) };
         });
 
         setStats(profileStats);
@@ -211,26 +163,25 @@ function OverviewTab() {
     const today = getTodayKey();
     setStats(PROFILES.map(p => {
       const todayVisits = parseInt(localStorage.getItem(`visit-${p.id}-${today}`) || '0');
-      const todayDetail = computeDayDetail(p.id, today);
+      const todayDetail = computeDayStatsFromPersisted(p.id, today);
 
       const weekDays = DAYS_SHORT.map(day => {
         const date = getDateForWeekday(day);
-        const detail = computeDayDetail(p.id, date);
+        const detail = computeDayStatsFromPersisted(p.id, date);
         return { day, date, ...detail };
       });
       const weekAvg = Math.round(weekDays.reduce((s, d) => s + d.pct, 0) / weekDays.length);
 
-      // Previous week
       const prevWeekDays = DAYS_SHORT.map((day, idx) => {
         const d = new Date();
         d.setDate(d.getDate() - (6 - idx) - 7);
         const date = getDateKey(d);
-        const detail = computeDayDetail(p.id, date);
+        const detail = computeDayStatsFromPersisted(p.id, date);
         return { day, date, ...detail };
       });
       const prevWeekAvg = Math.round(prevWeekDays.reduce((s, d) => s + d.pct, 0) / prevWeekDays.length);
 
-      return { ...p, todayVisits, todayDetail, weekDays, weekAvg, prevWeekDays, prevWeekAvg };
+      return { ...p, todayVisits, todayDetail, weekDays, weekAvg, prevWeekDays, prevWeekAvg, liveStreak: computeLiveStreak(p.id, todayDetail.pct > 0) };
     }));
   };
 
@@ -268,7 +219,12 @@ function OverviewTab() {
         <p style={{ margin: 0, color: C.secondary, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>
           🏆 User Performance
         </p>
-        <div style={{ display: 'flex', background: C.bgAlt, borderRadius: 10, padding: 3, border: `1px solid ${C.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: C.secondary, cursor: 'pointer' }}>
+            <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} />
+            Show archived
+          </label>
+          <div style={{ display: 'flex', background: C.bgAlt, borderRadius: 10, padding: 3, border: `1px solid ${C.border}` }}>
           {(['daily', 'weekly', 'comparison'] as const).map(m => (
             <button key={m} onClick={() => setViewMode(m)} style={{
               padding: '5px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11,
@@ -279,20 +235,36 @@ function OverviewTab() {
               {m === 'daily' ? 'Today' : m === 'weekly' ? 'This Week' : 'Comparison'}
             </button>
           ))}
+          </div>
         </div>
       </div>
 
-      {stats.map(p => (
+      {stats.filter(p => showArchived || !isProfileArchived(p.id)).map(p => (
         <div key={p.id} style={{ ...card, padding: 14, marginBottom: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <div style={{ fontSize: 22 }}>{p.avatar}</div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: C.headline }}>{p.name}</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: C.headline }}>
+                {p.name}
+                {isProfileArchived(p.id) && (
+                  <span style={{ marginLeft: 8, fontSize: 10, color: C.secondary, fontWeight: 600 }}>Archived</span>
+                )}
+              </div>
               <div style={{ fontSize: 11, color: C.secondary }}>{p.role}</div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => { setProfileArchived(p.id, !isProfileArchived(p.id)); load(); }}
+                style={{
+                  fontSize: 10, padding: '4px 8px', borderRadius: 6, border: `1px solid ${C.border}`,
+                  background: C.bgAlt, color: C.secondary, cursor: 'pointer', fontWeight: 600,
+                }}
+              >
+                {isProfileArchived(p.id) ? 'Restore' : 'Archive'}
+              </button>
               <FireOutlined style={{ color: C.streak, fontSize: 13 }} />
-              <span style={{ color: C.streak, fontWeight: 800, fontSize: 16 }}>{p.streak}</span>
+              <span style={{ color: C.streak, fontWeight: 800, fontSize: 16 }}>{p.liveStreak ?? computeLiveStreak(p.id)}</span>
             </div>
           </div>
 
@@ -448,7 +420,7 @@ function AnalyticsTab() {
   const today = getTodayKey();
 
   const hourlyData = getActivityChartData(selectedId, today);
-  const todayDetail = computeDayDetail(selectedId, today);
+  const todayDetail = computeDayStatsFromPersisted(selectedId, today);
   const todayVisits = parseInt(localStorage.getItem(`visit-${selectedId}-${today}`) || '0');
   const liveStreak = computeLiveStreak(selectedId, todayDetail.pct > 0);
 
@@ -567,25 +539,15 @@ function AnalyticsTab() {
 
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dateStr = getDateKey(d);
-      const cats = getTaskCategoriesForProfile(selectedId);
-      const allTasks = cats.flatMap(c => c.tasks);
-
-      const dayDeletions = deletions.filter(del => del.date === dateStr);
-      const deletedIds = new Set(dayDeletions.map(del => del.task_id));
-      const visibleTasks = allTasks.filter(t => !deletedIds.has(t.id));
-
-      const dayCompletions = completions.filter(c => c.date === dateStr);
-      const doneCount = dayCompletions.filter(c => c.status === 'done').length;
-
-      const total = visibleTasks.length;
-      const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+      const overlay = buildRemoteDayOverlay(selectedId, dateStr, completions, deletions);
+      const detail = computeDayStatsFromPersisted(selectedId, dateStr, overlay);
 
       data.push({
         date: dateStr,
         label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        pct,
-        done: doneCount,
-        total,
+        pct: detail.pct,
+        done: detail.done,
+        total: detail.total,
       });
     }
 
@@ -615,22 +577,12 @@ function AnalyticsTab() {
 
       for (let d = new Date(weekStart); d <= new Date(weekEndStr); d.setDate(d.getDate() + 1)) {
         const dateStr = getDateKey(d);
-        const cats = getTaskCategoriesForProfile(selectedId);
-        const allTasks = cats.flatMap(c => c.tasks);
+        const overlay = buildRemoteDayOverlay(selectedId, dateStr, completions, deletions);
+        const detail = computeDayStatsFromPersisted(selectedId, dateStr, overlay);
 
-        const dayDeletions = deletions.filter(del => del.date === dateStr);
-        const deletedIds = new Set(dayDeletions.map(del => del.task_id));
-        const visibleTasks = allTasks.filter(t => !deletedIds.has(t.id));
-
-        const dayCompletions = completions.filter(c => c.date === dateStr);
-        const doneCount = dayCompletions.filter(c => c.status === 'done').length;
-
-        const total = visibleTasks.length;
-        const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
-
-        totalPct += pct;
-        weekDone += doneCount;
-        weekTotal += total;
+        totalPct += detail.pct;
+        weekDone += detail.done;
+        weekTotal += detail.total;
         dayCount++;
       }
 
@@ -658,7 +610,7 @@ function AnalyticsTab() {
 
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dateStr = getDateKey(d);
-      const detail = computeDayDetail(selectedId, dateStr);
+      const detail = computeDayStatsFromPersisted(selectedId, dateStr);
 
       data.push({
         date: dateStr,
@@ -692,7 +644,7 @@ function AnalyticsTab() {
 
       for (let d = new Date(weekStart); d <= new Date(weekEndStr); d.setDate(d.getDate() + 1)) {
         const dateStr = getDateKey(d);
-        const detail = computeDayDetail(selectedId, dateStr);
+        const detail = computeDayStatsFromPersisted(selectedId, dateStr);
 
         totalPct += detail.pct;
         weekDone += detail.done;

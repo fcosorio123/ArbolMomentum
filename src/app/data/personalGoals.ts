@@ -2,6 +2,8 @@
 // Personal Goals Types & Data
 // ──────────────────────────────────────────────
 
+import { getTodayKey } from './profiles';
+
 export type MilestoneLevel = 'light' | 'medium' | 'medium-high' | 'hard' | 'epic';
 
 export interface Milestone {
@@ -1141,20 +1143,42 @@ function goalsVersionKey(profileId: string) {
   return `arbol-goals-version-${profileId}`;
 }
 
+function deletedDefaultGoalsKey(profileId: string) {
+  return `arbol-deleted-default-goals-${profileId}`;
+}
+
+export function getDeletedDefaultGoalIds(profileId: string): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(deletedDefaultGoalsKey(profileId)) || '[]') as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
+function recordDeletedDefaultGoal(profileId: string, goalId: string) {
+  const isDefault = DEFAULT_PERSONAL_GOALS.some(g => g.id === goalId && g.profileId === profileId);
+  if (!isDefault) return;
+  const deleted = getDeletedDefaultGoalIds(profileId);
+  deleted.add(goalId);
+  localStorage.setItem(deletedDefaultGoalsKey(profileId), JSON.stringify([...deleted]));
+}
+
 export function getPersonalGoals(profileId: string): PersonalGoal[] {
   const storedVersion = localStorage.getItem(goalsVersionKey(profileId));
   const stored = localStorage.getItem(allGoalsKey(profileId));
+  const deletedDefaults = getDeletedDefaultGoalIds(profileId);
 
-  // If data version is stale, reseed from defaults (preserves progress for goals
-  // that still exist by merging currentValue from old data).
   if (stored && storedVersion !== GOALS_DATA_VERSION) {
     const oldGoals: PersonalGoal[] = JSON.parse(stored);
-    const defaults = DEFAULT_PERSONAL_GOALS.filter(g => g.profileId === profileId);
-    if (defaults.length > 0) {
-      const merged = defaults.map(def => {
+    const userGoals = oldGoals.filter(g => g.id.startsWith(`user-${profileId}-`));
+    const defaults = DEFAULT_PERSONAL_GOALS
+      .filter(g => g.profileId === profileId && !deletedDefaults.has(g.id));
+    if (defaults.length > 0 || userGoals.length > 0) {
+      const mergedDefaults = defaults.map(def => {
         const old = oldGoals.find(o => o.id === def.id);
         return old ? { ...def, currentValue: old.currentValue, milestones: def.milestones.map((m, i) => ({ ...m, completed: old.milestones[i]?.completed ?? m.completed })) } : def;
       });
+      const merged = [...mergedDefaults, ...userGoals.filter(ug => !mergedDefaults.some(m => m.id === ug.id))];
       savePersonalGoals(profileId, merged);
       localStorage.setItem(goalsVersionKey(profileId), GOALS_DATA_VERSION);
       return merged;
@@ -1165,7 +1189,8 @@ export function getPersonalGoals(profileId: string): PersonalGoal[] {
     return JSON.parse(stored);
   }
 
-  const defaults = DEFAULT_PERSONAL_GOALS.filter(g => g.profileId === profileId);
+  const defaults = DEFAULT_PERSONAL_GOALS
+    .filter(g => g.profileId === profileId && !deletedDefaults.has(g.id));
   if (defaults.length > 0) {
     savePersonalGoals(profileId, defaults);
     localStorage.setItem(goalsVersionKey(profileId), GOALS_DATA_VERSION);
@@ -1214,6 +1239,7 @@ export function updateUserGoal(profileId: string, goalId: string, data: { title:
 }
 
 export function deleteUserGoal(profileId: string, goalId: string) {
+  recordDeletedDefaultGoal(profileId, goalId);
   const goals = getPersonalGoals(profileId);
   savePersonalGoals(profileId, goals.filter(g => g.id !== goalId));
   localStorage.setItem(goalsVersionKey(profileId), GOALS_DATA_VERSION);
@@ -1290,6 +1316,22 @@ export function logGoalProgress(log: Omit<GoalProgressLog, 'id'>): GoalProgressL
 
   // Notify listeners (Dashboard, etc.) that goals changed
   try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
+
+  import('./emailSettings').then(({ isEmailTypeEnabled }) => {
+    if (!isEmailTypeEnabled('goalUpdatedEnabled')) return;
+    const goals = getPersonalGoals(log.profileId);
+    const goal = goals.find(g => g.id === log.goalId);
+    import('./emailNudges').then(({ requestEmailSend }) => {
+      requestEmailSend({
+        profileId: log.profileId,
+        type: 'goal_updated',
+        tag: log.goalId,
+        title: goal?.title,
+        body: log.milestoneHit ? `Milestone reached on ${goal?.title ?? 'your goal'}.` : undefined,
+        date: getTodayKey(),
+      });
+    });
+  });
 
   // Sync to Supabase (async, non-blocking)
   import('./supabaseSync').then(({ syncGoalProgress }) => {

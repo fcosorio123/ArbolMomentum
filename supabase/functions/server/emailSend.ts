@@ -14,6 +14,9 @@ export interface EmailSettings {
   smartNudgeEnabled: boolean;
   taskCompletionEnabled: boolean;
   checkInConfirmationEnabled: boolean;
+  taskCreatedEnabled: boolean;
+  goalUpdatedEnabled: boolean;
+  profileArchivedEnabled: boolean;
   triggerMode: TriggerMode;
   fromName: string;
   replyTo: string;
@@ -28,6 +31,9 @@ export const DEFAULT_EMAIL_SETTINGS: EmailSettings = {
   smartNudgeEnabled: true,
   taskCompletionEnabled: false,
   checkInConfirmationEnabled: true,
+  taskCreatedEnabled: false,
+  goalUpdatedEnabled: false,
+  profileArchivedEnabled: false,
   triggerMode: "browser_aligned",
   fromName: "Arbol Momentum",
   replyTo: "",
@@ -77,6 +83,12 @@ function typeEnabled(settings: EmailSettings, type: EmailType): boolean {
       return settings.taskCompletionEnabled;
     case "check_in_confirmation":
       return settings.checkInConfirmationEnabled;
+    case "task_created":
+      return settings.taskCreatedEnabled;
+    case "goal_updated":
+      return settings.goalUpdatedEnabled;
+    case "profile_archived":
+      return settings.profileArchivedEnabled;
     case "test":
       return true;
     default:
@@ -94,6 +106,12 @@ function dedupeKey(payload: SendEmailPayload): string {
       return `${payload.date ?? "unknown"}-${payload.taskId ?? "task"}`;
     case "check_in_confirmation":
       return payload.date ?? "unknown";
+    case "task_created":
+      return payload.taskId ?? "task";
+    case "goal_updated":
+      return `${payload.date ?? "unknown"}-${payload.tag ?? "goal"}`;
+    case "profile_archived":
+      return "once";
     case "test":
       return `test-${Date.now()}`;
     default:
@@ -126,7 +144,8 @@ function triggerAllows(type: EmailType, mode: TriggerMode, force?: boolean): boo
   if (force) return true;
   if (mode === "manual") return false;
   if (mode === "event_only") {
-    return type === "welcome" || type === "task_completion" || type === "check_in_confirmation";
+    return type === "welcome" || type === "task_completion" || type === "check_in_confirmation"
+      || type === "task_created" || type === "goal_updated" || type === "profile_archived";
   }
   // browser_aligned: all automated types allowed
   return true;

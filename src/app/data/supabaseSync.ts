@@ -25,22 +25,37 @@ export async function syncTaskStatus(
   date: string,
   status: 'inprogress' | 'done' | 'skipped' | null
 ): Promise<void> {
-  // NOTE: localStorage is handled by profiles.ts - we only sync to Supabase here
-
-  // Sync to Supabase if published
   if (!shouldCollectData()) return;
 
   try {
-    if (status === null) {
-      // Delete from Supabase
+    if (status === 'skipped') {
       await supabase
         .from('task_completions')
         .delete()
         .eq('profile_id', profileId)
         .eq('task_id', taskId)
         .eq('date', date);
+      await supabase
+        .from('task_deletions')
+        .upsert({
+          profile_id: profileId,
+          task_id: taskId,
+          date,
+        }, { onConflict: 'profile_id,task_id,date' });
+    } else if (status === null) {
+      await supabase
+        .from('task_completions')
+        .delete()
+        .eq('profile_id', profileId)
+        .eq('task_id', taskId)
+        .eq('date', date);
+      await supabase
+        .from('task_deletions')
+        .delete()
+        .eq('profile_id', profileId)
+        .eq('task_id', taskId)
+        .eq('date', date);
     } else {
-      // Upsert to Supabase
       await supabase
         .from('task_completions')
         .upsert({
@@ -48,9 +63,13 @@ export async function syncTaskStatus(
           task_id: taskId,
           date,
           status,
-        }, {
-          onConflict: 'profile_id,task_id,date'
-        });
+        }, { onConflict: 'profile_id,task_id,date' });
+      await supabase
+        .from('task_deletions')
+        .delete()
+        .eq('profile_id', profileId)
+        .eq('task_id', taskId)
+        .eq('date', date);
     }
     notifySynced();
   } catch (error) {
@@ -289,6 +308,46 @@ export async function fetchAllTaskDeletions(
   } catch (error) {
     console.error('[Supabase Fetch] Failed to fetch task deletions:', error);
     return [];
+  }
+}
+
+/** Merge Supabase task state into localStorage when local data is empty (new device). */
+export async function hydrateProfileFromSupabase(profileId: string): Promise<boolean> {
+  if (!shouldCollectData()) return false;
+
+  let hasLocal = false;
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k?.startsWith(`task-${profileId}-`)) {
+      hasLocal = true;
+      break;
+    }
+  }
+  if (hasLocal) return false;
+
+  try {
+    const [completions, deletions] = await Promise.all([
+      fetchAllTaskCompletions({ profileId }),
+      fetchAllTaskDeletions({ profileId }),
+    ]);
+    if (completions.length === 0 && deletions.length === 0) return false;
+
+    for (const c of completions) {
+      if (c.status === 'done' || c.status === 'inprogress') {
+        localStorage.setItem(`task-${profileId}-${c.task_id}-${c.date}`, c.status);
+        if (c.status === 'done') {
+          localStorage.setItem(`streak-${profileId}-${c.date}`, 'true');
+        }
+      }
+    }
+    for (const d of deletions) {
+      if (d.date === 'permanent') continue;
+      localStorage.setItem(`task-${profileId}-${d.task_id}-${d.date}`, 'skipped');
+    }
+    return true;
+  } catch (error) {
+    console.error('[Supabase Sync] Failed to hydrate profile:', error);
+    return false;
   }
 }
 

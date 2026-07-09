@@ -7,6 +7,9 @@ export type EmailType =
   | "smart_nudge"
   | "task_completion"
   | "check_in_confirmation"
+  | "task_created"
+  | "goal_updated"
+  | "profile_archived"
   | "test";
 
 export interface TemplateContext {
@@ -85,6 +88,38 @@ export function buildEmailContent(
           ${ctaHtml("Back to your dashboard")}
         `),
         text: `Check-in done, ${name}! Thanks for updating your progress today. Open the app: ${link}`,
+      };
+
+    case "task_created":
+      return {
+        subject: ctx.taskLabel ? `New task: ${ctx.taskLabel}` : "New task assigned",
+        html: wrapHtml(`
+          <h2 style="margin:0 0 12px;">New task for you, ${name}</h2>
+          <p>${ctx.taskLabel ? `<strong>${ctx.taskLabel}</strong> was added to your list.` : "A new task was added to your list."}</p>
+          ${ctaHtml("View tasks")}
+        `),
+        text: `New task for you, ${name}. ${ctx.taskLabel ?? "A new task was added."} Open the app: ${link}`,
+      };
+
+    case "goal_updated":
+      return {
+        subject: ctx.title ? `Goal update: ${ctx.title}` : "Goal progress updated",
+        html: wrapHtml(`
+          <h2 style="margin:0 0 12px;">Goal progress, ${name}</h2>
+          <p>${ctx.body || (ctx.title ? `Your goal "${ctx.title}" was updated.` : "A goal was materially updated.")}</p>
+          ${ctaHtml("View goals")}
+        `),
+        text: `Goal progress, ${name}. ${ctx.body || ctx.title || "Goal updated."} Open the app: ${link}`,
+      };
+
+    case "profile_archived":
+      return {
+        subject: "Profile archived",
+        html: wrapHtml(`
+          <h2 style="margin:0 0 12px;">Profile archived</h2>
+          <p>${ctx.profileName ? `The profile for <strong>${ctx.profileName}</strong> has been archived.` : "A profile has been archived."} Historical data is preserved.</p>
+        `),
+        text: `Profile archived. ${ctx.profileName ?? ""}`,
       };
 
     case "test":

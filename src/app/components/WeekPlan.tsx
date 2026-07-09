@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import { Progress } from 'antd';
-import { PageTour, PageTourButton, TOUR_KEYS } from './AppTour';
+import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey } from './AppTour';
 import { CheckCircleFilled, StarFilled, CloseOutlined } from '@ant-design/icons';
 import {
   getWeekPlanForProfile, getAllTasksForProfile, getTaskCategoriesForProfile,
@@ -113,7 +113,7 @@ export function WeekPlan({ profile }: Props) {
   }, [loadState]);
 
   useEffect(() => {
-    if (!localStorage.getItem(TOUR_KEYS.week)) {
+    if (!localStorage.getItem(tourStorageKey(TOUR_KEYS.week, profile.id))) {
       const t = setTimeout(() => setShowTour(true), 700);
       return () => clearTimeout(t);
     }
@@ -412,7 +412,7 @@ export function WeekPlan({ profile }: Props) {
       <PageTour
         open={showTour}
         onClose={() => setShowTour(false)}
-        storageKey={TOUR_KEYS.week}
+        storageKey={tourStorageKey(TOUR_KEYS.week, profile.id)}
         pageLabel="Week Plan"
         doneEmoji="📅"
         doneMessage="You've got the Week view! Use it to plan ahead and keep your goals on track across the entire week."

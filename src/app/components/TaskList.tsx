@@ -21,7 +21,7 @@ import { ManageTaskModal } from './ManageTaskModal';
 import { DeleteTaskModal, type DeleteTaskChoice } from './DeleteTaskModal';
 import { C } from '../data/colors';
 import { trackActivity } from '../data/feedback';
-import { PageTour, PageTourButton, TOUR_KEYS } from './AppTour';
+import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey } from './AppTour';
 import { CongratModal } from './CongratModal';
 import { MomentumUpdateModal } from './MomentumUpdateModal';
 import { TaskUpdateModal, type TaskUpdateContext } from './TaskUpdateModal';
@@ -66,6 +66,7 @@ function taskDurationLabel(task: UserTask_): string {
 function TaskItem({
   task, catColor, status, remark, onOpenUpdate, onDelete, onEdit, statusLocked,
   profileId, profileName, calendarDateKey,
+  selectionMode, selected, onToggleSelect,
 }: {
   task: UserTask_; catColor: string; status: TaskStatus | null; remark?: string;
   onOpenUpdate: () => void; onDelete: () => void;
@@ -74,6 +75,9 @@ function TaskItem({
   profileId: string;
   profileName: string;
   calendarDateKey: string;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }) {
   const isSkipped = status === 'skipped';
   const display = status ? TASK_STATUS_DISPLAY[status] : TASK_STATUS_DISPLAY.null;
@@ -81,6 +85,10 @@ function TaskItem({
   const showRemark = shouldShowRemark(status, remarkText);
 
   const handleActivate = () => {
+    if (selectionMode) {
+      onToggleSelect?.();
+      return;
+    }
     if (statusLocked) {
       onEdit?.();
       return;
@@ -104,6 +112,15 @@ function TaskItem({
         opacity: isSkipped ? 0.58 : 1,
       }}
     >
+      {selectionMode && (
+        <input
+          type="checkbox"
+          checked={!!selected}
+          onChange={onToggleSelect}
+          onClick={e => e.stopPropagation()}
+          style={{ width: 18, height: 18, flexShrink: 0, cursor: 'pointer' }}
+        />
+      )}
       <div style={{
         width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
         background: isSkipped ? C.bgAlt : status === 'done' ? display.color : status === 'inprogress' ? display.color : '#fff',
@@ -308,6 +325,7 @@ function goalAccentColor(goalId: string) {
 function GoalGroup({
   goal, tasks, statuses, notes, onOpenUpdate, onDelete, timeFilter,
   onEditTask, onAddSuggestedTask, isFirst, profileId, profileName, calendarDateKey,
+  selectionMode, selectedTaskIds, onToggleTaskSelect,
 }: {
   goal: PersonalGoal; tasks: UserTask_[];
   statuses: StatusMap; notes: NotesMap;
@@ -320,6 +338,9 @@ function GoalGroup({
   profileId: string;
   profileName: string;
   calendarDateKey: string;
+  selectionMode?: boolean;
+  selectedTaskIds?: Set<string>;
+  onToggleTaskSelect?: (taskId: string) => void;
 }) {
   const [collapsed, setCollapsed] = useState(!isFirst);
   const accentColor = goalAccentColor(goal.id);
@@ -416,6 +437,9 @@ function GoalGroup({
               profileId={profileId}
               profileName={profileName}
               calendarDateKey={calendarDateKey}
+              selectionMode={selectionMode}
+              selected={selectedTaskIds?.has(task.id)}
+              onToggleSelect={() => onToggleTaskSelect?.(task.id)}
               onOpenUpdate={() => onOpenUpdate(task, goal, doneTasks, totalTasks)}
               onDelete={() => onDelete(task)}
               onEdit={() => onEditTask(task)}
@@ -535,6 +559,8 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   const [editingTask, setEditingTask] = useState<UserTask | null>(null);
   const [defaultTaskGoalId, setDefaultTaskGoalId] = useState<string | undefined>(undefined);
   const [showTour, setShowTour] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [congratTask, setCongratTask] = useState<{ label: string; rows: Array<{ icon: string; label: string; value: string }> } | null>(null);
   const [editingSeedTaskId, setEditingSeedTaskId] = useState<string | null>(null);
   const [liveCheckInEnabled, setLiveCheckInEnabled] = useState(() => isLiveCheckInEnabled());
@@ -603,7 +629,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
 
   // Auto-start tasks tour on first visit
   useEffect(() => {
-    if (!localStorage.getItem(TOUR_KEYS.tasks)) {
+    if (!localStorage.getItem(tourStorageKey(TOUR_KEYS.tasks, profile.id))) {
       const t = setTimeout(() => setShowTour(true), 700);
       return () => clearTimeout(t);
     }
@@ -611,21 +637,27 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
 
   const confirmDelete = () => {
     if (!deleteTarget) return;
-    captureScroll();
-    const { id, label, isUserCreated } = deleteTarget;
+    applyTaskDelete(deleteTarget.id, deleteTarget.isUserCreated, deleteChoice, deleteTarget.label);
+    setDeleteTarget(null);
+  };
 
-    if (deleteChoice === 'today') {
+  const applyTaskDelete = (
+    id: string,
+    isUserCreated: boolean,
+    choice: DeleteTaskChoice,
+    label?: string,
+  ) => {
+    captureScroll();
+    if (choice === 'today') {
       skipTaskForToday(profile.id, id, today);
-      message.info('Task skipped for today');
+      if (!selectMode) message.info('Task skipped for today');
     } else if (isUserCreated) {
       deleteUserTask(profile.id, id);
-      message.info(`"${label}" permanently removed`);
+      if (!selectMode) message.info(`"${label ?? 'Task'}" permanently removed`);
     } else {
       permanentlyHideSeedTask(profile.id, id);
-      message.info('Task permanently removed');
+      if (!selectMode) message.info('Task permanently removed');
     }
-
-    setDeleteTarget(null);
     loadState();
     restoreScroll();
     const newPending = allTasksCombined.filter(t => {
@@ -633,6 +665,31 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
       return st !== 'done' && st !== 'skipped';
     }).length;
     onTasksChange?.(newPending);
+  };
+
+  const toggleTaskSelect = (taskId: string) => {
+    setSelectedTaskIds(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
+
+  const runBulkDelete = (choice: DeleteTaskChoice) => {
+    const count = selectedTaskIds.size;
+    if (count === 0) return;
+    const ids = [...selectedTaskIds];
+    ids.forEach(id => {
+      const task = allTasksCombined.find(t => t.id === id);
+      const isUserCreated = userTasks.some(u => u.id === id);
+      applyTaskDelete(id, isUserCreated, choice, task?.label);
+    });
+    setSelectedTaskIds(new Set());
+    setSelectMode(false);
+    try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
+    message.success(`${count} task(s) updated`);
   };
 
   const openDeleteTask = (task: UserTask_) => {
@@ -834,6 +891,9 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
       dispatchFeedbackUpdated();
     }
 
+    const persisted = getTaskStatus(profile.id, taskId, today);
+    const statusSaved = persisted === status || (status === null && persisted === null);
+
     const newStatuses = { ...statuses, [taskId]: status };
     setStatuses(newStatuses);
     setTaskUpdateContext(null);
@@ -845,7 +905,13 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
       return st !== 'done' && st !== 'skipped';
     }).length;
     onTasksChange?.(newPending);
-    message.success({ content: 'Progress saved!', duration: 2 });
+
+    if (statusSaved) {
+      message.success({ content: 'Progress saved!', duration: 2 });
+    } else {
+      message.error({ content: 'Could not save progress. Try again.', duration: 3 });
+      return;
+    }
 
     if (status === 'done') {
       const task = allTasksCombined.find(t => t.id === taskId);
@@ -931,6 +997,29 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
       )}
 
       {/* Time filter pills */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button
+          type="button"
+          onClick={() => { setSelectMode(m => !m); setSelectedTaskIds(new Set()); }}
+          style={{
+            padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.border}`,
+            background: selectMode ? `${C.primary}15` : C.bgCard,
+            color: selectMode ? C.primary : C.secondary, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+          }}
+        >
+          {selectMode ? 'Cancel select' : 'Select tasks'}
+        </button>
+        {selectMode && selectedTaskIds.size > 0 && (
+          <>
+            <button type="button" onClick={() => runBulkDelete('today')} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.border}`, background: C.bgCard, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+              Skip today ({selectedTaskIds.size})
+            </button>
+            <button type="button" onClick={() => runBulkDelete('forever')} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.tertiary}40`, background: `${C.tertiary}10`, color: C.tertiary, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+              Remove ({selectedTaskIds.size})
+            </button>
+          </>
+        )}
+      </div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
         {([
           { key: 'all',     label: 'All tasks' },
@@ -995,6 +1084,9 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                 isFirst={idx === 0}
                 onEditTask={t => handleEditAnyTask(t, goal.id)}
                 onAddSuggestedTask={handleAddSuggestedTask}
+                selectionMode={selectMode}
+                selectedTaskIds={selectedTaskIds}
+                onToggleTaskSelect={toggleTaskSelect}
               />
             </div>
           ))}
@@ -1019,7 +1111,9 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                     profileId={profile.id}
                     profileName={profile.name}
                     calendarDateKey={calendarDateKey}
-                    statusLocked
+                    selectionMode={selectMode}
+                    selected={selectedTaskIds.has(task.id)}
+                    onToggleSelect={() => toggleTaskSelect(task.id)}
                     onOpenUpdate={() => openTaskUpdate(task)}
                     onDelete={() => openDeleteTask(task)}
                     onEdit={() => handleEditAnyTask(task, undefined)}
@@ -1103,7 +1197,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
       <PageTour
         open={showTour}
         onClose={() => setShowTour(false)}
-        storageKey={TOUR_KEYS.tasks}
+        storageKey={tourStorageKey(TOUR_KEYS.tasks, profile.id)}
         pageLabel="Tasks"
         doneEmoji="✅"
         doneMessage="You know how Tasks work. Mark tasks done as you go - every checkmark builds your streak!"

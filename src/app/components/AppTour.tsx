@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Modal, Button } from 'antd';
 import { CloseOutlined } from '@ant-design/icons';
 import { C } from '../data/colors';
+import { getStorageKey } from '../data/environment';
 
 export const TOUR_KEYS = {
   home:     'arbol-tour-home-done',
@@ -12,6 +13,15 @@ export const TOUR_KEYS = {
   calendar: 'arbol-tour-calendar-done',
   checkIn:  'arbol-tour-checkin-done',
 };
+
+/** Per-profile, env-prefixed tour dismissal key. */
+export function tourStorageKey(baseKey: string, profileId: string): string {
+  return getStorageKey(`${baseKey}-${profileId}`);
+}
+
+export function coachStorageKey(profileId: string): string {
+  return getStorageKey(`arbol-coach-done-${profileId}`);
+}
 
 export type TourPlacement = 'top' | 'bottom' | 'left' | 'right' | 'auto';
 

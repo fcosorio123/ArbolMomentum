@@ -1,6 +1,6 @@
 import { Button } from 'antd';
 import { FireOutlined, RightOutlined, SettingOutlined } from '@ant-design/icons';
-import { PROFILES, type Profile, computeLiveStreak } from '../data/profiles';
+import { getActiveProfiles, type Profile, computeLiveStreak } from '../data/profiles';
 import { C } from '../data/colors';
 
 interface Props {
@@ -52,7 +52,7 @@ export function ProfileSelector({ onSelect, onAdmin }: Props) {
           Select your profile
         </p>
 
-        {PROFILES.map((profile) => (
+        {getActiveProfiles().map((profile) => (
           <button
             key={profile.id}
             onClick={() => onSelect(profile)}

@@ -117,6 +117,17 @@ export function createUserTask(profileId: string, data: Omit<UserTask, 'id' | 'p
   };
   saveUserTasks(profileId, [...tasks, task]);
   try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
+  import('./emailSettings').then(({ isEmailTypeEnabled }) => {
+    if (!isEmailTypeEnabled('taskCreatedEnabled')) return;
+    import('./emailNudges').then(({ requestEmailSend }) => {
+      requestEmailSend({
+        profileId,
+        type: 'task_created',
+        taskId: task.id,
+        taskLabel: task.label,
+      });
+    });
+  });
   return task;
 }
 

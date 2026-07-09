@@ -11,7 +11,10 @@ export type EmailNudgeType =
   | 'welcome'
   | 'smart_nudge'
   | 'task_completion'
-  | 'check_in_confirmation';
+  | 'check_in_confirmation'
+  | 'task_created'
+  | 'goal_updated'
+  | 'profile_archived';
 
 export interface EmailSendPayload {
   profileId: string;

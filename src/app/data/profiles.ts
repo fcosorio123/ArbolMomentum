@@ -1708,6 +1708,44 @@ export function getWeekPlanForProfile(profileId: string): Record<string, string[
 }
 
 // ──────────────────────────────────────────────
+// Profile archive (soft hide from active lists)
+// ──────────────────────────────────────────────
+const ARCHIVED_PROFILES_KEY = 'arbol-archived-profiles';
+
+export function getArchivedProfileIds(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(ARCHIVED_PROFILES_KEY) || '[]') as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
+export function isProfileArchived(profileId: string): boolean {
+  return getArchivedProfileIds().has(profileId);
+}
+
+export function setProfileArchived(profileId: string, archived: boolean): void {
+  const ids = getArchivedProfileIds();
+  if (archived) ids.add(profileId);
+  else ids.delete(profileId);
+  localStorage.setItem(ARCHIVED_PROFILES_KEY, JSON.stringify([...ids]));
+  if (archived) {
+    import('./emailSettings').then(({ isEmailTypeEnabled }) => {
+      if (!isEmailTypeEnabled('profileArchivedEnabled')) return;
+      import('./emailNudges').then(({ requestEmailSend }) => {
+        requestEmailSend({ profileId, type: 'profile_archived' });
+      });
+    });
+  }
+}
+
+export function getActiveProfiles(includeArchived = false): Profile[] {
+  if (includeArchived) return PROFILES;
+  const archived = getArchivedProfileIds();
+  return PROFILES.filter(p => !archived.has(p.id));
+}
+
+// ──────────────────────────────────────────────
 // Task state helpers
 // ──────────────────────────────────────────────
 export function getDateKey(date: Date): string {
@@ -1884,6 +1922,9 @@ export function permanentlyHideSeedTask(profileId: string, taskId: string) {
   hidden.add(taskId);
   localStorage.setItem(hiddenSeedStorageKey(profileId), JSON.stringify([...hidden]));
   purgeTaskLocalState(profileId, taskId);
+  import('./supabaseSync').then(({ syncTaskDeletion }) => {
+    syncTaskDeletion(profileId, taskId, 'permanent');
+  });
   import('./cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId));
   try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch { /* ignore */ }
   try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch { /* ignore */ }

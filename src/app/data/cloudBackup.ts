@@ -8,6 +8,18 @@ import { supabase } from '/utils/supabase/client';
 import { getStorageKey } from './environment';
 
 const FN = 'make-server-5d90ddf5';
+const PERSONAL_GOALS_KEY = (profileId: string) => `arbol-personal-goals-${profileId}`;
+const LEGACY_GOALS_KEY = (profileId: string) => `arbol-goals-${profileId}`;
+
+function readPersonalGoals(profileId: string): unknown {
+  const current = localStorage.getItem(PERSONAL_GOALS_KEY(profileId));
+  if (current) {
+    try { return JSON.parse(current); } catch { return null; }
+  }
+  const legacy = localStorage.getItem(LEGACY_GOALS_KEY(profileId));
+  if (!legacy) return null;
+  try { return JSON.parse(legacy); } catch { return null; }
+}
 
 // ── Collect all localStorage entries for a profile ──────────────────
 
@@ -43,9 +55,23 @@ function collectLocalData(profileId: string): Record<string, unknown> {
     try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; }
   };
 
+  const tourDismissals: Record<string, string> = {};
+  const tourBases = [
+    'arbol-tour-home-done', 'arbol-tour-goals-done', 'arbol-tour-tasks-done',
+    'arbol-tour-week-done', 'arbol-tour-calendar-done', 'arbol-tour-checkin-done',
+  ];
+  for (const base of tourBases) {
+    const k = getStorageKey(`${base}-${profileId}`);
+    const v = localStorage.getItem(k);
+    if (v) tourDismissals[k] = v;
+  }
+  const coachK = getStorageKey(`arbol-coach-done-${profileId}`);
+  const coachV = localStorage.getItem(coachK);
+  if (coachV) tourDismissals[coachK] = coachV;
+
   return {
     userTasks:      raw(`arbol-user-tasks-${profileId}`),
-    personalGoals:  raw(`arbol-goals-${profileId}`),
+    personalGoals:  readPersonalGoals(profileId),
     userCategories: raw(`arbol-user-cats-${profileId}`),
     goalsVersion:   localStorage.getItem(`arbol-goals-version-${profileId}`),
     goalLogs:       raw(`arbol-goal-logs-${profileId}`),
@@ -59,6 +85,7 @@ function collectLocalData(profileId: string): Record<string, unknown> {
     streakDays,
     taskNotes,
     taskBlocked,
+    tourDismissals,
     savedAt: Date.now(),
   };
 }
@@ -72,7 +99,7 @@ function applyLocalData(profileId: string, data: Record<string, unknown>): void 
   };
 
   write(`arbol-user-tasks-${profileId}`, data.userTasks);
-  write(`arbol-goals-${profileId}`, data.personalGoals);
+  write(PERSONAL_GOALS_KEY(profileId), data.personalGoals);
   write(`arbol-user-cats-${profileId}`, data.userCategories);
   write(`arbol-goal-logs-${profileId}`, data.goalLogs);
   write(`streak-best-${profileId}`, data.streakBest);
@@ -100,6 +127,7 @@ function applyLocalData(profileId: string, data: Record<string, unknown>): void 
   restoreMap(data.streakDays);
   restoreMap(data.taskNotes);
   restoreMap(data.taskBlocked);
+  restoreMap(data.tourDismissals);
 }
 
 // ── API calls ────────────────────────────────────────────────────────

@@ -17,6 +17,9 @@ export interface EmailSettings {
   smartNudgeEnabled: boolean;
   taskCompletionEnabled: boolean;
   checkInConfirmationEnabled: boolean;
+  taskCreatedEnabled: boolean;
+  goalUpdatedEnabled: boolean;
+  profileArchivedEnabled: boolean;
   triggerMode: EmailTriggerMode;
   fromName: string;
   replyTo: string;
@@ -31,6 +34,9 @@ const DEFAULTS: EmailSettings = {
   smartNudgeEnabled: true,
   taskCompletionEnabled: false,
   checkInConfirmationEnabled: true,
+  taskCreatedEnabled: false,
+  goalUpdatedEnabled: false,
+  profileArchivedEnabled: false,
   triggerMode: 'browser_aligned',
   fromName: 'Arbol Momentum',
   replyTo: '',
@@ -66,6 +72,7 @@ export function isEmailEnabled(): boolean {
 export function isEmailTypeEnabled(type: keyof Pick<
   EmailSettings,
   'welcomeEnabled' | 'smartNudgeEnabled' | 'taskCompletionEnabled' | 'checkInConfirmationEnabled'
+  | 'taskCreatedEnabled' | 'goalUpdatedEnabled' | 'profileArchivedEnabled'
 >): boolean {
   if (!cached.enabled) return false;
   return cached[type];

@@ -272,6 +272,106 @@ export function getDoneTaskCountToday(profileId: string, dateKey = getTodayKey()
   ).length;
 }
 
+/** Admin + analytics day rollup — same rules as the student dashboard. */
+export interface DayStats {
+  done: number;
+  inprogress: number;
+  /** Alias for AdminView */
+  inprog: number;
+  notStarted: number;
+  skipped: number;
+  removed: number;
+  /** @deprecated use removed — kept for AdminView compat */
+  deleted: number;
+  total: number;
+  pct: number;
+}
+
+/** Optional Supabase overlay for published admin (cross-device reads). */
+export interface RemoteDayOverlay {
+  completions?: Map<string, 'inprogress' | 'done'>;
+  skippedIds?: Set<string>;
+  permanentlyRemovedIds?: Set<string>;
+}
+
+export const PERMANENT_DELETION_DATE = 'permanent';
+
+function applyRemoteOverlay(rows: TodayTaskRow[], overlay: RemoteDayOverlay): TodayTaskRow[] {
+  return rows
+    .filter(row => !overlay.permanentlyRemovedIds?.has(row.id))
+    .map(row => {
+      if (overlay.permanentlyRemovedIds?.has(row.id)) return row;
+      if (overlay.skippedIds?.has(row.id)) {
+        return { ...row, status: 'skipped' as const, disposition: 'skipped' as const };
+      }
+      const remote = overlay.completions?.get(row.id);
+      if (remote) {
+        return { ...row, status: remote, disposition: 'active' as const };
+      }
+      return row;
+    })
+    .filter(row => row.disposition !== 'removed' || !overlay.permanentlyRemovedIds?.has(row.id));
+}
+
+export function buildRemoteDayOverlay(
+  profileId: string,
+  dateKey: string,
+  completions: { profile_id: string; task_id: string; date: string; status: string }[],
+  deletions: { profile_id: string; task_id: string; date: string }[],
+): RemoteDayOverlay {
+  const completionMap = new Map<string, 'inprogress' | 'done'>();
+  for (const c of completions) {
+    if (c.profile_id !== profileId || c.date !== dateKey) continue;
+    if (c.status === 'done' || c.status === 'inprogress') {
+      completionMap.set(c.task_id, c.status);
+    }
+  }
+  const skippedIds = new Set<string>();
+  const permanentlyRemovedIds = new Set<string>();
+  for (const d of deletions) {
+    if (d.profile_id !== profileId) continue;
+    if (d.date === PERMANENT_DELETION_DATE) {
+      permanentlyRemovedIds.add(d.task_id);
+    } else if (d.date === dateKey) {
+      skippedIds.add(d.task_id);
+    }
+  }
+  return { completions: completionMap, skippedIds, permanentlyRemovedIds };
+}
+
+export function computeDayStatsFromPersisted(
+  profileId: string,
+  dateKey: string,
+  overlay?: RemoteDayOverlay,
+): DayStats {
+  let rows = getTodayTaskRows(profileId, dateKey);
+  if (overlay) {
+    rows = applyRemoteOverlay(rows, overlay);
+    rows = rows.filter(r => r.disposition !== 'removed');
+  }
+
+  const countable = rows.filter(r => r.disposition === 'active');
+  const done = countable.filter(r => r.status === 'done').length;
+  const inprogress = countable.filter(r => r.status === 'inprogress').length;
+  const notStarted = countable.filter(r => r.status === null).length;
+  const skipped = rows.filter(r => r.disposition === 'skipped').length;
+  const removed = rows.filter(r => r.disposition === 'removed').length;
+  const total = countable.length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  return {
+    done,
+    inprogress,
+    inprog: inprogress,
+    notStarted,
+    skipped,
+    removed,
+    deleted: removed,
+    total,
+    pct,
+  };
+}
+
 /** OS app-icon badge: pending tasks unless daily check-in is done or nothing left. */
 export function getBadgeCount(profileId: string, dateKey = getTodayKey()): number {
   const pending = getPendingTaskCount(profileId, dateKey);
