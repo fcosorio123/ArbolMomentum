@@ -8,7 +8,7 @@ import {
   sendEmail,
   DEFAULT_EMAIL_SETTINGS,
 } from "./emailSend.ts";
-const app = new Hono();
+const app = new Hono().basePath("/make-server-5d90ddf5");
 
 // Enable logger
 app.use('*', logger(console.log));
