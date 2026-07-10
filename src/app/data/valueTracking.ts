@@ -72,6 +72,9 @@ export function getValueTracker(profileId: string): ValueTracker {
       tracker.monthStart = thisMonthStart;
     }
 
+    const key = `value-tracker-${profileId}`;
+    localStorage.setItem(key, JSON.stringify(tracker));
+
     return tracker;
   }
 

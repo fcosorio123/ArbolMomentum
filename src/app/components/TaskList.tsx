@@ -1141,7 +1141,6 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                     onOpenUpdate={() => openTaskUpdate(task)}
                     onDelete={() => openDeleteTask(task)}
                     onEdit={() => handleEditAnyTask(task, undefined)}
-                    statusLocked
                   />
                 ))}
             </div>

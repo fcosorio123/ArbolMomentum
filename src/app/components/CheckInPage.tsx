@@ -148,6 +148,8 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
     try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
   };
 
+  const allTasksReviewed = totalTasks === 0 || answeredIds.size >= totalTasks;
+
   const markDoneToday = () => {
     localStorage.setItem(`arbol-checkin-${profile.id}-${today}`, 'true');
     try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
@@ -169,14 +171,26 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
     });
   };
 
+  const finishCheckInFlow = (includeCurrentAsReviewed = false) => {
+    const reviewedIds = new Set(answeredIds);
+    if (includeCurrentAsReviewed && currentTask) reviewedIds.add(currentTask.id);
+    if (includeCurrentAsReviewed && currentTask && !answeredIds.has(currentTask.id)) {
+      setAnsweredIds(reviewedIds);
+    }
+    setScreen('processing');
+    setProcessingStep(0);
+    if (totalTasks === 0 || reviewedIds.size >= totalTasks) markDoneToday();
+  };
+
   const goNext = () => {
     setSlideDir('forward');
     if (taskIdx < allTasks.length - 1) {
+      if (currentTask && !answeredIds.has(currentTask.id)) {
+        setAnsweredIds(prev => new Set([...prev, currentTask.id]));
+      }
       setTaskIdx(i => i + 1);
     } else {
-      markDoneToday();
-      setScreen('processing');
-      setProcessingStep(0);
+      finishCheckInFlow(true);
     }
   };
 
@@ -188,9 +202,8 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
   };
 
   const skipToProcessing = () => {
-    markDoneToday();
-    setScreen('processing');
-    setProcessingStep(0);
+    if (!allTasksReviewed) return;
+    finishCheckInFlow();
   };
 
   // Processing auto-advance

@@ -4,7 +4,8 @@
 
 import { areNotificationsEnabled } from './appSettings';
 
-const NOTIF_ICON = '/icon-192.svg';
+const APP_BASE = import.meta.env.BASE_URL || '/';
+const NOTIF_ICON = `${APP_BASE}icon-192.svg`;
 const RECENT_TAG_MS = 90_000; // suppress duplicate tag within 90s
 
 const recentTags = new Map<string, number>();
@@ -34,7 +35,7 @@ export async function showNotification(
     body,
     tag,
     badgeCount: options?.badgeCount,
-    url: options?.url ?? '/',
+    url: options?.url ?? APP_BASE,
   };
 
   try {

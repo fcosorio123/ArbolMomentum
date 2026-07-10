@@ -2,6 +2,7 @@
 // Value Tracking (Reward System)
 // ──────────────────────────────────────────────
 import { getCustomProfiles, isRegisteredFreshProfile } from './customProfiles';
+import { calculateWeeklyStreak, calculateMonthlyStreak } from './streakCalculations';
 export interface ValueStats {
   money: number;      // ₱ saved/earned
   health: number;     // calories burned
@@ -2039,8 +2040,76 @@ export const BADGES: Badge[] = [
   { id: 'all-rounder',    icon: '🌿', name: 'All-Rounder',     desc: 'Thriving across all categories',     category: 'special',     check: p => p.completionRate >= 80 && p.joinedWeek >= 4 },
 ];
 
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function computeLiveCompletionRate(profileId: string, days = 30): number {
+  let totalPct = 0;
+  let activeDays = 0;
+  for (let i = 0; i < days; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateKey = getDateKey(d);
+    const dayName = DAY_NAMES[d.getDay()];
+    let total = 0;
+    let done = 0;
+    for (const cat of getTaskCategoriesForProfile(profileId, dayName)) {
+      for (const task of cat.tasks) {
+        if (!isTaskActiveForDate(profileId, task.id, dateKey)) continue;
+        const status = getTaskStatus(profileId, task.id, dateKey);
+        if (status === 'skipped') continue;
+        total++;
+        if (status === 'done') done++;
+      }
+    }
+    if (total > 0) {
+      totalPct += Math.round((done / total) * 100);
+      activeDays++;
+    }
+  }
+  return activeDays > 0 ? Math.round(totalPct / activeDays) : 0;
+}
+
+function computeJoinedWeeks(profileId: string): number {
+  let earliest: string | null = null;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key?.startsWith(`streak-${profileId}-`)) continue;
+    const dateKey = key.slice(`streak-${profileId}-`.length);
+    if (!earliest || dateKey < earliest) earliest = dateKey;
+  }
+  if (!earliest) return 1;
+  const first = new Date(`${earliest}T12:00:00`);
+  const weeks = Math.floor((Date.now() - first.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+  return Math.max(1, weeks);
+}
+
+function getLiveBadgeProfile(profile: Profile): Profile {
+  const todayKey = getTodayKey();
+  const dailyStreak = computeLiveStreak(profile.id, hasActivityOnDate(profile.id, todayKey));
+  const weeklyStreak = calculateWeeklyStreak(profile.id);
+  const monthlyStreak = calculateMonthlyStreak(profile.id);
+  let bestWeeklyStreak = weeklyStreak;
+  let bestMonthlyStreak = monthlyStreak;
+  try {
+    const stored = JSON.parse(localStorage.getItem(`streak-best-${profile.id}`) || 'null');
+    if (typeof stored?.weekly === 'number') bestWeeklyStreak = Math.max(bestWeeklyStreak, stored.weekly);
+    if (typeof stored?.monthly === 'number') bestMonthlyStreak = Math.max(bestMonthlyStreak, stored.monthly);
+  } catch { /* ignore */ }
+  return {
+    ...profile,
+    streak: dailyStreak,
+    bestStreak: Math.max(computeBestStreak(profile.id), dailyStreak),
+    weeklyStreak,
+    bestWeeklyStreak,
+    monthlyStreak,
+    bestMonthlyStreak,
+    completionRate: computeLiveCompletionRate(profile.id),
+    joinedWeek: computeJoinedWeeks(profile.id),
+  };
+}
+
 export function getEarnedBadges(profile: Profile): Badge[] {
-  return BADGES.filter(b => b.check(profile));
+  return BADGES.filter(b => b.check(getLiveBadgeProfile(profile)));
 }
 
 // ──────────────────────────────────────────────

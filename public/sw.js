@@ -24,14 +24,22 @@ function applyBadge(count) {
   else self.clearAppBadge().catch(() => {});
 }
 
+function assetUrl(file) {
+  return new URL(file, self.location.href).href;
+}
+
+function appEntryUrl() {
+  return new URL('./', self.location.href).href;
+}
+
 function showArbolNotification(title, body, tag, extra = {}) {
   return self.registration.showNotification(title, {
     body,
     tag: tag || 'arbol',
     renotify: false,
-    icon: '/icon-192.svg',
-    badge: '/icon-72.svg',
-    data: { url: extra.url || '/', tag: tag || 'arbol' },
+    icon: assetUrl('icon-192.svg'),
+    badge: assetUrl('icon-72.svg'),
+    data: { url: extra.url || appEntryUrl(), tag: tag || 'arbol' },
     ...extra,
   });
 }
@@ -42,7 +50,7 @@ self.addEventListener('push', e => {
     body: 'Time to keep your college funding momentum going!',
     tag: 'arbol-push',
     badgeCount: 0,
-    url: '/',
+    url: appEntryUrl(),
   };
   try {
     if (e.data) d = { ...d, ...e.data.json() };
@@ -59,7 +67,7 @@ self.addEventListener('push', e => {
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  const url = e.notification.data?.url || '/';
+  const url = e.notification.data?.url || appEntryUrl();
   const tag = e.notification.data?.tag || 'arbol';
 
   e.waitUntil(
@@ -78,7 +86,7 @@ self.addEventListener('message', e => {
   if (t === 'SHOW') {
     const { title, body, tag, badgeCount, url } = e.data;
     e.waitUntil(
-      showArbolNotification(title, body, tag, { data: { url: url || '/', tag } })
+      showArbolNotification(title, body, tag, { data: { url: url || appEntryUrl(), tag } })
         .then(() => {
           if (typeof badgeCount === 'number') applyBadge(badgeCount);
         })

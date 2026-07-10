@@ -337,7 +337,6 @@ export default function App() {
     if (!activeProfile) return;
     const sessionKey = `arbol-restore-attempted-${activeProfile.id}`;
     if (sessionStorage.getItem(sessionKey)) return;
-    sessionStorage.setItem(sessionKey, 'true');
 
     const profileId = activeProfile.id;
 
@@ -351,6 +350,7 @@ export default function App() {
 
     import('./data/cloudBackup').then(({ syncProfileFromCloud }) => {
       syncProfileFromCloud(profileId).then(result => {
+        sessionStorage.setItem(sessionKey, 'true');
         if (result === 'full-restore') {
           window.location.reload();
           return;
@@ -377,18 +377,19 @@ export default function App() {
   }, [activeProfile?.id]);
 
 
-  // ── Daily summary: auto-show on launch
+  // ── Daily summary: auto-show on launch (after coach marks, not during)
   useEffect(() => {
     if (!activeProfile) return;
+    if (showCoach) return;
     if (!isSummaryEnabled(activeProfile.id)) return;
     if (wasSummaryShownToday(activeProfile.id)) return;
     const t = setTimeout(() => {
+      if (showCoach) return;
       setSummaryDataVersion(v => v + 1);
-      markSummaryShownToday(activeProfile.id);
       setShowDailySummary(true);
     }, 800);
     return () => clearTimeout(t);
-  }, [activeProfile?.id]);
+  }, [activeProfile?.id, showCoach]);
 
   // ── Keep summary modal in sync with task/goal changes
   useEffect(() => {
@@ -602,7 +603,6 @@ export default function App() {
           onSwitch={() => {
             try { localStorage.removeItem('arbol-active-profile'); } catch {}
             setActiveProfile(null);
-            setProfileSelectorUnlocked(false);
           }}
           onAdmin={() => setShowAdmin(true)}
           onAlerts={() => setActiveTab('reminders')}
@@ -671,8 +671,15 @@ export default function App() {
             open={showDailySummary}
             profile={activeProfile}
             dataVersion={summaryDataVersion}
-            onClose={() => setShowDailySummary(false)}
-            onStartTasks={() => { setShowDailySummary(false); setActiveTab('tasks'); }}
+            onClose={() => {
+              markSummaryShownToday(activeProfile.id);
+              setShowDailySummary(false);
+            }}
+            onStartTasks={() => {
+              markSummaryShownToday(activeProfile.id);
+              setShowDailySummary(false);
+              setActiveTab('tasks');
+            }}
           />
 
           {/* Feedback modal */}

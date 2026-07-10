@@ -537,7 +537,16 @@ export function PageTour({
     scrollPageToTop(anchor);
     setCurrent(0);
     if (resolved.length === 0) {
-      onClose();
+      const timers: ReturnType<typeof setTimeout>[] = [];
+      timers.push(setTimeout(() => {
+        if (dismissed.current) return;
+        if (refreshSteps().length > 0) return;
+        timers.push(setTimeout(() => {
+          if (dismissed.current) return;
+          if (refreshSteps().length === 0) onClose();
+        }, 1500));
+      }, 400));
+      return () => timers.forEach(clearTimeout);
     }
   }, [open, refreshSteps, onClose]);
 
