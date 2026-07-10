@@ -3,7 +3,7 @@ import { Button } from 'antd';
 import {
   FireOutlined, DownloadOutlined, ArrowRightOutlined,
 } from '@ant-design/icons';
-import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey } from './AppTour';
+import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile } from './AppTour';
 import type { Profile } from '../data/profiles';
 import {
   getDateKey, hasActivityOnDate, getEarnedBadges, BADGES,
@@ -167,14 +167,16 @@ export function Dashboard({
 
   useEffect(() => {
     if (!isActive || !canStartPageTours || isLoading) return;
+    if (areToursDismissedForProfile(profile.id)) return;
     if (localStorage.getItem(tourStorageKey(TOUR_KEYS.home, profile.id))) return;
     const t = setTimeout(() => setShowTour(true), 600);
     return () => clearTimeout(t);
-  }, [isActive, canStartPageTours, isLoading]);
+  }, [isActive, canStartPageTours, isLoading, profile.id]);
 
   // Goal Check-In tour — after Welcome, Summary, Home tour, and Tasks tour
   useEffect(() => {
     if (!isActive || !canStartPageTours || isLoading) return;
+    if (areToursDismissedForProfile(profile.id)) return;
     if (localStorage.getItem(tourStorageKey(TOUR_KEYS.checkIn, profile.id))) return;
     if (!localStorage.getItem(tourStorageKey(TOUR_KEYS.home, profile.id))) return;
     if (!localStorage.getItem(tourStorageKey(TOUR_KEYS.tasks, profile.id))) return;
@@ -600,6 +602,7 @@ export function Dashboard({
         open={showTour}
         onClose={() => setShowTour(false)}
         storageKey={tourStorageKey(TOUR_KEYS.home, profile.id)}
+        profileId={profile.id}
         pageLabel="Home"
         doneEmoji="🏠"
         doneMessage="You've got the Home screen down. Check your streak every day to build momentum!"
@@ -636,6 +639,7 @@ export function Dashboard({
         open={showCheckInTour}
         onClose={() => setShowCheckInTour(false)}
         storageKey={tourStorageKey(TOUR_KEYS.checkIn, profile.id)}
+        profileId={profile.id}
         pageLabel="Goal Check-In"
         doneEmoji="🔴"
         doneMessage="Use Start Check-in on the banner whenever you need to reflect on today's progress."

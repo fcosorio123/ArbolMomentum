@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Progress, Modal, Button } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, ArrowRightOutlined } from '@ant-design/icons';
-import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey } from './AppTour';
+import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile } from './AppTour';
 import { CongratModal } from './CongratModal';
 import {
   getPersonalGoals, createUserGoal, updateUserGoal, deleteUserGoal,
@@ -173,11 +173,12 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
 
   // Auto-start goals tour on first visit to this page
   useEffect(() => {
+    if (areToursDismissedForProfile(profile.id)) return;
     if (!localStorage.getItem(tourStorageKey(TOUR_KEYS.goals, profile.id))) {
       const t = setTimeout(() => setShowTour(true), 700);
       return () => clearTimeout(t);
     }
-  }, []);
+  }, [profile.id]);
 
   const handleSaveGoal = (data: { title: string; deepWhy: string }) => {
     if (editingGoal) {
@@ -507,6 +508,7 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
         open={showTour}
         onClose={() => setShowTour(false)}
         storageKey={tourStorageKey(TOUR_KEYS.goals, profile.id)}
+        profileId={profile.id}
         pageLabel="Goals"
         doneEmoji="🎯"
         doneMessage="You're ready to set and track goals. A goal without tasks is just a wish - add tasks to make it real!"

@@ -75,6 +75,9 @@ function collectLocalData(profileId: string): Record<string, unknown> {
   const coachK = getStorageKey(`arbol-coach-done-${profileId}`);
   const coachV = localStorage.getItem(coachK);
   if (coachV) tourDismissals[coachK] = coachV;
+  const allToursK = getStorageKey(`arbol-tours-all-dismissed-${profileId}`);
+  const allToursV = localStorage.getItem(allToursK);
+  if (allToursV) tourDismissals[allToursK] = allToursV;
 
   return {
     userTasks:      raw(`arbol-user-tasks-${profileId}`),

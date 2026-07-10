@@ -22,7 +22,7 @@ import {
   type CalendarExportPrefs,
 } from '../data/calendarExport';
 import { useCalendarExport } from '../hooks/useCalendarExport';
-import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey } from './AppTour';
+import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile } from './AppTour';
 
 interface Props {
   profile: Profile;
@@ -63,11 +63,12 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
   }, []);
 
   useEffect(() => {
+    if (areToursDismissedForProfile(profile.id)) return;
     if (!localStorage.getItem(tourStorageKey(TOUR_KEYS.calendar, profile.id))) {
       const t = setTimeout(() => setShowTour(true), 700);
       return () => clearTimeout(t);
     }
-  }, []);
+  }, [profile.id]);
 
   const weekEvents = useMemo(
     () => prepareWeekCalendarExport(profile.id, profile.name).events,
@@ -375,6 +376,7 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
         open={showTour}
         onClose={() => setShowTour(false)}
         storageKey={tourStorageKey(TOUR_KEYS.calendar, profile.id)}
+        profileId={profile.id}
         pageLabel="Calendar"
         doneEmoji="📅"
         doneMessage="You're set! Sync tasks to your phone calendar and get reminders even when Arbol is closed."

@@ -21,7 +21,7 @@ import { ManageTaskModal } from './ManageTaskModal';
 import { DeleteTaskModal, type DeleteTaskChoice } from './DeleteTaskModal';
 import { C } from '../data/colors';
 import { trackActivity } from '../data/feedback';
-import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey } from './AppTour';
+import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile } from './AppTour';
 import { CongratModal } from './CongratModal';
 import { MomentumUpdateModal } from './MomentumUpdateModal';
 import { TaskUpdateModal, type TaskUpdateContext } from './TaskUpdateModal';
@@ -634,11 +634,12 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
 
   // Auto-start tasks tour on first visit
   useEffect(() => {
+    if (areToursDismissedForProfile(profile.id)) return;
     if (!localStorage.getItem(tourStorageKey(TOUR_KEYS.tasks, profile.id))) {
       const t = setTimeout(() => setShowTour(true), 700);
       return () => clearTimeout(t);
     }
-  }, []);
+  }, [profile.id]);
 
   const confirmDelete = () => {
     if (!deleteTarget) return;
@@ -1222,6 +1223,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
         open={showTour}
         onClose={() => setShowTour(false)}
         storageKey={tourStorageKey(TOUR_KEYS.tasks, profile.id)}
+        profileId={profile.id}
         pageLabel="Tasks"
         doneEmoji="✅"
         doneMessage="You know how Tasks work. Mark tasks done as you go - every checkmark builds your streak!"

@@ -14,7 +14,7 @@ import { CheckInPage } from './components/CheckInPage';
 
 import { BottomNav } from './components/BottomNav';
 import { CoachMarks } from './components/CoachMarks';
-import { coachStorageKey } from './components/AppTour';
+import { coachStorageKey, dismissAllToursForProfile, areToursDismissedForProfile } from './components/AppTour';
 import { AddToHomeScreen } from './components/AddToHomeScreen';
 import { CelebrationModal } from './components/CelebrationModal';
 import { DailySummaryModal, isSummaryEnabled, markSummaryShownToday, wasSummaryShownToday } from './components/DailySummaryModal';
@@ -365,10 +365,16 @@ export default function App() {
 
   // ── Coach marks for first-time users
   useEffect(() => {
-    if (activeProfile && !localStorage.getItem(coachStorageKey(activeProfile.id))) {
-      setTimeout(() => setShowCoach(true), 600);
-    }
-  }, [activeProfile]);
+    if (!activeProfile) return;
+    if (areToursDismissedForProfile(activeProfile.id)) return;
+    if (localStorage.getItem(coachStorageKey(activeProfile.id))) return;
+    const t = setTimeout(() => {
+      if (areToursDismissedForProfile(activeProfile.id)) return;
+      if (localStorage.getItem(coachStorageKey(activeProfile.id))) return;
+      setShowCoach(true);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [activeProfile?.id]);
 
 
   // ── Daily summary: auto-show on launch
@@ -478,7 +484,7 @@ export default function App() {
 
   const handleCoachDone = () => {
     setShowCoach(false);
-    localStorage.setItem(coachStorageKey(activeProfile!.id), 'true');
+    if (activeProfile) dismissAllToursForProfile(activeProfile.id);
   };
 
   if (showAdmin) {

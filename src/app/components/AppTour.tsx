@@ -23,6 +23,31 @@ export function coachStorageKey(profileId: string): string {
   return getStorageKey(`arbol-coach-done-${profileId}`);
 }
 
+const TOURS_ALL_DISMISSED_BASE = 'arbol-tours-all-dismissed';
+
+export function allToursDismissedKey(profileId: string): string {
+  return getStorageKey(`${TOURS_ALL_DISMISSED_BASE}-${profileId}`);
+}
+
+/** True when user skipped all tours or every per-page tour + coach marks are done. */
+export function areToursDismissedForProfile(profileId: string): boolean {
+  if (localStorage.getItem(allToursDismissedKey(profileId))) return true;
+  if (!localStorage.getItem(coachStorageKey(profileId))) return false;
+  return Object.values(TOUR_KEYS).every(
+    key => !!localStorage.getItem(tourStorageKey(key, profileId)),
+  );
+}
+
+/** Skip every coach mark and page tour for this profile (persists + cloud backup). */
+export function dismissAllToursForProfile(profileId: string): void {
+  localStorage.setItem(allToursDismissedKey(profileId), 'true');
+  localStorage.setItem(coachStorageKey(profileId), 'true');
+  for (const base of Object.values(TOUR_KEYS)) {
+    localStorage.setItem(tourStorageKey(base, profileId), 'true');
+  }
+  import('../data/cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId));
+}
+
 export type TourPlacement = 'top' | 'bottom' | 'left' | 'right' | 'auto';
 
 export interface PageTourStep {
@@ -470,6 +495,7 @@ interface PageTourProps {
   steps: PageTourStep[];
   pageLabel: string;
   storageKey: string;
+  profileId: string;
   doneEmoji?: string;
   doneMessage?: string;
   onInteract?: () => void;
@@ -479,7 +505,7 @@ interface PageTourProps {
 }
 
 export function PageTour({
-  open, onClose, steps, pageLabel, storageKey,
+  open, onClose, steps, pageLabel, storageKey, profileId,
   doneEmoji = '✅', doneMessage,
   onInteract, interactLabel = 'Try it now →',
   sortTopToBottom = true,
@@ -592,7 +618,13 @@ export function PageTour({
     if (showCompletion) setTimeout(() => setShowDone(true), 120);
   };
 
-  const handleSkip = () => persistDismiss(false);
+  const handleSkip = () => {
+    if (dismissed.current) return;
+    dismissed.current = true;
+    dismissAllToursForProfile(profileId);
+    localStorage.setItem(storageKey, 'true');
+    onClose();
+  };
 
   const handleNext = () => {
     const isLast = current >= activeSteps.length - 1;
