@@ -26,12 +26,12 @@ app.use(
 );
 
 // Health check endpoint
-app.get("/make-server-5d90ddf5/health", (c) => {
+app.get("/health", (c) => {
   return c.json({ status: "ok" });
 });
 
 // Save a full profile backup
-app.post("/make-server-5d90ddf5/backup/:profileId", async (c) => {
+app.post("/backup/:profileId", async (c) => {
   const profileId = c.req.param("profileId");
   try {
     const payload = await c.req.json();
@@ -44,7 +44,7 @@ app.post("/make-server-5d90ddf5/backup/:profileId", async (c) => {
 });
 
 // Fetch the latest profile backup
-app.get("/make-server-5d90ddf5/backup/:profileId", async (c) => {
+app.get("/backup/:profileId", async (c) => {
   const profileId = c.req.param("profileId");
   try {
     const data = await kv.get(`arbol-backup-${profileId}`);
@@ -58,7 +58,7 @@ app.get("/make-server-5d90ddf5/backup/:profileId", async (c) => {
 
 
 // Global app notification settings
-app.get("/make-server-5d90ddf5/app-settings", async (c) => {
+app.get("/app-settings", async (c) => {
   try {
     const data = await kv.get("arbol-app-settings");
     if (!data) return c.json({ ok: true, data: null });
@@ -69,7 +69,7 @@ app.get("/make-server-5d90ddf5/app-settings", async (c) => {
   }
 });
 
-app.post("/make-server-5d90ddf5/app-settings", async (c) => {
+app.post("/app-settings", async (c) => {
   try {
     const payload = await c.req.json();
     await kv.set("arbol-app-settings", payload);
@@ -81,7 +81,7 @@ app.post("/make-server-5d90ddf5/app-settings", async (c) => {
 });
 
 // Live Check-In Feedback settings
-app.get("/make-server-5d90ddf5/live-check-in-settings", async (c) => {
+app.get("/live-check-in-settings", async (c) => {
   try {
     const data = await kv.get("arbol-live-check-in-settings");
     if (!data) return c.json({ ok: true, data: null });
@@ -92,7 +92,7 @@ app.get("/make-server-5d90ddf5/live-check-in-settings", async (c) => {
   }
 });
 
-app.post("/make-server-5d90ddf5/live-check-in-settings", async (c) => {
+app.post("/live-check-in-settings", async (c) => {
   try {
     const payload = await c.req.json();
     await kv.set("arbol-live-check-in-settings", payload);
@@ -104,7 +104,7 @@ app.post("/make-server-5d90ddf5/live-check-in-settings", async (c) => {
 });
 
 // Email notification settings
-app.get("/make-server-5d90ddf5/email-settings", async (c) => {
+app.get("/email-settings", async (c) => {
   try {
     const data = await getEmailSettings();
     return c.json({ ok: true, data });
@@ -114,7 +114,7 @@ app.get("/make-server-5d90ddf5/email-settings", async (c) => {
   }
 });
 
-app.post("/make-server-5d90ddf5/email-settings", async (c) => {
+app.post("/email-settings", async (c) => {
   try {
     const payload = await c.req.json();
     await saveEmailSettings({ ...DEFAULT_EMAIL_SETTINGS, ...payload, updatedAt: Date.now() });
@@ -126,7 +126,7 @@ app.post("/make-server-5d90ddf5/email-settings", async (c) => {
 });
 
 // Send one email (client triggers + admin manual)
-app.post("/make-server-5d90ddf5/send-email", async (c) => {
+app.post("/send-email", async (c) => {
   try {
     const payload = await c.req.json();
     const result = await sendEmail(payload);
@@ -138,7 +138,7 @@ app.post("/make-server-5d90ddf5/send-email", async (c) => {
 });
 
 // Admin test email
-app.post("/make-server-5d90ddf5/send-test-email", async (c) => {
+app.post("/send-test-email", async (c) => {
   try {
     const settings = await getEmailSettings();
     const body = await c.req.json().catch(() => ({}));
@@ -160,7 +160,7 @@ app.post("/make-server-5d90ddf5/send-test-email", async (c) => {
 });
 
 // V2 stub - requires external cron
-app.post("/make-server-5d90ddf5/run-daily-email-nudges", async (c) => {
+app.post("/run-daily-email-nudges", async (c) => {
   return c.json({
     ok: false,
     reason: "requires_cron",
@@ -169,7 +169,7 @@ app.post("/make-server-5d90ddf5/run-daily-email-nudges", async (c) => {
 });
 
 // Web Push subscription registration
-app.post("/make-server-5d90ddf5/register-push", async (c) => {
+app.post("/register-push", async (c) => {
   try {
     const { profileId, subscription, tzOffset } = await c.req.json();
     if (!profileId || !subscription?.endpoint) {
@@ -185,7 +185,7 @@ app.post("/make-server-5d90ddf5/register-push", async (c) => {
 });
 
 // Cron: run push nudges for a profile (Authorization: Bearer CRON_SECRET)
-app.post("/make-server-5d90ddf5/run-push-nudges", async (c) => {
+app.post("/run-push-nudges", async (c) => {
   try {
     const secret = Deno.env.get("CRON_SECRET")?.trim();
     const auth = c.req.header("Authorization")?.replace(/^Bearer\s+/i, "");
@@ -207,7 +207,7 @@ app.post("/make-server-5d90ddf5/run-push-nudges", async (c) => {
 });
 
 // VAPID public key for client subscribe (safe to expose)
-app.get("/make-server-5d90ddf5/push-vapid-key", (c) => {
+app.get("/push-vapid-key", (c) => {
   const publicKey = Deno.env.get("VAPID_PUBLIC_KEY")?.trim() ?? "";
   return c.json({ ok: !!publicKey, publicKey });
 });

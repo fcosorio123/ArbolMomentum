@@ -84,6 +84,8 @@ function updateAppBadge(count: number) {
   } catch { /* ignore */ }
 }
 
+const SELECTOR_UNLOCK_KEY = 'arbol-selector-unlocked';
+
 export default function App() {
   const [activeProfile, setActiveProfile] = useState<Profile | null>(() => {
     try {
@@ -92,7 +94,13 @@ export default function App() {
     } catch {}
     return null;
   });
-  const [profileSelectorUnlocked, setProfileSelectorUnlocked] = useState(false);
+  const [profileSelectorUnlocked, setProfileSelectorUnlocked] = useState(() => {
+    try {
+      if (sessionStorage.getItem(SELECTOR_UNLOCK_KEY) === 'true') return true;
+      if (localStorage.getItem('arbol-active-profile')) return true;
+    } catch {}
+    return false;
+  });
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [showAdmin, setShowAdmin] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -383,8 +391,10 @@ export default function App() {
     if (showCoach) return;
     if (!isSummaryEnabled(activeProfile.id)) return;
     if (wasSummaryShownToday(activeProfile.id)) return;
+    const profileId = activeProfile.id;
     const t = setTimeout(() => {
       if (showCoach) return;
+      if (!areToursDismissedForProfile(profileId) && !localStorage.getItem(coachStorageKey(profileId))) return;
       setSummaryDataVersion(v => v + 1);
       setShowDailySummary(true);
     }, 800);
@@ -507,6 +517,11 @@ export default function App() {
   }
 
 
+  const unlockProfileSelector = () => {
+    setProfileSelectorUnlocked(true);
+    try { sessionStorage.setItem(SELECTOR_UNLOCK_KEY, 'true'); } catch {}
+  };
+
   if (!activeProfile) {
     if (!profileSelectorUnlocked) {
       return (
@@ -515,11 +530,11 @@ export default function App() {
             {isDesktop ? (
               <div style={{ minHeight: '100dvh', background: C.bgAlt, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ width: '100%', maxWidth: 480, background: C.bg, borderRadius: 24, overflow: 'hidden', boxShadow: '0 8px 48px rgba(9,64,103,0.13)' }}>
-                  <AccessCodeGate onUnlock={() => setProfileSelectorUnlocked(true)} />
+                  <AccessCodeGate onUnlock={unlockProfileSelector} />
                 </div>
               </div>
             ) : (
-              <AccessCodeGate onUnlock={() => setProfileSelectorUnlocked(true)} />
+              <AccessCodeGate onUnlock={unlockProfileSelector} />
             )}
           </AntdApp>
         </ConfigProvider>
