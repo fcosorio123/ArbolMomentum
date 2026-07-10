@@ -25,65 +25,39 @@ const GOAL_THEMES: Array<{
   keywords: RegExp;
   title: string;
   deepWhy: string;
-  defaultTasks: Array<{ label: string; timeOfDay: 'morning' | 'evening'; type: TaskType }>;
 }> = [
   {
     keywords: /fafsa|financial aid|bursar|tuition|scholarship|aid compliance/i,
     title: 'Financial Aid & Compliance',
     deepWhy: 'Staying on top of aid deadlines and requirements protects your funding and peace of mind.',
-    defaultTasks: [
-      { label: 'Review bursar / tuition balance', timeOfDay: 'morning', type: 'priority' },
-      { label: 'Check financial aid portal for updates', timeOfDay: 'evening', type: 'routine' },
-      { label: 'Submit pending aid documents', timeOfDay: 'morning', type: 'priority' },
-    ],
   },
   {
     keywords: /budget|expense|save|savings|money|spending|financial/i,
     title: 'Budget & Savings',
     deepWhy: 'Small daily money habits compound into real financial security over the semester.',
-    defaultTasks: [
-      { label: 'Track daily expenses', timeOfDay: 'evening', type: 'routine' },
-      { label: 'Review weekly budget', timeOfDay: 'morning', type: 'goal' },
-      { label: 'Transfer savings if possible', timeOfDay: 'morning', type: 'goal' },
-    ],
   },
   {
     keywords: /exercise|workout|gym|run|walk|fitness|mwf|health/i,
     title: 'Health & Fitness',
     deepWhy: 'Moving your body regularly improves focus, energy, and long-term wellness.',
-    defaultTasks: [
-      { label: 'Exercise session', timeOfDay: 'morning', type: 'routine' },
-      { label: 'Drink enough water today', timeOfDay: 'evening', type: 'routine' },
-      { label: 'Stretch or mobility break', timeOfDay: 'evening', type: 'routine' },
-    ],
   },
   {
     keywords: /study|homework|class|exam|read|learn|academic|assignment/i,
     title: 'Academics',
     deepWhy: 'Consistent study blocks keep you ahead of deadlines and reduce last-minute stress.',
-    defaultTasks: [
-      { label: 'Complete assigned readings', timeOfDay: 'morning', type: 'priority' },
-      { label: 'Review class notes', timeOfDay: 'evening', type: 'routine' },
-      { label: 'Work on assignments', timeOfDay: 'evening', type: 'priority' },
-    ],
   },
   {
     keywords: /job|career|intern|apply|interview|resume|linkedin/i,
     title: 'Career & Work',
     deepWhy: 'Steady career actions build momentum toward opportunities you actually want.',
-    defaultTasks: [
-      { label: 'Apply to new opportunities', timeOfDay: 'morning', type: 'priority' },
-      { label: 'Update job application tracker', timeOfDay: 'evening', type: 'routine' },
-      { label: 'Practice interview questions', timeOfDay: 'evening', type: 'routine' },
-    ],
   },
 ];
 
 function splitLines(text: string): string[] {
   return text
-    .split(/\n|(?:^|\s)[•\-*]\s+/)
+    .split(/\n|(?:^|\s)[•\-*]\s+|(?:[,;]\s+)/)
     .map(l => l.replace(/^\d+[\.\)]\s*/, '').trim())
-    .filter(Boolean);
+    .filter(l => l.length >= 3);
 }
 
 function detectRecurrence(line: string): Recurrence {
@@ -132,7 +106,9 @@ function inferTaskType(line: string): TaskType {
 
 function cleanTaskLabel(line: string): string {
   return line
-    .replace(/\b(daily|weekly|monthly|mwf|every day|every week)\b/gi, '')
+    .replace(/\s+\b(daily|weekly|monthly|mwf|tuth|every day|every week|each week|each month)\s*$/i, '')
+    .replace(/\s+\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s*$/i, '')
+    .replace(/[.!?]+$/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/^./, c => c.toUpperCase());
@@ -148,88 +124,67 @@ function nextId(prefix: string) {
   return `${prefix}-${_id}`;
 }
 
-/** Parse free-text goals into editable suggestion groups. */
+function makeTask(line: string, label: string, recurrence: Recurrence): SeedTaskSuggestion {
+  return {
+    id: nextId('task'),
+    label,
+    timeOfDay: inferTimeOfDay(line),
+    type: inferTaskType(line),
+    recurrence,
+    selected: true,
+  };
+}
+
+function findOrCreateThemeGroup(
+  groups: SeedSuggestionGroup[],
+  theme: (typeof GOAL_THEMES)[number],
+): SeedSuggestionGroup {
+  let group = groups.find(g => g.goal.title === theme.title);
+  if (!group) {
+    group = {
+      id: nextId('goal'),
+      goal: { title: theme.title, deepWhy: theme.deepWhy },
+      selected: true,
+      tasks: [],
+    };
+    groups.push(group);
+  }
+  return group;
+}
+
+/** Parse free-text goals into editable suggestion groups (user input only, no bundled defaults). */
 export function parseGoalInput(text: string): SeedSuggestionGroup[] {
   _id = 0;
   const lines = splitLines(text);
   if (lines.length === 0) return [];
 
   const groups: SeedSuggestionGroup[] = [];
-  const usedThemes = new Set<string>();
 
   for (const line of lines) {
     const theme = matchTheme(line);
     const recurrence = detectRecurrence(line);
     const label = cleanTaskLabel(line);
+    if (label.length < 4) continue;
 
-    if (theme && !usedThemes.has(theme.title)) {
-      usedThemes.add(theme.title);
-      groups.push({
-        id: nextId('goal'),
-        goal: { title: theme.title, deepWhy: theme.deepWhy },
-        selected: true,
-        tasks: theme.defaultTasks.map(t => ({
-          id: nextId('task'),
-          label: t.label,
-          timeOfDay: t.timeOfDay,
-          type: t.type,
-          recurrence: detectRecurrence(t.label),
-          selected: true,
-        })),
-      });
-    }
-
-    if (label.length >= 4) {
-      const goalTitle = theme?.title ?? 'Personal Goals';
-      let group = groups.find(g => g.goal.title === goalTitle);
-      if (!group) {
-        group = {
-          id: nextId('goal'),
-          goal: {
-            title: goalTitle,
-            deepWhy: theme?.deepWhy ?? 'Goals you defined when creating this profile.',
-          },
-          selected: true,
-          tasks: [],
-        };
-        groups.push(group);
-        usedThemes.add(goalTitle);
-      }
-
+    if (theme) {
+      const group = findOrCreateThemeGroup(groups, theme);
       const duplicate = group.tasks.some(t => t.label.toLowerCase() === label.toLowerCase());
       if (!duplicate) {
-        group.tasks.push({
-          id: nextId('task'),
-          label,
-          timeOfDay: inferTimeOfDay(line),
-          type: inferTaskType(line),
-          recurrence,
-          selected: true,
-        });
+        group.tasks.push(makeTask(line, label, recurrence));
       }
+      continue;
     }
-  }
 
-  if (groups.length === 0) {
+    // Unmatched lines become their own concise goal + single task
     groups.push({
       id: nextId('goal'),
-      goal: {
-        title: 'My Goals',
-        deepWhy: 'Custom goals based on what you described.',
-      },
+      goal: { title: label, deepWhy: 'A goal you set when creating this profile.' },
       selected: true,
-      tasks: lines.map(line => ({
-        id: nextId('task'),
-        label: cleanTaskLabel(line),
-        timeOfDay: inferTimeOfDay(line),
-        type: inferTaskType(line),
-        recurrence: detectRecurrence(line),
-        selected: true,
-      })),
+      tasks: [makeTask(line, label, recurrence)],
     });
   }
 
-  return groups.filter(g => g.tasks.length > 0 || g.selected);
+  return groups.filter(g => g.tasks.length > 0);
 }
 
 export function recurrenceSummary(recurrence: Recurrence): string {

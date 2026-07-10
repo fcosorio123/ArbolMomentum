@@ -1,7 +1,7 @@
 // ──────────────────────────────────────────────
 // Value Tracking (Reward System)
 // ──────────────────────────────────────────────
-import { getCustomProfiles, isRegisteredFreshProfile } from './customProfiles';
+import { getCustomProfiles, isRegisteredFreshProfile, isUserDefinedProfile } from './customProfiles';
 import { calculateWeeklyStreak, calculateMonthlyStreak } from './streakCalculations';
 export interface ValueStats {
   money: number;      // ₱ saved/earned
@@ -1651,7 +1651,7 @@ export function getTaskCategoriesForProfile(
   dayName?: string,
   includeHidden = false,
 ): TaskCategory[] {
-  if (isFreshProfile(profileId)) return [];
+  if (isFreshProfile(profileId) || isUserDefinedProfile(profileId)) return [];
   const day = dayName ?? getTodayDayName();
   let categories: TaskCategory[];
   switch (profileId) {
@@ -1673,7 +1673,7 @@ export function getAllTasks(): Task[] {
 }
 
 export function getAllTasksForProfile(profileId: string): Task[] {
-  if (isFreshProfile(profileId)) return [];
+  if (isFreshProfile(profileId) || isUserDefinedProfile(profileId)) return [];
   const hidden = getPermanentlyHiddenSeedTaskIds(profileId);
   let tasks: Task[];
   switch (profileId) {

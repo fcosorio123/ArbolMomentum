@@ -68,6 +68,11 @@ export function getCustomProfileMeta(profileId: string): CustomProfileMeta | und
   return readMetas().find(p => p.id === profileId);
 }
 
+/** Custom profiles (fresh or seeded) never use built-in demo task seeds. */
+export function isUserDefinedProfile(profileId: string): boolean {
+  return !!getCustomProfileMeta(profileId);
+}
+
 function slugify(name: string): string {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   return slug.slice(0, 28) || 'profile';

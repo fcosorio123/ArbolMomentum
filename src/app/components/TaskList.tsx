@@ -5,8 +5,9 @@ import {
   type Profile, type Task, type TaskStatus,
   getTaskCategoriesForProfile, getTaskStatus, setTaskStatus,
   skipTaskForToday, permanentlyHideSeedTask, getTodayKey, getPermanentlyHiddenSeedTaskIds,
-  getEarnedBadges, type Badge,
+  getEarnedBadges, type Badge, isFreshProfile,
 } from '../data/profiles';
+import { isUserDefinedProfile } from '../data/customProfiles';
 import {
   getPersonalGoals,
   type PersonalGoal,
@@ -330,7 +331,7 @@ function goalAccentColor(goalId: string) {
 function GoalGroup({
   goal, tasks, statuses, notes, onOpenUpdate, onDelete, timeFilter,
   onEditTask, onAddSuggestedTask, isFirst, profileId, profileName, calendarDateKey,
-  selectionMode, selectedTaskIds, onToggleTaskSelect,
+  selectionMode, selectedTaskIds, onToggleTaskSelect, showExploreSuggestions = true,
 }: {
   goal: PersonalGoal; tasks: UserTask_[];
   statuses: StatusMap; notes: NotesMap;
@@ -346,6 +347,7 @@ function GoalGroup({
   selectionMode?: boolean;
   selectedTaskIds?: Set<string>;
   onToggleTaskSelect?: (taskId: string) => void;
+  showExploreSuggestions?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(!isFirst);
   const accentColor = goalAccentColor(goal.id);
@@ -454,7 +456,7 @@ function GoalGroup({
       )}
 
       {/* Other Tasks to Explore: keyword suggestions + custom entry */}
-      {!collapsed && (
+      {!collapsed && showExploreSuggestions && (
         <OtherTasksSection
           tasks={suggestedLabels}
           goalId={goal.id}
@@ -871,6 +873,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   const done = countable.filter(t => statuses[t.id] === 'done').length;
   const overallPct = countable.length > 0 ? Math.round((done / countable.length) * 100) : 0;
   const isEmpty = categories.length === 0 && userTasks.length === 0;
+  const hideExploreSuggestions = isFreshProfile(profile.id) || isUserDefinedProfile(profile.id);
 
   const openTaskUpdate = (
     task: Task,
@@ -1108,6 +1111,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                 isFirst={idx === 0}
                 onEditTask={t => handleEditAnyTask(t, goal.id)}
                 onAddSuggestedTask={handleAddSuggestedTask}
+                showExploreSuggestions={!hideExploreSuggestions}
                 selectionMode={selectMode}
                 selectedTaskIds={selectedTaskIds}
                 onToggleTaskSelect={toggleTaskSelect}
