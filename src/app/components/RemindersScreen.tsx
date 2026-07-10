@@ -324,7 +324,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
             <div style={{ fontWeight: 700, fontSize: 13, color: C.headline }}>Email reminders</div>
             <p style={{ margin: '4px 0 0', fontSize: 11, color: C.secondary, lineHeight: 1.45 }}>
               {getProfileEmail(profile.id)
-                ? 'Daily task nudges sent to your inbox when admin email is enabled.'
+                ? 'Scheduled emails send from the server — even when Arbol is closed.'
                 : 'Add your email on the Profile tab to enable email reminders.'}
             </p>
           </div>
@@ -344,7 +344,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
       }}>
         <div style={{ fontWeight: 700, fontSize: 13, color: C.headline, marginBottom: 4 }}>Daily smart nudges</div>
         <p style={{ margin: '0 0 10px', fontSize: 11, color: C.secondary }}>
-          Customize times for your profile. In-app while Arbol is open; email when enabled above.
+          Customize times for your profile. Emails use these times server-side; in-app alerts while Arbol is open.
         </p>
         {([
           ['morning', 'Morning overview', 'Key open tasks for today'],

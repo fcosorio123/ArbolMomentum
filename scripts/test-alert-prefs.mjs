@@ -198,5 +198,17 @@ console.log('\nSmart nudge email with topTasks payload:');
   assert('send smart_nudge with topTasks', data?.ok === true, data?.resendId ?? data?.reason);
 }
 
+console.log('\nServer cron endpoint:');
+{
+  const res = await fetch(`${BASE}/run-daily-email-nudges`, {
+    method: 'POST',
+    headers,
+    body: '{}',
+  });
+  const data = await res.json();
+  assert('POST run-daily-email-nudges (no auth if CRON_SECRET unset)', res.status === 200 || res.status === 401, `status ${res.status}`);
+  assert('cron returns structured result', data?.ok === true || data?.reason === 'unauthorized', JSON.stringify(data).slice(0, 80));
+}
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

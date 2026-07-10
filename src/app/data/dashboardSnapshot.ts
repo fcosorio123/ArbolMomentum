@@ -292,6 +292,20 @@ export function getTopPendingTasks(
     }));
 }
 
+/** Snapshot for server-side scheduled email nudges (cloud backup). */
+export function buildNudgeSnapshot(profileId: string, profileName: string, dateKey = getTodayKey()) {
+  return {
+    dateKey,
+    pending: getPendingTaskCount(profileId, dateKey),
+    done: getDoneTaskCountToday(profileId, dateKey),
+    streak: computeLiveStreak(profileId),
+    checkedIn: isDailyCheckInComplete(profileId, dateKey),
+    topTasks: getTopPendingTasks(profileId, dateKey, 3),
+    profileName,
+    updatedAt: Date.now(),
+  };
+}
+
 /** Admin + analytics day rollup — same rules as the student dashboard. */
 export interface DayStats {
   done: number;

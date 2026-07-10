@@ -6,6 +6,8 @@
 
 import { supabase } from '/utils/supabase/client';
 import { getStorageKey } from './environment';
+import { getActiveProfiles } from './profiles';
+import { buildNudgeSnapshot } from './dashboardSnapshot';
 
 const FN = 'make-server-5d90ddf5';
 const PERSONAL_GOALS_KEY = (profileId: string) => `arbol-personal-goals-${profileId}`;
@@ -88,6 +90,8 @@ function collectLocalData(profileId: string): Record<string, unknown> {
   const allToursV = localStorage.getItem(allToursK);
   if (allToursV) tourDismissals[allToursK] = allToursV;
 
+  const profile = getActiveProfiles(true).find(p => p.id === profileId);
+
   return {
     userTasks:      raw(`arbol-user-tasks-${profileId}`),
     personalGoals:  readPersonalGoals(profileId),
@@ -97,6 +101,8 @@ function collectLocalData(profileId: string): Record<string, unknown> {
     streakBest:     raw(`streak-best-${profileId}`),
     profileEmail:   localStorage.getItem(getStorageKey(`arbol-email-${profileId}`)) || null,
     alertPrefs:     raw(getStorageKey(`arbol-alert-prefs-${profileId}`)),
+    tzOffset:       new Date().getTimezoneOffset(),
+    nudgeSnapshot:  profile ? buildNudgeSnapshot(profileId, profile.name) : null,
     liveReports:    raw(`arbol-live-reports-${profileId}`),
     liveSnapshots:  raw(`arbol-live-snapshots-${profileId}`),
     permanentlyHiddenSeedTasks: raw(`arbol-hidden-seed-${profileId}`),

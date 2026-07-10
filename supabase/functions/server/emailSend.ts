@@ -79,6 +79,8 @@ export interface SendEmailPayload {
   streak?: number;
   topTasks?: Array<{ label: string; goalTitle?: string }>;
   force?: boolean;
+  /** Server cron path — bypasses client trigger_mode gates */
+  scheduled?: boolean;
 }
 
 function mergeSettings(raw: unknown): EmailSettings {
@@ -170,8 +172,8 @@ async function resolveRecipient(
   return null;
 }
 
-function triggerAllows(type: EmailType, mode: TriggerMode, force?: boolean): boolean {
-  if (force) return true;
+function triggerAllows(type: EmailType, mode: TriggerMode, force?: boolean, scheduled?: boolean): boolean {
+  if (force || scheduled) return true;
   if (mode === "manual") return false;
   if (mode === "event_only") {
     return type === "welcome" || type === "task_completion" || type === "check_in_confirmation"
@@ -197,7 +199,7 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
     return { ok: false, skipped: true, reason: "type_or_global_disabled" };
   }
 
-  if (payload.type !== "test" && !triggerAllows(payload.type, settings.triggerMode, payload.force)) {
+  if (payload.type !== "test" && !triggerAllows(payload.type, settings.triggerMode, payload.force, payload.scheduled)) {
     return { ok: false, skipped: true, reason: "trigger_mode_blocked" };
   }
 

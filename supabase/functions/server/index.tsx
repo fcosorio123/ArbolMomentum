@@ -159,13 +159,21 @@ app.post("/send-test-email", async (c) => {
   }
 });
 
-// V2 stub - requires external cron
+// Cron: scheduled email nudges for all profiles (Authorization: Bearer CRON_SECRET)
 app.post("/run-daily-email-nudges", async (c) => {
-  return c.json({
-    ok: false,
-    reason: "requires_cron",
-    message: "Scheduled daily email nudges require V2 cron integration.",
-  });
+  try {
+    const secret = Deno.env.get("CRON_SECRET")?.trim();
+    const auth = c.req.header("Authorization")?.replace(/^Bearer\s+/i, "");
+    if (secret && auth !== secret) {
+      return c.json({ ok: false, reason: "unauthorized" }, 401);
+    }
+    const { runScheduledEmailNudges } = await import("./emailNudgeCron.ts");
+    const result = await runScheduledEmailNudges();
+    return c.json(result);
+  } catch (err) {
+    console.log("[RunDailyEmailNudges] Error:", err);
+    return c.json({ ok: false, reason: String(err) }, 500);
+  }
 });
 
 // Web Push subscription registration

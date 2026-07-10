@@ -453,10 +453,10 @@ export default function App() {
     };
   }, [activeProfile?.id, syncBadge]);
 
-  // ── Smart nudges: schedule fires browser + email independently
+  // ── Smart nudges: browser in-app while open; email via server cron
   const runNudgeScheduler = useCallback(async () => {
     if (!activeProfile) return;
-    await processDueNudges({ profile: activeProfile, swReg: swRef.current, sendBrowser: true, sendEmail: true });
+    await processDueNudges({ profile: activeProfile, swReg: swRef.current, sendBrowser: true, sendEmail: false });
   }, [activeProfile]);
 
   useEffect(() => {
