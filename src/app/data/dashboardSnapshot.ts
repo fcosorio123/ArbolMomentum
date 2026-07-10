@@ -276,6 +276,22 @@ export function getDoneTaskCountToday(profileId: string, dateKey = getTodayKey()
   ).length;
 }
 
+export function getTopPendingTasks(
+  profileId: string,
+  dateKey = getTodayKey(),
+  limit = 3,
+): Array<{ label: string; goalTitle?: string }> {
+  const goals = getPersonalGoals(profileId);
+  const goalMap = new Map(goals.map(g => [g.id, g.title]));
+  return getTodayTaskRows(profileId, dateKey)
+    .filter(r => r.disposition === 'active' && r.status !== 'done' && r.status !== 'skipped')
+    .slice(0, limit)
+    .map(r => ({
+      label: r.label,
+      goalTitle: r.goalId ? goalMap.get(r.goalId) : undefined,
+    }));
+}
+
 /** Admin + analytics day rollup — same rules as the student dashboard. */
 export interface DayStats {
   done: number;

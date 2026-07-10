@@ -4,6 +4,17 @@ import { BellOutlined, BellFilled, PlusOutlined, DeleteOutlined, CheckCircleOutl
 import { DEFAULT_REMINDERS, type Profile } from '../data/profiles';
 import { C } from '../data/colors';
 import { areNotificationsEnabled, fetchAppSettings } from '../data/appSettings';
+import { fetchEmailSettings } from '../data/emailSettings';
+import { getProfileEmail } from '../data/profileContact';
+import {
+  getProfileAlertPrefs,
+  saveProfileAlertPrefs,
+  getEffectiveSmartSlots,
+  formatSlotTime,
+  parseSlotTime,
+  type ProfileAlertPrefs,
+} from '../data/profileAlertPrefs';
+import type { SmartSlotsConfig } from '../data/emailSettings';
 import { showNotification } from '../data/notifications';
 import { rebuildDailySchedule } from '../data/nudgeScheduler';
 import {
@@ -35,13 +46,38 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
   const [sending, setSending] = useState(false);
   const [enabling, setEnabling] = useState(false);
   const [notifGloballyEnabled, setNotifGloballyEnabled] = useState(() => areNotificationsEnabled());
+  const [alertPrefs, setAlertPrefs] = useState<ProfileAlertPrefs>(() => getProfileAlertPrefs(profile.id));
+  const [smartSlots, setSmartSlots] = useState<SmartSlotsConfig>(() => getEffectiveSmartSlots(profile.id));
   const platform = getPushPlatformInfo();
+
+  const persistPrefs = (next: ProfileAlertPrefs) => {
+    setAlertPrefs(next);
+    saveProfileAlertPrefs(profile.id, next);
+    const slots = getEffectiveSmartSlots(profile.id);
+    setSmartSlots(slots);
+    rebuildDailySchedule(profile.id);
+  };
+
+  const updateUserSlot = (key: keyof SmartSlotsConfig, patch: { enabled?: boolean; hour?: number; minute?: number }) => {
+    const next: ProfileAlertPrefs = {
+      ...alertPrefs,
+      smartSlots: {
+        ...(alertPrefs.smartSlots ?? {}),
+        [key]: { ...(alertPrefs.smartSlots?.[key] ?? {}), ...patch },
+      },
+    };
+    persistPrefs(next);
+  };
 
   useEffect(() => {
     if ('Notification' in window) setPermission(Notification.permission as Permission);
     const saved = localStorage.getItem(`reminders-${profile.id}`);
     setReminders(saved ? (JSON.parse(saved) as Reminder[]) : DEFAULT_REMINDERS);
     fetchAppSettings().then(() => setNotifGloballyEnabled(areNotificationsEnabled()));
+    fetchEmailSettings().then(() => {
+      setAlertPrefs(getProfileAlertPrefs(profile.id));
+      setSmartSlots(getEffectiveSmartSlots(profile.id));
+    });
     rebuildDailySchedule(profile.id);
   }, [profile.id]);
 
@@ -278,29 +314,74 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
         </Button>
       </div>
 
-      {/* Daily nudge preview */}
+      {/* Email reminders */}
+      <div style={{
+        background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16,
+        padding: '14px 16px', marginBottom: 16, boxShadow: C.shadow,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 13, color: C.headline }}>Email reminders</div>
+            <p style={{ margin: '4px 0 0', fontSize: 11, color: C.secondary, lineHeight: 1.45 }}>
+              {getProfileEmail(profile.id)
+                ? 'Daily task nudges sent to your inbox when admin email is enabled.'
+                : 'Add your email on the Profile tab to enable email reminders.'}
+            </p>
+          </div>
+          <Switch
+            checked={alertPrefs.emailEnabled !== false}
+            disabled={!getProfileEmail(profile.id)}
+            onChange={enabled => persistPrefs({ ...alertPrefs, emailEnabled: enabled })}
+            style={{ background: alertPrefs.emailEnabled !== false ? C.primary : undefined }}
+          />
+        </div>
+      </div>
+
+      {/* Daily nudge schedule */}
       <div style={{
         background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16,
         padding: '14px 16px', marginBottom: 16, boxShadow: C.shadow,
       }}>
         <div style={{ fontWeight: 700, fontSize: 13, color: C.headline, marginBottom: 4 }}>Daily smart nudges</div>
-        <p style={{ margin: '0 0 10px', fontSize: 11, color: C.secondary }}>While Arbol is open — up to 3 per day</p>
-        {[
-          { time: '8:00 AM', label: 'Morning overview', desc: 'Key financial tasks for today (FAFSA, TAP, payments)' },
-          { time: '1:00 PM', label: 'Midday check-in', desc: 'Aid and scholarship task progress' },
-          { time: '7:30 PM', label: 'Evening summary', desc: 'Celebrate completed funding tasks' },
-        ].map(slot => (
-          <div key={slot.time} style={{
-            display: 'flex', gap: 12, padding: '8px 0',
-            borderBottom: `1px solid ${C.border}`,
-          }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: C.primary, width: 58, flexShrink: 0 }}>{slot.time}</span>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: C.headline }}>{slot.label}</div>
-              <div style={{ fontSize: 11, color: C.secondary, marginTop: 2 }}>{slot.desc}</div>
+        <p style={{ margin: '0 0 10px', fontSize: 11, color: C.secondary }}>
+          Customize times for your profile. In-app while Arbol is open; email when enabled above.
+        </p>
+        {([
+          ['morning', 'Morning overview', 'Key open tasks for today'],
+          ['midday', 'Midday check-in', 'Goal-linked task progress'],
+          ['evening', 'Evening summary', 'Celebrate progress or last-chance reminder'],
+          ['streakRisk', 'Streak-at-risk', 'Protect your streak before day ends'],
+        ] as [keyof SmartSlotsConfig, string, string][]).map(([key, label, desc]) => {
+          const slot = smartSlots[key];
+          return (
+            <div key={key} style={{
+              display: 'flex', gap: 12, padding: '10px 0',
+              borderBottom: `1px solid ${C.border}`,
+              alignItems: 'center',
+              flexWrap: 'wrap',
+            }}>
+              <Switch
+                checked={slot.enabled}
+                onChange={enabled => updateUserSlot(key, { enabled })}
+                style={{ background: slot.enabled ? C.primary : undefined }}
+              />
+              <div style={{ flex: 1, minWidth: 140 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.headline }}>{label}</div>
+                <div style={{ fontSize: 11, color: C.secondary, marginTop: 2 }}>{desc}</div>
+              </div>
+              <Input
+                type="time"
+                value={formatSlotTime(slot)}
+                disabled={!slot.enabled}
+                onChange={e => {
+                  const { hour, minute } = parseSlotTime(e.target.value);
+                  updateUserSlot(key, { hour, minute });
+                }}
+                style={{ width: 110, borderRadius: 8 }}
+              />
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Reminders list */}

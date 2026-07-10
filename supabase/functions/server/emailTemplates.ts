@@ -20,6 +20,8 @@ export interface TemplateContext {
   body?: string;
   taskLabel?: string;
   pendingCount?: number;
+  streak?: number;
+  topTasks?: Array<{ label: string; goalTitle?: string }>;
 }
 
 function appLink(): string {
@@ -57,14 +59,23 @@ export function buildEmailContent(
     case "smart_nudge": {
       const subject = ctx.title || "Time for your daily momentum";
       const body = ctx.body || "You have tasks waiting. A little progress goes a long way.";
+      const taskList = (ctx.topTasks ?? [])
+        .map((t) => `<li>${t.goalTitle ? `${t.label} <em>(${t.goalTitle})</em>` : t.label}</li>`)
+        .join("");
+      const taskHtml = taskList ? `<ul style="margin:12px 0;padding-left:20px;">${taskList}</ul>` : "";
+      const taskText = (ctx.topTasks ?? [])
+        .map((t) => (t.goalTitle ? `• ${t.label} (${t.goalTitle})` : `• ${t.label}`))
+        .join("\n");
       return {
         subject,
         html: wrapHtml(`
           <h2 style="margin:0 0 12px;">${subject}</h2>
-          <p>${body}</p>
-          ${ctaHtml("View today's tasks")}
+          <p style="white-space:pre-line;">${body}</p>
+          ${taskHtml}
+          ${ctx.streak && ctx.streak > 0 ? `<p style="margin-top:12px;">🔥 Current streak: <strong>${ctx.streak} day${ctx.streak === 1 ? "" : "s"}</strong></p>` : ""}
+          ${ctaHtml("Open today's check-in")}
         `),
-        text: `${subject}\n\n${body}\n\nOpen the app: ${link}`,
+        text: `${subject}\n\n${body}${taskText ? `\n\n${taskText}` : ""}${ctx.streak ? `\n\nStreak: ${ctx.streak} days` : ""}\n\nOpen the app: ${link}`,
       };
     }
 

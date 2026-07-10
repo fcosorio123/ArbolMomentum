@@ -19,7 +19,7 @@ export function getProfileEmail(profileId: string): string {
   }
 }
 
-function isValidEmail(email: string): boolean {
+export function isValidProfileEmail(email: string): boolean {
   if (!email || email.length > 254) return false;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
@@ -30,7 +30,7 @@ export function saveProfileEmail(
   opts?: { profileName?: string; sendWelcome?: boolean },
 ): { ok: boolean; error?: string } {
   const trimmed = email.trim();
-  if (trimmed && !isValidEmail(trimmed)) {
+  if (trimmed && !isValidProfileEmail(trimmed)) {
     return { ok: false, error: 'Enter a valid email address' };
   }
 

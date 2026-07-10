@@ -38,7 +38,8 @@ import {
 import {
   fetchEmailSettings, saveEmailSettings, getEmailSettings,
   sendTestEmail, sendManualNudge,
-  type EmailSettings, type EmailTriggerMode,
+  type EmailSettings, type EmailTriggerMode, type SmartSlotsConfig,
+  DEFAULT_SMART_SLOTS,
 } from '../data/emailSettings';
 import {
   fetchLiveCheckInSettings, saveLiveCheckInSettings, getLiveCheckInSettings,
@@ -1874,6 +1875,22 @@ function SettingsTab() {
     }));
   };
 
+  const updateSmartSlot = (
+    key: keyof SmartSlotsConfig,
+    patch: Partial<SmartSlotsConfig[keyof SmartSlotsConfig]>,
+  ) => {
+    setEmailSettings(s => ({
+      ...s,
+      smartSlots: {
+        ...(s.smartSlots ?? DEFAULT_SMART_SLOTS),
+        [key]: { ...(s.smartSlots ?? DEFAULT_SMART_SLOTS)[key], ...patch },
+      },
+    }));
+  };
+
+  const formatSlotTime = (hour: number, minute: number) =>
+    `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+
   const cardStyle = { background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16, padding: '16px 18px', marginBottom: 14, boxShadow: C.shadow };
   const inputStyle = { borderRadius: 10, marginTop: 6 };
   const labelStyle = { color: C.secondary, fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 4 };
@@ -2027,6 +2044,41 @@ function SettingsTab() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div style={cardStyle}>
+        <div style={labelStyle}>Default smart nudge schedule</div>
+        <p style={{ margin: '6px 0 12px', fontSize: 12, color: C.body, lineHeight: 1.45 }}>
+          Org-wide defaults for daily email and in-app reminders. Users can override times on their Alerts screen.
+        </p>
+        {([
+          ['morning', 'Morning overview'],
+          ['midday', 'Midday check-in'],
+          ['evening', 'Evening summary'],
+          ['streakRisk', 'Streak-at-risk'],
+        ] as [keyof SmartSlotsConfig, string][]).map(([key, label]) => {
+          const slot = (emailSettings.smartSlots ?? DEFAULT_SMART_SLOTS)[key];
+          return (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+              <Switch
+                checked={slot.enabled}
+                onChange={enabled => updateSmartSlot(key, { enabled })}
+                style={{ background: slot.enabled ? C.primary : undefined }}
+              />
+              <span style={{ fontSize: 13, color: C.headline, minWidth: 120 }}>{label}</span>
+              <Input
+                type="time"
+                value={formatSlotTime(slot.hour, slot.minute)}
+                disabled={!slot.enabled}
+                onChange={e => {
+                  const [h, m] = e.target.value.split(':').map(Number);
+                  updateSmartSlot(key, { hour: h, minute: m });
+                }}
+                style={{ width: 120, borderRadius: 8 }}
+              />
+            </div>
+          );
+        })}
       </div>
 
       <div style={cardStyle}>

@@ -5,6 +5,7 @@ import { C } from '../data/colors';
 import type { Profile } from '../data/profiles';
 import type { CustomProfileType } from '../data/customProfiles';
 import { createCustomProfile } from '../data/customProfiles';
+import { saveProfileEmail, isValidProfileEmail } from '../data/profileContact';
 import {
   parseGoalInput,
   recurrenceSummary,
@@ -40,6 +41,7 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
   const [goalText, setGoalText] = useState('');
   const [suggestions, setSuggestions] = useState<SeedSuggestionGroup[]>([]);
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [avatar, setAvatar] = useState('🌱');
   const [creating, setCreating] = useState(false);
 
@@ -55,6 +57,7 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
     setGoalText('');
     setSuggestions([]);
     setName('');
+    setEmail('');
     setAvatar('🌱');
     setCreating(false);
   };
@@ -99,7 +102,9 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
 
   const handleCreate = async () => {
     const trimmed = name.trim();
+    const trimmedEmail = email.trim();
     if (!trimmed || !profileType) return;
+    if (!trimmedEmail || !isValidProfileEmail(trimmedEmail)) return;
     setCreating(true);
     try {
       const profile = createCustomProfile({
@@ -108,6 +113,7 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
         profileType,
         suggestions: profileType === 'seeded' ? suggestions : undefined,
       });
+      saveProfileEmail(profile.id, trimmedEmail, { profileName: profile.name });
       reset();
       onCreated(profile);
       onClose();
@@ -286,8 +292,19 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
             onChange={e => setName(e.target.value)}
             placeholder={suggestedName}
             size="large"
-            style={{ marginBottom: 16 }}
+            style={{ marginBottom: 12 }}
             maxLength={48}
+          />
+          <label style={{ display: 'block', fontSize: 12, color: C.body, marginBottom: 6 }}>
+            Email for reminders <span style={{ color: C.tertiary }}>*</span>
+          </label>
+          <Input
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            type="email"
+            size="large"
+            style={{ marginBottom: 16 }}
           />
           <Button
             type="primary"
@@ -295,7 +312,7 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
             size="large"
             icon={<CheckOutlined />}
             loading={creating}
-            disabled={!name.trim()}
+            disabled={!name.trim() || !email.trim() || !isValidProfileEmail(email.trim())}
             onClick={handleCreate}
             style={{ background: C.primary, fontWeight: 600 }}
           >

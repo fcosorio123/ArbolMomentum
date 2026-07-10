@@ -96,6 +96,7 @@ function collectLocalData(profileId: string): Record<string, unknown> {
     goalLogs:       raw(`arbol-goal-logs-${profileId}`),
     streakBest:     raw(`streak-best-${profileId}`),
     profileEmail:   localStorage.getItem(getStorageKey(`arbol-email-${profileId}`)) || null,
+    alertPrefs:     raw(getStorageKey(`arbol-alert-prefs-${profileId}`)),
     liveReports:    raw(`arbol-live-reports-${profileId}`),
     liveSnapshots:  raw(`arbol-live-snapshots-${profileId}`),
     permanentlyHiddenSeedTasks: raw(`arbol-hidden-seed-${profileId}`),
@@ -276,6 +277,8 @@ function applyLocalData(profileId: string, data: Record<string, unknown>): void 
   if (typeof data.profileEmail === 'string' && data.profileEmail.trim()) {
     localStorage.setItem(getStorageKey(`arbol-email-${profileId}`), data.profileEmail.trim());
   }
+
+  write(getStorageKey(`arbol-alert-prefs-${profileId}`), data.alertPrefs);
 
   if (data.goalsVersion && typeof data.goalsVersion === 'string') {
     localStorage.setItem(`arbol-goals-version-${profileId}`, data.goalsVersion);

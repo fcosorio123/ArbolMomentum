@@ -11,6 +11,26 @@ const STORAGE_KEY = getStorageKey('arbol-email-settings');
 
 export type EmailTriggerMode = 'browser_aligned' | 'event_only' | 'manual';
 
+export interface SmartSlotConfig {
+  enabled: boolean;
+  hour: number;
+  minute: number;
+}
+
+export interface SmartSlotsConfig {
+  morning: SmartSlotConfig;
+  midday: SmartSlotConfig;
+  evening: SmartSlotConfig;
+  streakRisk: SmartSlotConfig;
+}
+
+export const DEFAULT_SMART_SLOTS: SmartSlotsConfig = {
+  morning: { enabled: true, hour: 8, minute: 0 },
+  midday: { enabled: true, hour: 13, minute: 0 },
+  evening: { enabled: true, hour: 19, minute: 30 },
+  streakRisk: { enabled: true, hour: 20, minute: 0 },
+};
+
 export interface EmailSettings {
   enabled: boolean;
   welcomeEnabled: boolean;
@@ -21,6 +41,7 @@ export interface EmailSettings {
   goalUpdatedEnabled: boolean;
   profileArchivedEnabled: boolean;
   triggerMode: EmailTriggerMode;
+  smartSlots: SmartSlotsConfig;
   fromName: string;
   replyTo: string;
   testRecipient: string;
@@ -38,6 +59,7 @@ const DEFAULTS: EmailSettings = {
   goalUpdatedEnabled: false,
   profileArchivedEnabled: false,
   triggerMode: 'browser_aligned',
+  smartSlots: { ...DEFAULT_SMART_SLOTS },
   fromName: 'Arbol Momentum',
   replyTo: '',
   testRecipient: '',
@@ -49,7 +71,12 @@ function readLocal(): EmailSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...DEFAULTS };
-    return { ...DEFAULTS, ...JSON.parse(raw) };
+    const parsed = { ...DEFAULTS, ...JSON.parse(raw) };
+    parsed.smartSlots = { ...DEFAULT_SMART_SLOTS, ...(parsed.smartSlots ?? {}) };
+    for (const key of Object.keys(DEFAULT_SMART_SLOTS) as (keyof SmartSlotsConfig)[]) {
+      parsed.smartSlots[key] = { ...DEFAULT_SMART_SLOTS[key], ...(parsed.smartSlots[key] ?? {}) };
+    }
+    return parsed;
   } catch {
     return { ...DEFAULTS };
   }
@@ -88,7 +115,12 @@ export async function fetchEmailSettings(): Promise<EmailSettings> {
       method: 'GET',
     });
     if (!error && data?.ok && data.data) {
-      cached = { ...DEFAULTS, ...data.data };
+      const merged = { ...DEFAULTS, ...data.data };
+      merged.smartSlots = { ...DEFAULT_SMART_SLOTS, ...(merged.smartSlots ?? {}) };
+      for (const key of Object.keys(DEFAULT_SMART_SLOTS) as (keyof SmartSlotsConfig)[]) {
+        merged.smartSlots[key] = { ...DEFAULT_SMART_SLOTS[key], ...(merged.smartSlots[key] ?? {}) };
+      }
+      cached = merged;
       writeLocal(cached);
     }
   } catch {
@@ -101,8 +133,12 @@ export async function fetchEmailSettings(): Promise<EmailSettings> {
 export async function saveEmailSettings(settings: EmailSettings): Promise<EmailSettings> {
   const next: EmailSettings = {
     ...settings,
+    smartSlots: { ...DEFAULT_SMART_SLOTS, ...(settings.smartSlots ?? {}) },
     updatedAt: Date.now(),
   };
+  for (const key of Object.keys(DEFAULT_SMART_SLOTS) as (keyof SmartSlotsConfig)[]) {
+    next.smartSlots[key] = { ...DEFAULT_SMART_SLOTS[key], ...(next.smartSlots[key] ?? {}) };
+  }
   cached = next;
   writeLocal(next);
 

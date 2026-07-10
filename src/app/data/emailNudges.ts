@@ -28,6 +28,8 @@ export interface EmailSendPayload {
   body?: string;
   taskLabel?: string;
   pendingCount?: number;
+  streak?: number;
+  topTasks?: Array<{ label: string; goalTitle?: string }>;
   force?: boolean;
 }
 

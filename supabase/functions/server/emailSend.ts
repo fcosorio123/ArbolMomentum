@@ -8,6 +8,26 @@ const SETTINGS_KEY = "arbol-email-settings";
 
 export type TriggerMode = "browser_aligned" | "event_only" | "manual";
 
+export interface SmartSlotConfig {
+  enabled: boolean;
+  hour: number;
+  minute: number;
+}
+
+export interface SmartSlotsConfig {
+  morning: SmartSlotConfig;
+  midday: SmartSlotConfig;
+  evening: SmartSlotConfig;
+  streakRisk: SmartSlotConfig;
+}
+
+export const DEFAULT_SMART_SLOTS: SmartSlotsConfig = {
+  morning: { enabled: true, hour: 8, minute: 0 },
+  midday: { enabled: true, hour: 13, minute: 0 },
+  evening: { enabled: true, hour: 19, minute: 30 },
+  streakRisk: { enabled: true, hour: 20, minute: 0 },
+};
+
 export interface EmailSettings {
   enabled: boolean;
   welcomeEnabled: boolean;
@@ -18,6 +38,7 @@ export interface EmailSettings {
   goalUpdatedEnabled: boolean;
   profileArchivedEnabled: boolean;
   triggerMode: TriggerMode;
+  smartSlots: SmartSlotsConfig;
   fromName: string;
   replyTo: string;
   testRecipient: string;
@@ -35,6 +56,7 @@ export const DEFAULT_EMAIL_SETTINGS: EmailSettings = {
   goalUpdatedEnabled: false,
   profileArchivedEnabled: false,
   triggerMode: "browser_aligned",
+  smartSlots: { ...DEFAULT_SMART_SLOTS },
   fromName: "Arbol Momentum",
   replyTo: "",
   testRecipient: "",
@@ -54,12 +76,20 @@ export interface SendEmailPayload {
   body?: string;
   taskLabel?: string;
   pendingCount?: number;
+  streak?: number;
+  topTasks?: Array<{ label: string; goalTitle?: string }>;
   force?: boolean;
 }
 
 function mergeSettings(raw: unknown): EmailSettings {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_EMAIL_SETTINGS };
-  return { ...DEFAULT_EMAIL_SETTINGS, ...(raw as Partial<EmailSettings>) };
+  const partial = raw as Partial<EmailSettings>;
+  const merged = { ...DEFAULT_EMAIL_SETTINGS, ...partial };
+  merged.smartSlots = { ...DEFAULT_SMART_SLOTS, ...(partial.smartSlots ?? {}) };
+  for (const key of Object.keys(DEFAULT_SMART_SLOTS) as (keyof SmartSlotsConfig)[]) {
+    merged.smartSlots[key] = { ...DEFAULT_SMART_SLOTS[key], ...(merged.smartSlots[key] ?? {}) };
+  }
+  return merged;
 }
 
 export async function getEmailSettings(): Promise<EmailSettings> {
@@ -196,6 +226,8 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
     body: payload.body,
     taskLabel: payload.taskLabel,
     pendingCount: payload.pendingCount,
+    streak: payload.streak,
+    topTasks: payload.topTasks,
   });
 
   const replyTo = settings.replyTo?.trim() || undefined;

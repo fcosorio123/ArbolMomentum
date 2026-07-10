@@ -111,8 +111,13 @@ export function ProfileScreen({ profile, onSwitch, onAdmin, onAlerts }: Props) {
               Save email
             </Button>
             {emailMsg && <div style={{ fontSize: 12, color: C.body, marginTop: 8 }}>{emailMsg}</div>}
+            {!email.trim() && (
+              <div style={{ fontSize: 11, color: C.streak, marginTop: 8, lineHeight: 1.45 }}>
+                Add your email to receive daily task reminders and streak alerts.
+              </div>
+            )}
             <div style={{ fontSize: 11, color: C.secondary, marginTop: 8 }}>
-              Optional. Used for welcome and reminder emails when enabled by admin.
+              Required for new profiles. Used for welcome and reminder emails when enabled by admin.
             </div>
           </div>
 

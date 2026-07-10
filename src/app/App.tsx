@@ -453,10 +453,10 @@ export default function App() {
     };
   }, [activeProfile?.id, syncBadge]);
 
-  // ── Smart nudges: 3 state-based slots/day + custom reminders (local + push when subscribed)
+  // ── Smart nudges: schedule fires browser + email independently
   const runNudgeScheduler = useCallback(async () => {
     if (!activeProfile) return;
-    await processDueNudges({ profile: activeProfile, swReg: swRef.current });
+    await processDueNudges({ profile: activeProfile, swReg: swRef.current, sendBrowser: true, sendEmail: true });
   }, [activeProfile]);
 
   useEffect(() => {
