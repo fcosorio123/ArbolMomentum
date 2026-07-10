@@ -6,7 +6,7 @@ import {
   BarChart, Bar, LineChart, Line,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
-import { PROFILES, getTodayKey, getDateKey, computeLiveStreak, computeBestStreak, hasActivityOnDate, isProfileArchived, setProfileArchived, getActiveProfiles } from '../data/profiles';
+import { getActiveProfiles, getTodayKey, getDateKey, computeLiveStreak, computeBestStreak, hasActivityOnDate, isProfileArchived, setProfileArchived } from '../data/profiles';
 import {
   computeDayStatsFromPersisted,
   buildRemoteDayOverlay,
@@ -109,7 +109,7 @@ function OverviewTab() {
         const completions = await fetchAllTaskCompletions();
         const deletions = await fetchAllTaskDeletions();
 
-        const profileStats = PROFILES.map(p => {
+        const profileStats = getActiveProfiles(true).map(p => {
           const todayVisits = parseInt(localStorage.getItem(`visit-${p.id}-${today}`) || '0');
 
           const calculateDayStats = (date: string) => {
@@ -161,7 +161,7 @@ function OverviewTab() {
 
   const loadFromLocalStorage = () => {
     const today = getTodayKey();
-    setStats(PROFILES.map(p => {
+    setStats(getActiveProfiles(true).map(p => {
       const todayVisits = parseInt(localStorage.getItem(`visit-${p.id}-${today}`) || '0');
       const todayDetail = computeDayStatsFromPersisted(p.id, today);
 
@@ -201,7 +201,7 @@ function OverviewTab() {
       </p>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
         {[
-          { label: 'Total visits', value: totalVisits, sub: `${stats.filter(p => p.todayVisits > 0).length} of ${PROFILES.length} active`, color: C.primary },
+          { label: 'Total visits', value: totalVisits, sub: `${stats.filter(p => p.todayVisits > 0).length} of ${getActiveProfiles(true).length} active`, color: C.primary },
           { label: 'Avg completion', value: `${avgCompletion}%`, sub: 'across all users', color: C.primary },
           { label: 'In progress', value: stats.filter(p => p.todayDetail.inprog > 0).length, sub: 'users mid-way', color: C.streak },
           { label: 'Fully done', value: stats.filter(p => p.todayDetail.pct === 100).length, sub: '100% today', color: C.tertiary },
@@ -409,14 +409,14 @@ interface EngagementData {
 }
 
 function AnalyticsTab() {
-  const [selectedId, setSelectedId] = useState(PROFILES[0].id);
+  const [selectedId, setSelectedId] = useState(getActiveProfiles(true)[0].id);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('week');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [engagementData, setEngagementData] = useState<EngagementData[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const profile = PROFILES.find(p => p.id === selectedId)!;
+  const profile = getActiveProfiles(true).find(p => p.id === selectedId)!;
   const today = getTodayKey();
 
   const hourlyData = getActivityChartData(selectedId, today);
@@ -713,7 +713,7 @@ function AnalyticsTab() {
         Select User
       </p>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
-        {PROFILES.map(p => (
+        {getActiveProfiles(true).map(p => (
           <button key={p.id} onClick={() => setSelectedId(p.id)} style={{
             flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6,
             padding: '8px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
@@ -1045,7 +1045,7 @@ function FeedbackTab() {
 
   const card: React.CSSProperties = { background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16, boxShadow: C.shadow };
 
-  const profileMap = useMemo(() => Object.fromEntries(PROFILES.map(p => [p.id, p])), []);
+  const profileMap = useMemo(() => Object.fromEntries(getActiveProfiles(true).map(p => [p.id, p])), []);
 
   return (
     <div style={{ padding: '0 16px 24px' }}>
@@ -1060,7 +1060,7 @@ function FeedbackTab() {
           color: filterUser === 'all' ? '#fff' : C.body,
           fontWeight: filterUser === 'all' ? 700 : 400, fontSize: 13, boxShadow: C.shadow,
         }}>All</button>
-        {PROFILES.map(p => (
+        {getActiveProfiles(true).map(p => (
           <button key={p.id} onClick={() => setFilterUser(p.id)} style={{
             flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5,
             padding: '7px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
@@ -1249,7 +1249,7 @@ function DevicesTab() {
     notif_clicked: '👆', badge_updated: '🔴',
   };
 
-  const allProfiles = PROFILES;
+  const allProfiles = getActiveProfiles(true);
   const recordList = allProfiles.map(p => ({
     profile: p,
     record: records[p.id] ?? null,
@@ -1275,7 +1275,7 @@ function DevicesTab() {
 
   // Summary counts
   const allRecords = Object.values(records);
-  const totalProfiles = PROFILES.length;
+  const totalProfiles = getActiveProfiles(true).length;
   const withRecord = allRecords.length;
   const pwaCount = allRecords.filter(r => r.isPwa).length;
   const notifGranted = allRecords.filter(r => r.notifPermission === 'granted').length;
@@ -1446,7 +1446,7 @@ function DevicesTab() {
           </p>
           <div style={{ ...card, overflow: 'hidden' }}>
             {eventLogEntries.map((ev, idx) => {
-              const profile = PROFILES.find(p => p.id === ev.profileId);
+              const profile = getActiveProfiles(true).find(p => p.id === ev.profileId);
               return (
                 <div key={`${ev.profileId}-${ev.event}-${ev.timestamp}-${idx}`} style={{
                   display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
@@ -1514,7 +1514,7 @@ function PersonalGoalsTab() {
 
     // Load all goals from all profiles
     const goalMap: Record<string, PersonalGoal> = {};
-    PROFILES.forEach(profile => {
+    getActiveProfiles(true).forEach(profile => {
       const goals = getPersonalGoals(profile.id);
       goals.forEach(goal => {
         goalMap[goal.id] = goal;
@@ -1599,7 +1599,7 @@ function PersonalGoalsTab() {
           color: filterUser === 'all' ? '#fff' : C.body,
           fontWeight: filterUser === 'all' ? 700 : 400, fontSize: 13, boxShadow: C.shadow,
         }}>All</button>
-        {PROFILES.map(p => (
+        {getActiveProfiles(true).map(p => (
           <button key={p.id} onClick={() => setFilterUser(p.id)} style={{
             flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5,
             padding: '7px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
@@ -1643,7 +1643,7 @@ function PersonalGoalsTab() {
               <strong style={{ color: C.body }}>Data source:</strong> {isPublishedVersion() ? 'Supabase (cloud)' : 'localStorage (local)'}
             </div>
             <div>
-              <strong style={{ color: C.body }}>Filter:</strong> {filterUser === 'all' ? 'All users' : PROFILES.find(p => p.id === filterUser)?.name || filterUser}
+              <strong style={{ color: C.body }}>Filter:</strong> {filterUser === 'all' ? 'All users' : getActiveProfiles(true).find(p => p.id === filterUser)?.name || filterUser}
             </div>
           </div>
         </div>
@@ -1657,7 +1657,7 @@ function PersonalGoalsTab() {
               {new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </div>
             {entries.map((log) => {
-              const profile = PROFILES.find(p => p.id === log.profileId);
+              const profile = getActiveProfiles(true).find(p => p.id === log.profileId);
               const goal = allGoals[log.goalId];
               return (
                 <div key={log.id} style={{ ...card, padding: '14px 16px', marginBottom: 10 }}>
@@ -1738,7 +1738,7 @@ function PersonalGoalsTab() {
       {/* User-Created Tasks section */}
       {(() => {
         const userTaskRows: { profile: string; task: UserTask; goalTitle?: string }[] = [];
-        PROFILES.forEach(p => {
+        getActiveProfiles(true).forEach(p => {
           const uts = getUserTasks(p.id);
           const goals = getPersonalGoals(p.id);
           uts.forEach(t => {
@@ -1799,7 +1799,7 @@ function SettingsTab() {
   const [liveCheckInSaved, setLiveCheckInSaved] = useState(false);
   const [testSending, setTestSending] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
-  const [manualProfileId, setManualProfileId] = useState(PROFILES[0]?.id ?? '');
+  const [manualProfileId, setManualProfileId] = useState(getActiveProfiles(true)[0]?.id ?? '');
   const [manualType, setManualType] = useState<'smart_nudge' | 'welcome' | 'check_in_confirmation'>('smart_nudge');
   const [manualSending, setManualSending] = useState(false);
   const [manualResult, setManualResult] = useState<string | null>(null);
@@ -1852,7 +1852,7 @@ function SettingsTab() {
   };
 
   const handleManualNudge = async () => {
-    const profile = PROFILES.find(p => p.id === manualProfileId);
+    const profile = getActiveProfiles(true).find(p => p.id === manualProfileId);
     setManualSending(true);
     setManualResult(null);
     const result = await sendManualNudge({
@@ -2051,7 +2051,7 @@ function SettingsTab() {
 
       <div style={cardStyle}>
         <div style={labelStyle}>Profile emails (admin override)</div>
-        {PROFILES.map(p => (
+        {getActiveProfiles(true).map(p => (
           <div key={p.id} style={{ marginTop: 10 }}>
             <div style={{ fontSize: 12, color: C.body, marginBottom: 4 }}>{p.name} ({p.id})</div>
             <Input
@@ -2072,7 +2072,7 @@ function SettingsTab() {
             value={manualProfileId}
             onChange={setManualProfileId}
             style={{ width: '100%' }}
-            options={PROFILES.map(p => ({ value: p.id, label: p.name }))}
+            options={getActiveProfiles(true).map(p => ({ value: p.id, label: p.name }))}
           />
         </div>
         <div style={{ marginTop: 10 }}>

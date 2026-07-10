@@ -35,7 +35,7 @@ import {
   requestNotificationPermission,
 } from './data/pushNotifications';
 import {
-  PROFILES, type Profile, type Badge,
+  getProfileById, type Profile, type Badge,
 } from './data/profiles';
 import { C } from './data/colors';
 
@@ -88,7 +88,7 @@ export default function App() {
   const [activeProfile, setActiveProfile] = useState<Profile | null>(() => {
     try {
       const saved = localStorage.getItem('arbol-active-profile');
-      if (saved) return PROFILES.find(p => p.id === saved) ?? null;
+      if (saved) return getProfileById(saved) ?? null;
     } catch {}
     return null;
   });

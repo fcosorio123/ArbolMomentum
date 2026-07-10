@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Button } from 'antd';
-import { FireOutlined, RightOutlined, SettingOutlined } from '@ant-design/icons';
+import { FireOutlined, RightOutlined, SettingOutlined, PlusOutlined } from '@ant-design/icons';
 import { getActiveProfiles, type Profile, computeLiveStreak } from '../data/profiles';
 import { C } from '../data/colors';
+import { CreateProfileModal } from './CreateProfileModal';
 
 interface Props {
   onSelect: (p: Profile) => void;
@@ -9,6 +11,16 @@ interface Props {
 }
 
 export function ProfileSelector({ onSelect, onAdmin }: Props) {
+  const [createOpen, setCreateOpen] = useState(false);
+  const [profileListKey, setProfileListKey] = useState(0);
+
+  const profiles = getActiveProfiles();
+
+  const handleCreated = (profile: Profile) => {
+    setProfileListKey(k => k + 1);
+    onSelect(profile);
+  };
+
   return (
     <div style={{
       minHeight: '100dvh',
@@ -47,12 +59,12 @@ export function ProfileSelector({ onSelect, onAdmin }: Props) {
       </div>
 
       {/* Profiles */}
-      <div style={{ padding: '24px 16px 100px' }}>
+      <div style={{ padding: '24px 16px 100px' }} key={profileListKey}>
         <p style={{ color: C.secondary, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12, paddingLeft: 4 }}>
           Select your profile
         </p>
 
-        {getActiveProfiles().map((profile) => (
+        {profiles.map((profile) => (
           <button
             key={profile.id}
             onClick={() => onSelect(profile)}
@@ -101,6 +113,53 @@ export function ProfileSelector({ onSelect, onAdmin }: Props) {
           </button>
         ))}
 
+        {/* Create New Profile — only on this screen */}
+        <button
+          type="button"
+          onClick={() => setCreateOpen(true)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            width: '100%',
+            padding: '16px',
+            marginTop: 4,
+            marginBottom: 10,
+            background: `${C.primary}08`,
+            border: `1.5px dashed ${C.primary}55`,
+            borderRadius: 16,
+            color: C.headline,
+            cursor: 'pointer',
+            textAlign: 'left',
+            transition: 'border-color 0.2s, background 0.2s',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = C.primary;
+            e.currentTarget.style.background = `${C.primary}14`;
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = `${C.primary}55`;
+            e.currentTarget.style.background = `${C.primary}08`;
+          }}
+        >
+          <div style={{
+            width: 48, height: 48, borderRadius: 14,
+            background: C.bgCard,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 20, flexShrink: 0,
+            border: `1.5px dashed ${C.primary}40`,
+            color: C.primary,
+          }}>
+            <PlusOutlined />
+          </div>
+          <div style={{ flex: 1, marginLeft: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: C.headline }}>Create New Profile</div>
+            <div style={{ color: C.body, fontSize: 12, marginTop: 2 }}>
+              Fresh slate or AI-assisted goal suggestions
+            </div>
+          </div>
+          <RightOutlined style={{ color: C.secondary, fontSize: 12 }} />
+        </button>
+
         <div style={{ textAlign: 'center', marginTop: 24 }}>
           <Button type="text" icon={<SettingOutlined />} onClick={onAdmin}
             style={{ color: C.secondary, fontSize: 13 }}>
@@ -108,6 +167,12 @@ export function ProfileSelector({ onSelect, onAdmin }: Props) {
           </Button>
         </div>
       </div>
+
+      <CreateProfileModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={handleCreated}
+      />
     </div>
   );
 }

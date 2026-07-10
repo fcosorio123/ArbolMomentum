@@ -1,6 +1,7 @@
 // ──────────────────────────────────────────────
 // Value Tracking (Reward System)
 // ──────────────────────────────────────────────
+import { getCustomProfiles, isRegisteredFreshProfile } from './customProfiles';
 export interface ValueStats {
   money: number;      // ₱ saved/earned
   health: number;     // calories burned
@@ -173,7 +174,30 @@ export const PROFILES: Profile[] = [
     completionRate: 65,
     bio: 'Creative soul who paints a lot, needs meditation, and is actively building a healthy daily routine. Finds joy in small rituals - morning walks with the dog, cooking, and making art.',
   },
+  {
+    id: 'eu',
+    name: 'Eu',
+    tagline: 'Fresh start · Build your own way 🌱',
+    streak: 0,
+    bestStreak: 0,
+    weeklyStreak: 0,
+    bestWeeklyStreak: 0,
+    monthlyStreak: 0,
+    bestMonthlyStreak: 0,
+    role: 'Student · Custom',
+    avatar: '🌱',
+    joinedWeek: 1,
+    completionRate: 0,
+    bio: 'Empty slate profile — add your own goals and tasks from scratch.',
+  },
 ];
+
+/** Built-in profiles with no seeded goals or tasks (fresh-slate template). */
+export const FRESH_PROFILE_IDS = new Set<string>(['eu']);
+
+export function isFreshProfile(profileId: string): boolean {
+  return FRESH_PROFILE_IDS.has(profileId) || isRegisteredFreshProfile(profileId);
+}
 
 // ──────────────────────────────────────────────
 // Task types
@@ -1626,6 +1650,7 @@ export function getTaskCategoriesForProfile(
   dayName?: string,
   includeHidden = false,
 ): TaskCategory[] {
+  if (isFreshProfile(profileId)) return [];
   const day = dayName ?? getTodayDayName();
   let categories: TaskCategory[];
   switch (profileId) {
@@ -1647,6 +1672,7 @@ export function getAllTasks(): Task[] {
 }
 
 export function getAllTasksForProfile(profileId: string): Task[] {
+  if (isFreshProfile(profileId)) return [];
   const hidden = getPermanentlyHiddenSeedTaskIds(profileId);
   let tasks: Task[];
   switch (profileId) {
@@ -1669,6 +1695,9 @@ export function getTasksForToday(profileId: string): Task[] {
 
 export function getWeekPlanForProfile(profileId: string): Record<string, string[]> {
   const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  if (isFreshProfile(profileId)) {
+    return Object.fromEntries(DAYS.map(d => [d, []]));
+  }
   let plan: Record<string, string[]>;
   switch (profileId) {
     case 'kyle':
@@ -1740,9 +1769,14 @@ export function setProfileArchived(profileId: string, archived: boolean): void {
 }
 
 export function getActiveProfiles(includeArchived = false): Profile[] {
-  if (includeArchived) return PROFILES;
+  const all = [...PROFILES, ...getCustomProfiles()];
+  if (includeArchived) return all;
   const archived = getArchivedProfileIds();
-  return PROFILES.filter(p => !archived.has(p.id));
+  return all.filter(p => !archived.has(p.id));
+}
+
+export function getProfileById(profileId: string): Profile | undefined {
+  return getActiveProfiles(true).find(p => p.id === profileId);
 }
 
 // ──────────────────────────────────────────────
