@@ -6,7 +6,8 @@
 
 import { supabase } from '/utils/supabase/client';
 import { getStorageKey } from './environment';
-import { getActiveProfiles } from './profiles';
+import { getActiveProfiles, isProfileArchived, applyProfileArchivedFromSync } from './profiles';
+import { CALENDAR_PREFS_KEY, CALENDAR_PROVIDER_KEY } from './calendarExport';
 import { buildNudgeSnapshot } from './dashboardSnapshot';
 
 const FN = 'make-server-5d90ddf5';
@@ -115,6 +116,9 @@ function collectLocalData(profileId: string): Record<string, unknown> {
     taskBlocked,
     goalProgressLogs,
     tourDismissals,
+    calendarPrefs: raw(CALENDAR_PREFS_KEY(profileId)),
+    calendarProvider: localStorage.getItem(CALENDAR_PROVIDER_KEY(profileId)) || null,
+    profileArchived: isProfileArchived(profileId),
     savedAt: Date.now(),
   };
 }
@@ -301,6 +305,17 @@ function applyLocalData(profileId: string, data: Record<string, unknown>): void 
   restoreMap(data.taskBlocked);
   restoreMap(data.goalProgressLogs);
   restoreMap(data.tourDismissals);
+
+  if (typeof data.profileArchived === 'boolean') {
+    applyProfileArchivedFromSync(profileId, data.profileArchived);
+  }
+
+  if (data.calendarPrefs != null) {
+    write(CALENDAR_PREFS_KEY(profileId), data.calendarPrefs);
+  }
+  if (typeof data.calendarProvider === 'string' && data.calendarProvider.trim()) {
+    localStorage.setItem(CALENDAR_PROVIDER_KEY(profileId), data.calendarProvider.trim());
+  }
 }
 
 // ── API calls ────────────────────────────────────────────────────────
@@ -337,17 +352,149 @@ function isTransientError(err: unknown): boolean {
   return msg.includes('FunctionsFetchError') || msg.includes('Failed to send') || msg.includes('NetworkError');
 }
 
-export async function saveToCloud(profileId: string): Promise<void> {
+/** Merge email qualification fields when cloud is newer or local is missing them. */
+function mergeQualificationFieldsFromCloud(profileId: string, cloud: Record<string, unknown>): boolean {
+  const localAt = Number(localStorage.getItem(LOCAL_CLOUD_AT_KEY(profileId)) || 0);
+  const cloudAt = typeof cloud.savedAt === 'number' ? cloud.savedAt : 0;
+  const emailKey = getStorageKey(`arbol-email-${profileId}`);
+  const prefsKey = getStorageKey(`arbol-alert-prefs-${profileId}`);
+
+  const localEmail = localStorage.getItem(emailKey)?.trim() ?? '';
+  const cloudEmail = typeof cloud.profileEmail === 'string' ? cloud.profileEmail.trim() : '';
+
+  let changed = false;
+
+  if (!localEmail && cloudEmail) {
+    localStorage.setItem(emailKey, cloudEmail);
+    changed = true;
+  } else if (cloudAt > localAt && cloudEmail && cloudEmail !== localEmail) {
+    localStorage.setItem(emailKey, cloudEmail);
+    changed = true;
+  }
+
+  if (cloud.alertPrefs != null && cloudAt > localAt) {
+    const next = typeof cloud.alertPrefs === 'string' ? cloud.alertPrefs : JSON.stringify(cloud.alertPrefs);
+    const current = localStorage.getItem(prefsKey);
+    if (current !== next) {
+      localStorage.setItem(prefsKey, next);
+      changed = true;
+    }
+  }
+
+  if (cloud.calendarPrefs != null && cloudAt > localAt) {
+    const next = typeof cloud.calendarPrefs === 'string' ? cloud.calendarPrefs : JSON.stringify(cloud.calendarPrefs);
+    const current = localStorage.getItem(CALENDAR_PREFS_KEY(profileId));
+    if (current !== next) {
+      localStorage.setItem(CALENDAR_PREFS_KEY(profileId), next);
+      changed = true;
+    }
+  }
+
+  if (typeof cloud.calendarProvider === 'string' && cloud.calendarProvider.trim() && cloudAt > localAt) {
+    const next = cloud.calendarProvider.trim();
+    const current = localStorage.getItem(CALENDAR_PROVIDER_KEY(profileId));
+    if (current !== next) {
+      localStorage.setItem(CALENDAR_PROVIDER_KEY(profileId), next);
+      changed = true;
+    }
+  }
+
+  return changed;
+}
+
+function mergeArchiveFromCloud(profileId: string, cloud: Record<string, unknown>): boolean {
+  if (typeof cloud.profileArchived !== 'boolean') return false;
+  const localAt = Number(localStorage.getItem(LOCAL_CLOUD_AT_KEY(profileId)) || 0);
+  const cloudAt = typeof cloud.savedAt === 'number' ? cloud.savedAt : 0;
+  if (cloudAt <= localAt && isProfileArchived(profileId) === cloud.profileArchived) return false;
+  if (isProfileArchived(profileId) === cloud.profileArchived) return false;
+  applyProfileArchivedFromSync(profileId, cloud.profileArchived);
+  return true;
+}
+
+async function fetchCloudBackup(profileId: string): Promise<Record<string, unknown> | null> {
+  const { data, error } = await invokeWithRetry(`${FN}/backup/${profileId}`, { method: 'GET' });
+  if (error || !data?.ok || !data?.data) return null;
+  return data.data as Record<string, unknown>;
+}
+
+export async function fetchProfileBackupForAdmin(profileId: string): Promise<Record<string, unknown> | null> {
+  return fetchCloudBackup(profileId);
+}
+
+export interface ProfileSyncStatus {
+  profileId: string;
+  localSavedAt: number;
+  cloudSavedAt: number | null;
+  lastSyncDirection: 'local_newer' | 'cloud_newer' | 'in_sync' | 'unknown';
+  hasCloudBackup: boolean;
+}
+
+export async function getProfileSyncStatus(profileId: string): Promise<ProfileSyncStatus> {
+  const localSavedAt = Number(localStorage.getItem(LOCAL_CLOUD_AT_KEY(profileId)) || 0);
+  const cloud = await fetchCloudBackup(profileId);
+  const cloudSavedAt = typeof cloud?.savedAt === 'number' ? cloud.savedAt : null;
+  let lastSyncDirection: ProfileSyncStatus['lastSyncDirection'] = 'unknown';
+  if (cloudSavedAt != null && localSavedAt > 0) {
+    if (localSavedAt > cloudSavedAt + 1000) lastSyncDirection = 'local_newer';
+    else if (cloudSavedAt > localSavedAt + 1000) lastSyncDirection = 'cloud_newer';
+    else lastSyncDirection = 'in_sync';
+  } else if (cloudSavedAt != null) {
+    lastSyncDirection = 'cloud_newer';
+  } else if (localSavedAt > 0) {
+    lastSyncDirection = 'local_newer';
+  }
+  return {
+    profileId,
+    localSavedAt,
+    cloudSavedAt,
+    lastSyncDirection,
+    hasCloudBackup: cloud != null,
+  };
+}
+
+export async function saveToCloud(profileId: string, opts?: { retryOnStale?: boolean }): Promise<boolean> {
   const payload = collectLocalData(profileId);
-  const { error } = await invokeWithRetry(`${FN}/backup/${profileId}`, {
+  const { data, error } = await invokeWithRetry(`${FN}/backup/${profileId}`, {
     method: 'POST',
     body: payload,
   });
-  // Silently swallow transient network failures - localStorage is the source of truth
+
+  if (!error && data?.ok === true) {
+    localStorage.setItem(LOCAL_CLOUD_AT_KEY(profileId), String(payload.savedAt));
+    return true;
+  }
+
+  if (data?.reason === 'stale_backup' && opts?.retryOnStale !== false) {
+    await syncProfileFromCloud(profileId);
+    const retryPayload = collectLocalData(profileId);
+    const retry = await invokeWithRetry(`${FN}/backup/${profileId}`, {
+      method: 'POST',
+      body: retryPayload,
+    });
+    if (!retry.error && retry.data?.ok === true) {
+      localStorage.setItem(LOCAL_CLOUD_AT_KEY(profileId), String(retryPayload.savedAt));
+      return true;
+    }
+  }
+
   if (error && !isTransientError(error)) {
     console.warn('[CloudBackup] Save failed:', error);
-  } else if (!error) {
-    localStorage.setItem(LOCAL_CLOUD_AT_KEY(profileId), String(payload.savedAt));
+  }
+  return false;
+}
+
+/** After cloud pull, push fresh qualification + snapshot data for email cron. */
+export async function pushQualificationAfterSync(profileId: string): Promise<void> {
+  const cloud = await fetchCloudBackup(profileId);
+  const local = collectLocalData(profileId);
+  const cloudAt = typeof cloud?.savedAt === 'number' ? cloud.savedAt : 0;
+  const localEmail = typeof local.profileEmail === 'string' ? local.profileEmail.trim() : '';
+  const cloudEmail = typeof cloud?.profileEmail === 'string' ? cloud.profileEmail.trim() : '';
+  const needsEmailPush = !!localEmail && !cloudEmail;
+  const localNewer = local.savedAt >= cloudAt;
+  if (needsEmailPush || localNewer || !cloud) {
+    await saveToCloud(profileId);
   }
 }
 
@@ -381,6 +528,8 @@ export async function syncProfileFromCloud(
   let merged = false;
   if (mergePersonalGoalsFromCloud(profileId, cloud.personalGoals)) merged = true;
   if (mergeTaskGoalLinksFromCloud(profileId, cloud.taskGoalLinks)) merged = true;
+  if (mergeQualificationFieldsFromCloud(profileId, cloud)) merged = true;
+  if (mergeArchiveFromCloud(profileId, cloud)) merged = true;
   if (mergeCloudActivityWhenNewer(profileId, cloud)) merged = true;
 
   if (merged) {

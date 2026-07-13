@@ -125,7 +125,7 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
 
   return (
     <div style={{
-      padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 16px',
+      padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px calc(100px + env(safe-area-inset-bottom, 0px))',
       background: C.bg,
       minHeight: '100dvh',
     }}>

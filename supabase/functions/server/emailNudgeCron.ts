@@ -12,7 +12,22 @@ import {
 import { isValidEmail } from "./resend.ts";
 
 const BACKUP_PREFIX = "arbol-backup-";
-const CRON_WINDOW_MINUTES = 15;
+/** Wider window so GitHub Actions UTC schedule drift is less likely to miss a slot (C1 evidence). */
+const CRON_WINDOW_MINUTES = 20;
+export const CRON_LAST_RUN_KEY = "arbol-cron-last-run";
+export const CRON_ATTEMPT_LOG_KEY = "arbol-cron-attempt-log";
+const ATTEMPT_LOG_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const ATTEMPT_LOG_MAX_ENTRIES = 500;
+
+export interface EmailAttemptLogEntry {
+  profileId: string;
+  tag: string;
+  recipient?: string;
+  attemptAt: number;
+  status: string;
+  skipReason?: string;
+  resendId?: string;
+}
 
 export interface NudgeSnapshot {
   dateKey: string;
@@ -35,6 +50,7 @@ interface BackupPayload {
   alertPrefs?: ProfileAlertPrefs | null;
   nudgeSnapshot?: NudgeSnapshot | null;
   tzOffset?: number;
+  profileArchived?: boolean;
 }
 
 const SLOT_TAGS = {
@@ -195,6 +211,37 @@ async function collectProfileIds(settings: EmailSettings): Promise<string[]> {
   return [...ids];
 }
 
+function truncateRecipient(email?: string): string | undefined {
+  if (!email || typeof email !== "string") return undefined;
+  const trimmed = email.trim();
+  const at = trimmed.indexOf("@");
+  if (at <= 0) return "***";
+  const user = trimmed.slice(0, at);
+  const domain = trimmed.slice(at + 1);
+  return `${user.slice(0, 2)}***@${domain}`;
+}
+
+async function logEmailAttempt(entry: EmailAttemptLogEntry): Promise<void> {
+  const raw = await kv.get(CRON_ATTEMPT_LOG_KEY);
+  const log: EmailAttemptLogEntry[] = Array.isArray(raw) ? raw as EmailAttemptLogEntry[] : [];
+  log.push({
+    ...entry,
+    recipient: truncateRecipient(entry.recipient),
+  });
+  const cutoff = Date.now() - ATTEMPT_LOG_MAX_AGE_MS;
+  const trimmed = log.filter((e) => e.attemptAt >= cutoff).slice(-ATTEMPT_LOG_MAX_ENTRIES);
+  await kv.set(CRON_ATTEMPT_LOG_KEY, trimmed);
+}
+
+export async function getCronAttemptLog(profileId?: string): Promise<EmailAttemptLogEntry[]> {
+  const raw = await kv.get(CRON_ATTEMPT_LOG_KEY);
+  const log: EmailAttemptLogEntry[] = Array.isArray(raw) ? raw as EmailAttemptLogEntry[] : [];
+  const cutoff = Date.now() - ATTEMPT_LOG_MAX_AGE_MS;
+  const recent = log.filter((e) => e.attemptAt >= cutoff);
+  if (!profileId) return recent.slice(-100);
+  return recent.filter((e) => e.profileId === profileId).slice(-50);
+}
+
 export async function runScheduledEmailNudges(): Promise<{
   ok: boolean;
   processed: number;
@@ -208,18 +255,47 @@ export async function runScheduledEmailNudges(): Promise<{
   let skipped = 0;
 
   if (!settings.enabled || !settings.smartNudgeEnabled) {
-    return { ok: true, processed: 0, sent: 0, skipped: 0, details: [{ profileId: "*", tag: "*", status: "global_disabled" }] };
+    const disabledResult = {
+      ok: true,
+      processed: 0,
+      sent: 0,
+      skipped: 0,
+      details: [{ profileId: "*", tag: "*", status: "global_disabled" }],
+    };
+    await kv.set(CRON_LAST_RUN_KEY, { ranAt: Date.now(), ...disabledResult });
+    return disabledResult;
   }
 
   const profileIds = await collectProfileIds(settings);
 
   for (const profileId of profileIds) {
     const backup = (await kv.get(`${BACKUP_PREFIX}${profileId}`)) as BackupPayload | null;
+
+    if (backup?.profileArchived === true) {
+      skipped++;
+      details.push({ profileId, tag: "*", status: "archived" });
+      await logEmailAttempt({
+        profileId,
+        tag: "*",
+        attemptAt: Date.now(),
+        status: "not_qualified",
+        skipReason: "archived",
+      });
+      continue;
+    }
+
     const prefs = backup?.alertPrefs ?? null;
 
     if (!isEmailEnabledForProfile(prefs)) {
       skipped++;
-      details.push({ profileId, tag: "*", status: "user_email_disabled" });
+      details.push({ profileId, tag: "*", status: "prefs_disabled" });
+      await logEmailAttempt({
+        profileId,
+        tag: "*",
+        attemptAt: Date.now(),
+        status: "not_qualified",
+        skipReason: "prefs_disabled",
+      });
       continue;
     }
 
@@ -230,6 +306,13 @@ export async function runScheduledEmailNudges(): Promise<{
     if (!isValidEmail(email)) {
       skipped++;
       details.push({ profileId, tag: "*", status: "no_email" });
+      await logEmailAttempt({
+        profileId,
+        tag: "*",
+        attemptAt: Date.now(),
+        status: "not_qualified",
+        skipReason: "no_email",
+      });
       continue;
     }
 
@@ -248,7 +331,16 @@ export async function runScheduledEmailNudges(): Promise<{
       const copy = buildNudgeCopy(tag, snapshotFresh, profileName);
       if (!copy) {
         skipped++;
-        details.push({ profileId, tag, status: "no_copy" });
+        const skipReason = !snapshotFresh ? "no_snapshot" : "no_copy";
+        details.push({ profileId, tag, status: skipReason });
+        await logEmailAttempt({
+          profileId,
+          tag,
+          recipient: email,
+          attemptAt: Date.now(),
+          status: "suppressed",
+          skipReason,
+        });
         continue;
       }
 
@@ -270,12 +362,40 @@ export async function runScheduledEmailNudges(): Promise<{
       if (result.ok) {
         sent++;
         details.push({ profileId, tag, status: `sent:${result.resendId ?? "ok"}` });
+        await logEmailAttempt({
+          profileId,
+          tag,
+          recipient: email,
+          attemptAt: Date.now(),
+          status: "provider_accepted",
+          resendId: result.resendId,
+        });
       } else {
         skipped++;
-        details.push({ profileId, tag, status: result.reason ?? "skipped" });
+        const reason = result.reason ?? "skipped";
+        details.push({
+          profileId,
+          tag,
+          status: reason === "send_failed" ? `send_failed` : reason,
+        });
+        await logEmailAttempt({
+          profileId,
+          tag,
+          recipient: email,
+          attemptAt: Date.now(),
+          status: reason === "send_failed" ? "provider_rejected" : "suppressed",
+          skipReason: reason,
+        });
       }
     }
   }
 
-  return { ok: true, processed: profileIds.length, sent, skipped, details };
+  const result = { ok: true, processed: profileIds.length, sent, skipped, details };
+  await kv.set(CRON_LAST_RUN_KEY, { ranAt: Date.now(), ...result });
+  return result;
+}
+
+export async function getCronLastRun(): Promise<Record<string, unknown> | null> {
+  const data = await kv.get(CRON_LAST_RUN_KEY);
+  return data && typeof data === "object" ? (data as Record<string, unknown>) : null;
 }

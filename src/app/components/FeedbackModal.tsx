@@ -57,9 +57,17 @@ export function FeedbackModal({ open, profileId, onSubmit, onLater }: Props) {
       footer={null}
       centered
       closable={false}
-      width="min(360px, calc(100vw - 24px))"
+      destroyOnHidden
+      width={360}
       styles={{
-        content: { borderRadius: 24, padding: 0, overflow: 'hidden', maxWidth: 360, margin: '0 auto' },
+        content: {
+          borderRadius: 24,
+          padding: 0,
+          overflow: 'hidden',
+          maxWidth: 'calc(100vw - 24px)',
+          width: 'min(360px, calc(100vw - 24px))',
+          margin: '0 auto',
+        },
         mask: { backdropFilter: 'blur(6px)', background: 'rgba(9,64,103,0.25)' },
       }}
     >
@@ -70,8 +78,11 @@ export function FeedbackModal({ open, profileId, onSubmit, onLater }: Props) {
           <h3 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 800, color: C.headline }}>
             Quick check-in!
           </h3>
-          <p style={{ color: C.body, fontSize: 14, margin: '0 0 28px', lineHeight: 1.5 }}>
+          <p style={{ color: C.body, fontSize: 14, margin: '0 0 12px', lineHeight: 1.5 }}>
             How was your experience today?<br />Takes less than 30 seconds.
+          </p>
+          <p style={{ color: C.secondary, fontSize: 12, margin: '0 0 28px', lineHeight: 1.45 }}>
+            This is a short app feedback survey, not your live task check-in coaching.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <button

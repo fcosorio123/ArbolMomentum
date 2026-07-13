@@ -1,16 +1,14 @@
 import { useState, useMemo } from 'react';
-import { Modal, Input, Button, Checkbox } from 'antd';
+import { Modal, Input, Button, Checkbox, Switch } from 'antd';
 import { ArrowLeftOutlined, CheckOutlined } from '@ant-design/icons';
 import { C } from '../data/colors';
 import type { Profile } from '../data/profiles';
 import type { CustomProfileType } from '../data/customProfiles';
 import { createCustomProfile } from '../data/customProfiles';
 import { saveProfileEmail, isValidProfileEmail } from '../data/profileContact';
-import {
-  parseGoalInput,
-  recurrenceSummary,
-  type SeedSuggestionGroup,
-} from '../data/profileSeedParser';
+import { parseContextTasksFromEdge } from '../data/aiTaskCreation';
+import { recurrenceSummary, type SeedSuggestionGroup } from '../data/profileSeedParser';
+import type { ParseContextSource } from '../data/aiTaskCreation';
 
 const { TextArea } = Input;
 
@@ -44,6 +42,10 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
   const [email, setEmail] = useState('');
   const [avatar, setAvatar] = useState('🌱');
   const [creating, setCreating] = useState(false);
+  const [useAiAssist, setUseAiAssist] = useState(true);
+  const [parsing, setParsing] = useState(false);
+  const [parseSource, setParseSource] = useState<ParseContextSource | null>(null);
+  const [parseError, setParseError] = useState<string | null>(null);
 
   const suggestedName = useMemo(() => {
     if (profileType === 'fresh') return 'Student - Fall 2026';
@@ -60,6 +62,10 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
     setEmail('');
     setAvatar('🌱');
     setCreating(false);
+    setUseAiAssist(true);
+    setParsing(false);
+    setParseSource(null);
+    setParseError(null);
   };
 
   const handleClose = () => {
@@ -77,11 +83,27 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
     }
   };
 
-  const handleGenerate = () => {
-    const parsed = parseGoalInput(goalText);
-    setSuggestions(parsed);
-    setName(parsed[0]?.goal.title ? `${parsed[0].goal.title} Profile` : 'My Profile');
-    setStep('review');
+  const handleGenerate = async () => {
+    setParsing(true);
+    setParseError(null);
+    try {
+      const result = await parseContextTasksFromEdge(goalText, { preferRules: !useAiAssist });
+      if (!result.ok || result.groups.length === 0) {
+        const reason = result.reason === 'network_error'
+          ? 'Could not reach the server. Check your connection and try again.'
+          : result.reason === 'input_too_short'
+            ? 'Please add a bit more detail about your goals.'
+            : 'No suggestions could be generated. Try rephrasing your goals.';
+        setParseError(reason);
+        return;
+      }
+      setSuggestions(result.groups);
+      setParseSource(result.source);
+      setName(result.groups[0]?.goal.title ? `${result.groups[0].goal.title} Profile` : 'My Profile');
+      setStep('review');
+    } finally {
+      setParsing(false);
+    }
   };
 
   const toggleGoal = (goalId: string, selected: boolean) => {
@@ -185,13 +207,28 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
             onChange={e => setGoalText(e.target.value)}
             placeholder="Complete FAFSA, track monthly expenses, exercise MWF, review tuition bill weekly..."
             rows={6}
-            style={{ marginBottom: 16, fontSize: 14 }}
+            style={{ marginBottom: 12, fontSize: 14 }}
           />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.headline }}>AI assist</div>
+              <div style={{ fontSize: 11, color: C.body, marginTop: 2 }}>
+                {useAiAssist ? 'Uses AI when available; falls back to rules on the server.' : 'Rule-based parsing only.'}
+              </div>
+            </div>
+            <Switch checked={useAiAssist} onChange={setUseAiAssist} />
+          </div>
+          {parseError && (
+            <p style={{ margin: '0 0 12px', fontSize: 12, color: '#c0392b', lineHeight: 1.4 }}>
+              {parseError}
+            </p>
+          )}
           <Button
             type="primary"
             block
             size="large"
-            disabled={goalText.trim().length < 8}
+            loading={parsing}
+            disabled={goalText.trim().length < 8 || parsing}
             onClick={handleGenerate}
             style={{ background: C.primary, fontWeight: 600 }}
           >
@@ -214,6 +251,11 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
           </h2>
           <p style={{ margin: '0 0 14px', fontSize: 12, color: C.body }}>
             {selectedTaskCount} task{selectedTaskCount !== 1 ? 's' : ''} selected · uncheck anything you don&apos;t need
+            {parseSource && (
+              <span style={{ display: 'block', marginTop: 4, color: C.secondary }}>
+                Parsed with {parseSource === 'llm' ? 'AI' : 'rules'}
+              </span>
+            )}
           </p>
           <div style={{ maxHeight: 320, overflowY: 'auto', marginBottom: 16 }}>
             {suggestions.map(group => (

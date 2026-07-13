@@ -3,10 +3,11 @@ import { Progress } from 'antd';
 import { CloseOutlined, CheckOutlined, RightOutlined, LeftOutlined } from '@ant-design/icons';
 import { getPersonalGoals, type PersonalGoal } from '../data/personalGoals';
 import {
-  getTaskStatus, setTaskStatus,
+  getTaskStatus,
   getTodayKey, getEarnedBadges,
   type TaskStatus,
 } from '../data/profiles';
+import { applyTaskStatusUpdate } from '../data/taskStatusPipeline';
 import { getTodayTaskRows } from '../data/dashboardSnapshot';
 import { C } from '../data/colors';
 import type { Profile } from '../data/profiles';
@@ -142,10 +143,17 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
   const overallPct = totalTasks > 0 ? Math.round((answeredCount / totalTasks) * 100) : 100;
 
   const selectStatus = (taskId: string, status: TaskStatus | null) => {
+    const task = allTasks.find(t => t.id === taskId);
+    applyTaskStatusUpdate({
+      profileId: profile.id,
+      taskId,
+      status,
+      source: 'check_in',
+      taskLabel: task?.label ?? taskId,
+      previousStatus: getTaskStatus(profile.id, taskId, today),
+    });
     setSelections(prev => ({ ...prev, [taskId]: status }));
-    setTaskStatus(profile.id, taskId, today, status);
     setAnsweredIds(prev => new Set([...prev, taskId]));
-    try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
   };
 
   const allTasksReviewed = totalTasks === 0 || answeredIds.size >= totalTasks;

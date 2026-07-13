@@ -13,7 +13,7 @@ interface Props {
 }
 
 export function ActiveGoalsList({ profileId, onNavigateGoals }: Props) {
-  const [goals, setGoals] = useState<PersonalGoal[]>([]);
+  const [goals, setGoals] = useState<PersonalGoal[]>(() => getPersonalGoals(profileId));
 
   const loadGoals = useCallback(() => {
     setGoals(getPersonalGoals(profileId));
@@ -88,6 +88,7 @@ export function ActiveGoalsList({ profileId, onNavigateGoals }: Props) {
         {headerLink}
       </div>
 
+      <div style={{ position: 'relative' }}>
       <div
         data-active-goals-scroll
         style={{
@@ -109,6 +110,13 @@ export function ActiveGoalsList({ profileId, onNavigateGoals }: Props) {
             isHighlighted={idx === 0}
           />
         ))}
+      </div>
+      {goalCards.length > 1 && (
+        <div aria-hidden style={{
+          position: 'absolute', top: 0, right: 0, bottom: 4, width: 28, pointerEvents: 'none',
+          background: `linear-gradient(90deg, transparent, ${C.bg})`,
+        }} />
+      )}
       </div>
 
       <div style={{ fontSize: 11, color: C.secondary, marginTop: 6, paddingLeft: 2 }}>

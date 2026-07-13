@@ -6,11 +6,11 @@
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { getEdgeBase, ANON } from './edge-config.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT = 'lhbvzojmtvjeauqnnmdu';
-const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxoYnZ6b2ptdHZqZWF1cW5ubWR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTk3OTYsImV4cCI6MjA5NDY3NTc5Nn0.ZRNFRD6I2E03nmP3N8ScDQig5SeVsSbliyyw-XjkEXI';
-const BASE = `https://${PROJECT}.supabase.co/functions/v1/make-server-5d90ddf5`;
+const BASE = getEdgeBase();
 const FAVIO_ID = 'favio';
 const FAVIO_EMAIL = 'favio.c.osorio@gmail.com';
 
@@ -76,6 +76,14 @@ assert('edge /health', health.status === 200 && health.data?.status === 'ok');
 // 2. Unauthorized cron blocked
 const unauth = await invoke('/run-daily-email-nudges', { method: 'POST', body: {}, cron: false });
 assert('cron rejects missing auth', unauth.status === 401);
+
+const wrongSecret = await fetch(`${BASE}/run-daily-email-nudges`, {
+  method: 'POST',
+  headers: { Authorization: 'Bearer wrong-secret-test', 'Content-Type': 'application/json' },
+  body: '{}',
+});
+const wrongData = await wrongSecret.json().catch(() => ({}));
+assert('cron rejects wrong secret', wrongSecret.status === 401, wrongData?.reason);
 
 // 3. Seed favio backup with email + fresh snapshot + tzOffset for local time
 const { hour, minute } = slotForNow();
@@ -167,6 +175,14 @@ const dedupTag = activeSlot?.tag ?? favioDetail?.tag ?? 'daily-morning';
 const favio2 = (cron2.data?.details ?? []).find(d => d.profileId === FAVIO_ID && d.tag === dedupTag);
 const deduped = favio2?.status === 'already_sent' || (cron2.data?.sent === 0 && !favio2?.status?.startsWith('sent:'));
 assert('cron dedupes same-day slot', deduped, favio2?.status ?? 'no repeat');
+
+// 8. Cron last-run observability
+const lastRun = await invoke('/cron-last-run');
+assert(
+  'cron-last-run endpoint',
+  lastRun.status === 200 && lastRun.data?.ok === true && lastRun.data?.data?.ranAt,
+  `sent=${lastRun.data?.data?.sent}`,
+);
 
 // 7. Restore default morning slot
 settings.smartSlots.morning = { enabled: true, hour: 8, minute: 0 };

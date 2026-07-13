@@ -92,34 +92,33 @@ export function calculateDailyStreak(profileId: string): number {
  */
 export function calculateWeeklyStreak(profileId: string): number {
   const today = new Date();
-  let streak = 0;
-
-  // Get current week's Monday
   const dayOfWeek = today.getDay();
-  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Sunday = 6 days from Monday
+  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
 
-  // Walk backward week by week
+  let streak = 0;
   for (let weekOffset = 0; weekOffset < 52; weekOffset++) {
     const weekStartDate = new Date(today);
     weekStartDate.setDate(today.getDate() - daysFromMonday - (weekOffset * 7));
 
-    // Check all 7 days of this week (Mon-Sun)
     let hasCompletionThisWeek = false;
     for (let dayInWeek = 0; dayInWeek < 7; dayInWeek++) {
       const checkDate = new Date(weekStartDate);
       checkDate.setDate(weekStartDate.getDate() + dayInWeek);
+      if (checkDate > today) break;
       const dateKey = getDateKey(checkDate);
-
       if (hasCompletionOnDate(profileId, dateKey)) {
         hasCompletionThisWeek = true;
         break;
       }
     }
 
+    if (weekOffset === 0 && !hasCompletionThisWeek) {
+      continue;
+    }
+
     if (hasCompletionThisWeek) {
       streak++;
     } else {
-      // Weekly streak broken
       break;
     }
   }
@@ -135,32 +134,32 @@ export function calculateMonthlyStreak(profileId: string): number {
   const today = new Date();
   let streak = 0;
 
-  // Walk backward month by month
   for (let monthOffset = 0; monthOffset < 24; monthOffset++) {
     const checkMonth = new Date(today.getFullYear(), today.getMonth() - monthOffset, 1);
     const year = checkMonth.getFullYear();
     const month = checkMonth.getMonth();
 
-    // Get first and last day of this month
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
+    const lastCheckDay = monthOffset === 0 ? today.getDate() : lastDay.getDate();
 
-    // Check all days in this month
     let hasCompletionThisMonth = false;
-    for (let day = firstDay.getDate(); day <= lastDay.getDate(); day++) {
+    for (let day = firstDay.getDate(); day <= lastCheckDay; day++) {
       const checkDate = new Date(year, month, day);
       const dateKey = getDateKey(checkDate);
-
       if (hasCompletionOnDate(profileId, dateKey)) {
         hasCompletionThisMonth = true;
         break;
       }
     }
 
+    if (monthOffset === 0 && !hasCompletionThisMonth) {
+      continue;
+    }
+
     if (hasCompletionThisMonth) {
       streak++;
     } else {
-      // Monthly streak broken
       break;
     }
   }

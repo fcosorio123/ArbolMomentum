@@ -1,0 +1,86 @@
+/**
+ * WP-23A static mobile launch gate checks (complements manual device matrix).
+ * Run: node scripts/test-mobile-gate.mjs
+ */
+import { readFileSync, existsSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const src = join(root, 'src', 'app', 'components');
+
+const MOBILE_SCREENS = [
+  'Dashboard.tsx',
+  'GoalsPage.tsx',
+  'TaskList.tsx',
+  'WeekPlan.tsx',
+  'CalendarScreen.tsx',
+  'RemindersScreen.tsx',
+  'ProfileScreen.tsx',
+  'CheckInPage.tsx',
+  'BottomNav.tsx',
+];
+
+const BOTTOM_NAV_CLEAR = /calc\(100px \+ env\(safe-area-inset-bottom/;
+const SAFE_TOP = /safe-area-inset-top/;
+const DYNAMIC_VH = /100dvh/;
+
+let passed = 0;
+let failed = 0;
+
+function assert(name, ok, detail = '') {
+  if (ok) {
+    passed++;
+    console.log(`  ✓ ${name}${detail ? ` — ${detail}` : ''}`);
+  } else {
+    failed++;
+    console.error(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`);
+  }
+}
+
+console.log('\nWP-23A mobile static gate\n');
+
+for (const file of MOBILE_SCREENS) {
+  const path = join(src, file);
+  if (!existsSync(path)) {
+    assert(`${file} exists`, false, 'missing');
+    continue;
+  }
+  const text = readFileSync(path, 'utf8');
+  if (file === 'CheckInPage.tsx') {
+    assert(`${file} full-viewport shell`, /inset:\s*0/.test(text) && /safe-area-inset-top/.test(text));
+    continue;
+  }
+  assert(`${file} uses 100dvh`, DYNAMIC_VH.test(text) || file === 'BottomNav.tsx');
+  if (!['BottomNav.tsx', 'CheckInPage.tsx'].includes(file)) {
+    assert(`${file} safe-area top`, SAFE_TOP.test(text));
+  }
+  if (!['BottomNav.tsx', 'CheckInPage.tsx'].includes(file)) {
+    assert(`${file} clears bottom nav`, BOTTOM_NAV_CLEAR.test(text) || /16px 100px/.test(text) || (file === 'ProfileScreen.tsx' && /calc\(130px \+ env\(safe-area-inset-bottom/.test(text)));
+  }
+}
+
+// Core workflow modules present
+const workflowModules = [
+  'src/app/components/CreateProfileModal.tsx',
+  'src/app/components/CheckInPage.tsx',
+  'src/app/components/admin/OpsTab.tsx',
+  'src/app/data/feedbackTriggers.ts',
+  'src/app/data/taskPrioritization.ts',
+  'src/app/data/aiTaskCreation.ts',
+];
+
+for (const rel of workflowModules) {
+  assert(rel, existsSync(join(root, rel)));
+}
+
+const ai = readFileSync(join(root, 'src/app/data/aiTaskCreation.ts'), 'utf8');
+assert('AI parse client rule fallback', /parseGoalInput/.test(ai) && /client_fallback/.test(ai));
+
+const app = readFileSync(join(root, 'src/app/App.tsx'), 'utf8');
+assert('viewport-fit=cover meta', /viewport-fit=cover/.test(app));
+assert('no 90s feedback timer', !/setTimeout\([^,]+,\s*90000/.test(app));
+assert('feedback trigger polling', /evaluateFeedbackTrigger|feedbackTriggers/.test(app));
+
+console.log(`\n${passed} passed, ${failed} failed\n`);
+process.exit(failed > 0 ? 1 : 0);

@@ -3,7 +3,7 @@
 // ──────────────────────────────────────────────
 
 import { getStorageKey } from './environment';
-import { scheduleSave } from './cloudBackup';
+import { scheduleSave, saveToCloud } from './cloudBackup';
 import { requestEmailSend } from './emailNudges';
 import { isEmailTypeEnabled } from './emailSettings';
 
@@ -44,6 +44,7 @@ export function saveProfileEmail(
   }
 
   scheduleSave(profileId);
+  void saveToCloud(profileId);
 
   if (trimmed && !hadEmail && opts?.sendWelcome !== false && isEmailTypeEnabled('welcomeEnabled')) {
     requestEmailSend({

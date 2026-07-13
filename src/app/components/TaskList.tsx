@@ -3,7 +3,7 @@ import { App, Button, Progress } from 'antd';
 import { DeleteOutlined, CheckCircleFilled, PlayCircleOutlined, ArrowRightOutlined, EditOutlined, PlusOutlined, CloseOutlined } from '@ant-design/icons';
 import {
   type Profile, type Task, type TaskStatus,
-  getTaskCategoriesForProfile, getTaskStatus, setTaskStatus,
+  getTaskCategoriesForProfile, getTaskStatus,
   skipTaskForToday, permanentlyHideSeedTask, getTodayKey, getPermanentlyHiddenSeedTaskIds,
   getEarnedBadges, type Badge, isFreshProfile,
 } from '../data/profiles';
@@ -28,9 +28,8 @@ import { MomentumUpdateModal } from './MomentumUpdateModal';
 import { TaskUpdateModal, type TaskUpdateContext } from './TaskUpdateModal';
 import { TASK_STATUS_DISPLAY } from './TaskStatusSelector';
 import { LiveCheckInFeedbackCard } from './LiveCheckInFeedbackCard';
-import {
-  submitReportUpdate, saveTaskNote, dispatchFeedbackUpdated, getTaskNote, type ReportEntry,
-} from '../data/liveCheckInFeedback';
+import { getTaskNote, type ReportEntry } from '../data/liveCheckInFeedback';
+import { applyTaskStatusUpdate } from '../data/taskStatusPipeline';
 import { isLiveCheckInEnabled, fetchLiveCheckInSettings } from '../data/liveCheckInSettings';
 import { useScrollPositionLock } from '../hooks/useScrollPositionLock';
 import { truncateRemark, SKIPPED_BADGE, shouldShowRemark } from './taskCardDisplay';
@@ -355,7 +354,34 @@ function GoalGroup({
   const allVisibleTasks = tasks.filter(t =>
     timeFilter === 'all' || t.timeOfDay === timeFilter
   );
-  if (allVisibleTasks.length === 0) return null;
+  const suggestedLabels = suggestTasksForGoal(goal).map(s => s.label);
+
+  if (allVisibleTasks.length === 0) {
+    return (
+      <div style={{ marginBottom: 20 }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px',
+          background: `linear-gradient(135deg, ${accentColor}18, ${accentColor}06)`,
+          borderRadius: 16, border: `1.5px solid ${accentColor}30`,
+        }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: C.headline }}>{goal.title}</div>
+            <div style={{ fontSize: 12, color: C.body, marginTop: 4 }}>No tasks yet for this goal today.</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => onAddSuggestedTask(suggestedLabels[0] ?? 'New task', goal.id)}
+            style={{
+              padding: '8px 12px', borderRadius: 10, border: `1.5px solid ${accentColor}`,
+              background: '#fff', color: accentColor, fontWeight: 600, fontSize: 12, cursor: 'pointer',
+            }}
+          >
+            Add task
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const countableTasks = allVisibleTasks.filter(t => statuses[t.id] !== 'skipped');
   const doneTasks = countableTasks.filter(t => statuses[t.id] === 'done').length;
@@ -363,8 +389,6 @@ function GoalGroup({
   const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
   const allDone = totalTasks > 0 && doneTasks === totalTasks;
   const accent = allDone ? C.primary : accentColor;
-
-  const suggestedLabels = suggestTasksForGoal(goal).map(s => s.label);
 
   return (
     <div style={{ marginBottom: 24 }}>
@@ -872,7 +896,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   const countable = visible.filter(t => statuses[t.id] !== 'skipped');
   const done = countable.filter(t => statuses[t.id] === 'done').length;
   const overallPct = countable.length > 0 ? Math.round((done / countable.length) * 100) : 0;
-  const isEmpty = categories.length === 0 && userTasks.length === 0;
+  const isEmpty = categories.length === 0 && userTasks.length === 0 && goals.length === 0;
   const hideExploreSuggestions = isFreshProfile(profile.id) || isUserDefinedProfile(profile.id);
 
   const openTaskUpdate = (
@@ -901,22 +925,16 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     const { taskId, taskLabel } = taskUpdateContext;
     const prevStatus = statuses[taskId] ?? null;
 
-    let entry: ReportEntry | null = null;
-    if (liveCheckInEnabled) {
-      entry = submitReportUpdate({
-        profileId: profile.id,
-        taskId,
-        taskTitle: taskLabel,
-        status,
-        note,
-        previousStatus: prevStatus,
-      });
-    } else {
-      setTaskStatus(profile.id, taskId, today, status);
-      saveTaskNote(profile.id, taskId, today, note);
-      try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
-      dispatchFeedbackUpdated();
-    }
+    const entry = applyTaskStatusUpdate({
+      profileId: profile.id,
+      taskId,
+      status,
+      note,
+      source: 'task_list',
+      taskLabel,
+      previousStatus: prevStatus,
+      liveCheckInEnabled,
+    });
 
     const persisted = getTaskStatus(profile.id, taskId, today);
     const statusSaved = persisted === status || (status === null && persisted === null);

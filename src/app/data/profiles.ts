@@ -1741,6 +1741,7 @@ export function getWeekPlanForProfile(profileId: string): Record<string, string[
 // Profile archive (soft hide from active lists)
 // ──────────────────────────────────────────────
 const ARCHIVED_PROFILES_KEY = 'arbol-archived-profiles';
+export const PROFILE_ARCHIVE_CHANGED = 'arbol-profile-archive-changed';
 
 export function getArchivedProfileIds(): Set<string> {
   try {
@@ -1754,11 +1755,41 @@ export function isProfileArchived(profileId: string): boolean {
   return getArchivedProfileIds().has(profileId);
 }
 
-export function setProfileArchived(profileId: string, archived: boolean): void {
+export function getStoredActiveProfileId(): string | null {
+  try { return localStorage.getItem('arbol-active-profile'); } catch { return null; }
+}
+
+export function clearStoredActiveProfile(): void {
+  try {
+    localStorage.removeItem('arbol-active-profile');
+    sessionStorage.removeItem('arbol-selector-unlocked');
+  } catch { /* ignore */ }
+}
+
+function writeArchivedProfileIds(ids: Set<string>): void {
+  localStorage.setItem(ARCHIVED_PROFILES_KEY, JSON.stringify([...ids]));
+}
+
+/** Cloud sync merge — no archive notification email. */
+export function applyProfileArchivedFromSync(profileId: string, archived: boolean): void {
   const ids = getArchivedProfileIds();
   if (archived) ids.add(profileId);
   else ids.delete(profileId);
-  localStorage.setItem(ARCHIVED_PROFILES_KEY, JSON.stringify([...ids]));
+  writeArchivedProfileIds(ids);
+}
+
+export function setProfileArchived(profileId: string, archived: boolean): { clearedActiveSession: boolean } {
+  const ids = getArchivedProfileIds();
+  if (archived) ids.add(profileId);
+  else ids.delete(profileId);
+  writeArchivedProfileIds(ids);
+
+  let clearedActiveSession = false;
+  if (archived && getStoredActiveProfileId() === profileId) {
+    clearStoredActiveProfile();
+    clearedActiveSession = true;
+  }
+
   if (archived) {
     import('./emailSettings').then(({ isEmailTypeEnabled }) => {
       if (!isEmailTypeEnabled('profileArchivedEnabled')) return;
@@ -1767,6 +1798,16 @@ export function setProfileArchived(profileId: string, archived: boolean): void {
       });
     });
   }
+
+  import('./cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId));
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(PROFILE_ARCHIVE_CHANGED, {
+      detail: { profileId, archived, clearedActiveSession },
+    }));
+  }
+
+  return { clearedActiveSession };
 }
 
 export function getActiveProfiles(includeArchived = false): Profile[] {
@@ -1826,20 +1867,19 @@ export function computeLiveStreak(profileId: string, todayHasActivity = false): 
       }
     }
     return count;
-  } else {
-    // Today not yet done - show yesterday's trailing streak so users see what they stand to lose
-    let count = 0;
-    for (let i = 1; i <= 365; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      if (hasActivityOnDate(profileId, getDateKey(d))) {
-        count++;
-      } else {
-        break;
-      }
-    }
-    return count;
   }
+
+  let count = 0;
+  for (let i = 1; i <= 365; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    if (hasActivityOnDate(profileId, getDateKey(d))) {
+      count++;
+    } else {
+      break;
+    }
+  }
+  return count;
 }
 
 /** Longest consecutive days with ≥1 completed task (same rule as live streak). */
@@ -1864,6 +1904,23 @@ export function computeBestStreak(profileId: string): number {
   return best;
 }
 
+/** Persist best daily/weekly/monthly streak values after a completion. */
+export function updateStreakBests(profileId: string): void {
+  const todayKey = getTodayKey();
+  const daily = computeLiveStreak(profileId, hasActivityOnDate(profileId, todayKey));
+  const weekly = calculateWeeklyStreak(profileId);
+  const monthly = calculateMonthlyStreak(profileId);
+  let stored = { daily: 0, weekly: 0, monthly: 0 };
+  try {
+    stored = { ...stored, ...JSON.parse(localStorage.getItem(`streak-best-${profileId}`) || '{}') };
+  } catch { /* ignore */ }
+  localStorage.setItem(`streak-best-${profileId}`, JSON.stringify({
+    daily: Math.max(daily, stored.daily || 0),
+    weekly: Math.max(weekly, stored.weekly || 0),
+    monthly: Math.max(monthly, stored.monthly || 0),
+  }));
+}
+
 export function getTaskStatus(profileId: string, taskId: string, date: string): TaskStatus | null {
   const stored = localStorage.getItem(`task-${profileId}-${taskId}-${date}`);
   if (stored === 'inprogress' || stored === 'done' || stored === 'skipped') return stored;
@@ -1880,6 +1937,7 @@ export function setTaskStatus(profileId: string, taskId: string, date: string, s
 
   if (status === 'done') {
     localStorage.setItem(`streak-${profileId}-${date}`, 'true');
+    updateStreakBests(profileId);
   }
 
   // Sync to Supabase (async, non-blocking)

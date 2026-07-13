@@ -169,6 +169,55 @@ export async function sendTestEmail(recipient?: string): Promise<{ ok: boolean; 
   }
 }
 
+export interface CronLastRun {
+  ranAt?: number;
+  processed?: number;
+  sent?: number;
+  skipped?: number;
+  details?: Array<{ profileId: string; tag: string; status: string }>;
+}
+
+export async function fetchCronLastRun(): Promise<CronLastRun | null> {
+  if (!isPublishedVersion()) return null;
+  try {
+    const { data, error } = await supabase.functions.invoke(`${FN}/cron-last-run`, {
+      method: 'GET',
+    });
+    if (!error && data?.ok && data.data) return data.data as CronLastRun;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+export interface CronAttemptLogEntry {
+  profileId: string;
+  tag: string;
+  recipient?: string;
+  attemptAt: number;
+  status: string;
+  skipReason?: string;
+  resendId?: string;
+}
+
+export async function fetchCronAttemptLog(profileId?: string): Promise<CronAttemptLogEntry[]> {
+  if (!isPublishedVersion()) return [];
+  try {
+    const path = profileId
+      ? `${FN}/cron-attempt-log?profileId=${encodeURIComponent(profileId)}`
+      : `${FN}/cron-attempt-log`;
+    const { data, error } = await supabase.functions.invoke(path, { method: 'GET' });
+    if (!error && data?.ok && Array.isArray(data.data)) return data.data as CronAttemptLogEntry[];
+  } catch {
+    // ignore
+  }
+  return [];
+}
+
+export function isOperationalEmailLive(settings: EmailSettings): boolean {
+  return settings.enabled && settings.smartNudgeEnabled;
+}
+
 export async function sendManualNudge(opts: {
   profileId: string;
   type: 'smart_nudge' | 'welcome' | 'check_in_confirmation';

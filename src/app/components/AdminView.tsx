@@ -7,6 +7,7 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
 import { getActiveProfiles, getTodayKey, getDateKey, computeLiveStreak, computeBestStreak, hasActivityOnDate, isProfileArchived, setProfileArchived } from '../data/profiles';
+import { OpsTab } from './admin/OpsTab';
 import {
   computeDayStatsFromPersisted,
   buildRemoteDayOverlay,
@@ -37,8 +38,9 @@ import {
 } from '../data/appSettings';
 import {
   fetchEmailSettings, saveEmailSettings, getEmailSettings,
-  sendTestEmail, sendManualNudge,
+  sendTestEmail, sendManualNudge, fetchCronLastRun, isOperationalEmailLive,
   type EmailSettings, type EmailTriggerMode, type SmartSlotsConfig,
+  type CronLastRun,
   DEFAULT_SMART_SLOTS,
 } from '../data/emailSettings';
 import {
@@ -67,6 +69,10 @@ function getDateForWeekday(dayName: string) {
 
 // ── Sub-components ────────────────────────────
 
+function getOperativeProfiles() {
+  return getActiveProfiles(false);
+}
+
 function TabBar({ tab, onChange }: { tab: string; onChange: (t: string) => void }) {
   const tabs = [
     { id: 'overview', label: '📊' },
@@ -74,6 +80,7 @@ function TabBar({ tab, onChange }: { tab: string; onChange: (t: string) => void 
     { id: 'feedback', label: '💬' },
     { id: 'goals', label: '🌟' },
     { id: 'devices', label: '📱' },
+    { id: 'ops', label: '🔧' },
     { id: 'settings', label: '⚙️' },
   ];
   return (
@@ -189,8 +196,9 @@ function OverviewTab() {
   useEffect(() => { load(); const iv = setInterval(load, 30000); return () => clearInterval(iv); }, []);
 
   const today = getTodayKey();
-  const totalVisits = stats.reduce((s, p) => s + p.todayVisits, 0);
-  const avgCompletion = stats.length > 0 ? Math.round(stats.reduce((s, p) => s + p.todayDetail.pct, 0) / stats.length) : 0;
+  const visibleStats = stats.filter(p => showArchived || !isProfileArchived(p.id));
+  const totalVisits = visibleStats.reduce((s, p) => s + p.todayVisits, 0);
+  const avgCompletion = visibleStats.length > 0 ? Math.round(visibleStats.reduce((s, p) => s + p.todayDetail.pct, 0) / visibleStats.length) : 0;
 
   const card: React.CSSProperties = { background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16, boxShadow: C.shadow };
 
@@ -202,10 +210,10 @@ function OverviewTab() {
       </p>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
         {[
-          { label: 'Total visits', value: totalVisits, sub: `${stats.filter(p => p.todayVisits > 0).length} of ${getActiveProfiles(true).length} active`, color: C.primary },
+          { label: 'Total visits', value: totalVisits, sub: `${visibleStats.filter(p => p.todayVisits > 0).length} of ${visibleStats.length} active`, color: C.primary },
           { label: 'Avg completion', value: `${avgCompletion}%`, sub: 'across all users', color: C.primary },
-          { label: 'In progress', value: stats.filter(p => p.todayDetail.inprog > 0).length, sub: 'users mid-way', color: C.streak },
-          { label: 'Fully done', value: stats.filter(p => p.todayDetail.pct === 100).length, sub: '100% today', color: C.tertiary },
+          { label: 'In progress', value: visibleStats.filter(p => p.todayDetail.inprog > 0).length, sub: 'users mid-way', color: C.streak },
+          { label: 'Fully done', value: visibleStats.filter(p => p.todayDetail.pct === 100).length, sub: '100% today', color: C.tertiary },
         ].map(s => (
           <div key={s.label} style={{ ...card, padding: 14 }}>
             <div style={{ fontSize: 26, fontWeight: 800, color: C.headline }}>{s.value}</div>
@@ -410,14 +418,14 @@ interface EngagementData {
 }
 
 function AnalyticsTab() {
-  const [selectedId, setSelectedId] = useState(getActiveProfiles(true)[0].id);
+  const [selectedId, setSelectedId] = useState(getOperativeProfiles()[0]?.id ?? '');
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('week');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [engagementData, setEngagementData] = useState<EngagementData[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const profile = getActiveProfiles(true).find(p => p.id === selectedId)!;
+  const profile = getOperativeProfiles().find(p => p.id === selectedId)!;
   const today = getTodayKey();
 
   const hourlyData = getActivityChartData(selectedId, today);
@@ -714,7 +722,7 @@ function AnalyticsTab() {
         Select User
       </p>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
-        {getActiveProfiles(true).map(p => (
+        {getOperativeProfiles().map(p => (
           <button key={p.id} onClick={() => setSelectedId(p.id)} style={{
             flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6,
             padding: '8px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
@@ -1046,7 +1054,7 @@ function FeedbackTab() {
 
   const card: React.CSSProperties = { background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16, boxShadow: C.shadow };
 
-  const profileMap = useMemo(() => Object.fromEntries(getActiveProfiles(true).map(p => [p.id, p])), []);
+  const profileMap = useMemo(() => Object.fromEntries(getOperativeProfiles().map(p => [p.id, p])), []);
 
   return (
     <div style={{ padding: '0 16px 24px' }}>
@@ -1061,7 +1069,7 @@ function FeedbackTab() {
           color: filterUser === 'all' ? '#fff' : C.body,
           fontWeight: filterUser === 'all' ? 700 : 400, fontSize: 13, boxShadow: C.shadow,
         }}>All</button>
-        {getActiveProfiles(true).map(p => (
+        {getOperativeProfiles().map(p => (
           <button key={p.id} onClick={() => setFilterUser(p.id)} style={{
             flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5,
             padding: '7px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
@@ -1250,7 +1258,7 @@ function DevicesTab() {
     notif_clicked: '👆', badge_updated: '🔴',
   };
 
-  const allProfiles = getActiveProfiles(true);
+  const allProfiles = getOperativeProfiles();
   const recordList = allProfiles.map(p => ({
     profile: p,
     record: records[p.id] ?? null,
@@ -1276,7 +1284,7 @@ function DevicesTab() {
 
   // Summary counts
   const allRecords = Object.values(records);
-  const totalProfiles = getActiveProfiles(true).length;
+  const totalProfiles = getOperativeProfiles().length;
   const withRecord = allRecords.length;
   const pwaCount = allRecords.filter(r => r.isPwa).length;
   const notifGranted = allRecords.filter(r => r.notifPermission === 'granted').length;
@@ -1447,7 +1455,7 @@ function DevicesTab() {
           </p>
           <div style={{ ...card, overflow: 'hidden' }}>
             {eventLogEntries.map((ev, idx) => {
-              const profile = getActiveProfiles(true).find(p => p.id === ev.profileId);
+              const profile = getOperativeProfiles().find(p => p.id === ev.profileId);
               return (
                 <div key={`${ev.profileId}-${ev.event}-${ev.timestamp}-${idx}`} style={{
                   display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
@@ -1515,7 +1523,7 @@ function PersonalGoalsTab() {
 
     // Load all goals from all profiles
     const goalMap: Record<string, PersonalGoal> = {};
-    getActiveProfiles(true).forEach(profile => {
+    getOperativeProfiles().forEach(profile => {
       const goals = getPersonalGoals(profile.id);
       goals.forEach(goal => {
         goalMap[goal.id] = goal;
@@ -1600,7 +1608,7 @@ function PersonalGoalsTab() {
           color: filterUser === 'all' ? '#fff' : C.body,
           fontWeight: filterUser === 'all' ? 700 : 400, fontSize: 13, boxShadow: C.shadow,
         }}>All</button>
-        {getActiveProfiles(true).map(p => (
+        {getOperativeProfiles().map(p => (
           <button key={p.id} onClick={() => setFilterUser(p.id)} style={{
             flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5,
             padding: '7px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
@@ -1644,7 +1652,7 @@ function PersonalGoalsTab() {
               <strong style={{ color: C.body }}>Data source:</strong> {isPublishedVersion() ? 'Supabase (cloud)' : 'localStorage (local)'}
             </div>
             <div>
-              <strong style={{ color: C.body }}>Filter:</strong> {filterUser === 'all' ? 'All users' : getActiveProfiles(true).find(p => p.id === filterUser)?.name || filterUser}
+              <strong style={{ color: C.body }}>Filter:</strong> {filterUser === 'all' ? 'All users' : getOperativeProfiles().find(p => p.id === filterUser)?.name || filterUser}
             </div>
           </div>
         </div>
@@ -1658,7 +1666,7 @@ function PersonalGoalsTab() {
               {new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </div>
             {entries.map((log) => {
-              const profile = getActiveProfiles(true).find(p => p.id === log.profileId);
+              const profile = getOperativeProfiles().find(p => p.id === log.profileId);
               const goal = allGoals[log.goalId];
               return (
                 <div key={log.id} style={{ ...card, padding: '14px 16px', marginBottom: 10 }}>
@@ -1739,7 +1747,7 @@ function PersonalGoalsTab() {
       {/* User-Created Tasks section */}
       {(() => {
         const userTaskRows: { profile: string; task: UserTask; goalTitle?: string }[] = [];
-        getActiveProfiles(true).forEach(p => {
+        getOperativeProfiles().forEach(p => {
           const uts = getUserTasks(p.id);
           const goals = getPersonalGoals(p.id);
           uts.forEach(t => {
@@ -1800,16 +1808,19 @@ function SettingsTab() {
   const [liveCheckInSaved, setLiveCheckInSaved] = useState(false);
   const [testSending, setTestSending] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
-  const [manualProfileId, setManualProfileId] = useState(getActiveProfiles(true)[0]?.id ?? '');
+  const [manualProfileId, setManualProfileId] = useState(getOperativeProfiles()[0]?.id ?? '');
   const [manualType, setManualType] = useState<'smart_nudge' | 'welcome' | 'check_in_confirmation'>('smart_nudge');
   const [manualSending, setManualSending] = useState(false);
   const [manualResult, setManualResult] = useState<string | null>(null);
+  const [cronLastRun, setCronLastRun] = useState<CronLastRun | null>(null);
+  const [cronDetailsOpen, setCronDetailsOpen] = useState(false);
 
   useEffect(() => {
-    Promise.all([fetchAppSettings(), fetchEmailSettings(), fetchLiveCheckInSettings()]).then(([s, e, l]) => {
+    Promise.all([fetchAppSettings(), fetchEmailSettings(), fetchLiveCheckInSettings(), fetchCronLastRun()]).then(([s, e, l, cron]) => {
       setSettings(s);
       setEmailSettings(e);
       setLiveCheckInSettings(l);
+      setCronLastRun(cron);
       setLoading(false);
     });
   }, []);
@@ -1853,7 +1864,7 @@ function SettingsTab() {
   };
 
   const handleManualNudge = async () => {
-    const profile = getActiveProfiles(true).find(p => p.id === manualProfileId);
+    const profile = getOperativeProfiles().find(p => p.id === manualProfileId);
     setManualSending(true);
     setManualResult(null);
     const result = await sendManualNudge({
@@ -1990,6 +2001,86 @@ function SettingsTab() {
 
       <div style={{ ...labelStyle, marginBottom: 10 }}>Email notifications (Resend)</div>
 
+      {!isOperationalEmailLive(emailSettings) && (
+        <div style={{
+          marginBottom: 16, padding: '12px 14px', borderRadius: 12,
+          background: `${C.streak}18`, border: `1.5px solid ${C.streak}55`,
+          fontSize: 13, color: C.headline, lineHeight: 1.45,
+        }}>
+          <strong>Operational email alerts are off.</strong> Test emails from this screen may still work, but scheduled smart nudges will not send until global email and smart nudges are both enabled.
+        </div>
+      )}
+
+      <div style={{ ...cardStyle, marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, color: C.headline }}>Email cron health</div>
+          <Button size="small" icon={<ReloadOutlined />} onClick={async () => setCronLastRun(await fetchCronLastRun())}>
+            Refresh
+          </Button>
+        </div>
+        {cronLastRun ? (
+          <>
+            <div style={{ fontSize: 12, color: C.body, lineHeight: 1.5 }}>
+              Last run: {cronLastRun.ranAt ? new Date(cronLastRun.ranAt).toLocaleString() : 'unknown'}
+              {' · '}Processed: {cronLastRun.processed ?? 0}
+              {' · '}Sent: {cronLastRun.sent ?? 0}
+              {' · '}Skipped: {cronLastRun.skipped ?? 0}
+            </div>
+            {cronLastRun.ranAt && Date.now() - cronLastRun.ranAt > 2 * 60 * 60 * 1000 && (
+              <div style={{ marginTop: 8, fontSize: 12, color: C.streak, fontWeight: 600 }}>
+                Last run is over 2 hours ago — check GitHub Actions schedule.
+              </div>
+            )}
+            {(cronLastRun.details ?? []).some(d => d.status === 'global_disabled') && (
+              <div style={{ marginTop: 8, fontSize: 12, color: C.streak, fontWeight: 600 }}>
+                Last cron reported global_disabled — enable global email and smart nudges above.
+              </div>
+            )}
+            {(cronLastRun.details?.length ?? 0) > 0 && (
+              <button
+                type="button"
+                onClick={() => setCronDetailsOpen(v => !v)}
+                style={{
+                  marginTop: 10, padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.border}`,
+                  background: C.bgAlt, fontSize: 12, cursor: 'pointer', color: C.primary,
+                }}
+              >
+                {cronDetailsOpen ? 'Hide skip details' : 'Show skip details'}
+              </button>
+            )}
+            {cronDetailsOpen && (
+              <div style={{ marginTop: 10, maxHeight: 180, overflow: 'auto', fontSize: 11, fontFamily: 'monospace' }}>
+                {(cronLastRun.details ?? []).map((d, i) => (
+                  <div key={`${d.profileId}-${d.tag}-${i}`} style={{ padding: '2px 0', color: C.body }}>
+                    {d.profileId} / {d.tag}: {d.status}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{ fontSize: 12, color: C.secondary }}>
+            No cron run recorded yet (published builds only). Use Refresh after deploying edge or running the GitHub workflow.
+          </div>
+        )}
+        <div style={{ marginTop: 8, fontSize: 11, color: C.body }}>
+          Per-profile attempt history: Ops tab. Re-run: GitHub Actions → Email nudge cron.
+        </div>
+        <div style={{ marginTop: 6, fontSize: 11, color: C.secondary, lineHeight: 1.45 }}>
+          Common skip reasons: <code>no_email</code> (profile email missing in backup),{' '}
+          <code>already_sent</code> (same slot today), <code>no_copy</code> (zero pending tasks — expected),{' '}
+          <code>global_disabled</code> (toggle above), <code>archived</code> (profile archived).
+        </div>
+      </div>
+
+      <div style={{
+        marginBottom: 16, padding: '10px 14px', borderRadius: 12,
+        background: `${C.primary}0d`, border: `1px solid ${C.primary}30`,
+        fontSize: 12, color: C.body, lineHeight: 1.45,
+      }}>
+        Production delivery to student addresses requires a verified sending domain in Resend (not onboarding@resend.dev sandbox).
+      </div>
+
       <div style={cardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
@@ -2103,7 +2194,7 @@ function SettingsTab() {
 
       <div style={cardStyle}>
         <div style={labelStyle}>Profile emails (admin override)</div>
-        {getActiveProfiles(true).map(p => (
+        {getOperativeProfiles().map(p => (
           <div key={p.id} style={{ marginTop: 10 }}>
             <div style={{ fontSize: 12, color: C.body, marginBottom: 4 }}>{p.name} ({p.id})</div>
             <Input
@@ -2124,7 +2215,7 @@ function SettingsTab() {
             value={manualProfileId}
             onChange={setManualProfileId}
             style={{ width: '100%' }}
-            options={getActiveProfiles(true).map(p => ({ value: p.id, label: p.name }))}
+            options={getOperativeProfiles().map(p => ({ value: p.id, label: p.name }))}
           />
         </div>
         <div style={{ marginTop: 10 }}>
@@ -2162,7 +2253,7 @@ export function AdminView({ onBack }: Props) {
   const dataStats = isPublishedVersion() ? getDataCollectionStats() : null;
 
   return (
-    <div style={{ minHeight: '100dvh', background: C.bg, maxWidth: 430, margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100dvh', background: C.bg, width: '100%', maxWidth: 'min(100vw, 900px)', margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
       {/* Header */}
       <div style={{ background: `linear-gradient(160deg, ${C.headline} 0%, #1a6da8 100%)`, padding: 'max(52px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -2239,6 +2330,7 @@ export function AdminView({ onBack }: Props) {
         {tab === 'feedback' && <FeedbackTab />}
         {tab === 'goals' && <PersonalGoalsTab />}
         {tab === 'devices' && <DevicesTab />}
+        {tab === 'ops' && <OpsTab />}
         {tab === 'settings' && <SettingsTab />}
       </div>
 

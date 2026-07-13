@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from 'antd';
 import {
-  FireOutlined, DownloadOutlined, ArrowRightOutlined,
+  FireOutlined, DownloadOutlined, ArrowRightOutlined, BellOutlined,
 } from '@ant-design/icons';
 import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile } from './AppTour';
 import type { Profile } from '../data/profiles';
@@ -21,6 +21,7 @@ interface Props {
   onCoachMark: () => void;
   onNavigateTasks?: () => void;
   onNavigateGoals?: () => void;
+  onNavigateReminders?: () => void;
   onShowSummary?: () => void;
   onShowFeedback?: () => void;
   onGoals?: () => void;
@@ -136,7 +137,7 @@ function DashboardSkeleton() {
 
 export function Dashboard({
   profile, installPrompt, onInstall, onCoachMark,
-  onNavigateTasks, onNavigateGoals, onShowSummary, onShowFeedback, onGoals: _onGoals, onStartCheckIn,
+  onNavigateTasks, onNavigateGoals, onNavigateReminders, onShowSummary, onShowFeedback, onGoals: _onGoals, onStartCheckIn,
   isActive = true,
   canStartPageTours = true,
 }: Props) {
@@ -249,7 +250,7 @@ export function Dashboard({
   }
 
   return (
-    <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 20px', background: C.bg, minHeight: '100dvh' }}>
+    <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px calc(100px + env(safe-area-inset-bottom, 0px))', background: C.bg, minHeight: '100dvh' }}>
 
       {/* ── Header */}
       <div data-tour-id="home-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
@@ -261,6 +262,13 @@ export function Dashboard({
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {onNavigateReminders && (
+            <button onClick={onNavigateReminders} aria-label="Alerts and reminders" style={{
+              background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 10,
+              padding: '6px 10px', cursor: 'pointer', color: C.primary, fontSize: 13,
+              display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600,
+            }}><BellOutlined /> Alerts</button>
+          )}
           {onShowSummary && (
             <button onClick={onShowSummary} style={{
               background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 10,

@@ -14,14 +14,19 @@ import { CheckInPage } from './components/CheckInPage';
 
 import { BottomNav } from './components/BottomNav';
 import { CoachMarks } from './components/CoachMarks';
-import { coachStorageKey, dismissAllToursForProfile, areToursDismissedForProfile } from './components/AppTour';
 import { AddToHomeScreen } from './components/AddToHomeScreen';
 import { CelebrationModal } from './components/CelebrationModal';
-import { DailySummaryModal, isSummaryEnabled, markSummaryShownToday, wasSummaryShownToday } from './components/DailySummaryModal';
+import { DailySummaryModal, markSummaryShownToday } from './components/DailySummaryModal';
 import { DASHBOARD_REFRESH_EVENT, getBadgeCount } from './data/dashboardSnapshot';
 import { FeedbackModal } from './components/FeedbackModal';
 import { SupabaseSyncIndicator } from './components/SupabaseSyncIndicator';
-import { shouldShowFeedbackNudge } from './data/feedback';
+import { shouldShowFeedbackNudge } from './data/feedbackTriggers';
+import {
+  type OnboardingModal,
+  peekOnboardingModal,
+  nextOnboardingAfter,
+  markCoachDone,
+} from './data/onboardingQueue';
 import {
   detectDevice, saveDeviceRecord, trackEvent,
 } from './data/deviceAnalytics';
@@ -36,6 +41,7 @@ import {
 } from './data/pushNotifications';
 import {
   getProfileById, type Profile, type Badge,
+  isProfileArchived, clearStoredActiveProfile, PROFILE_ARCHIVE_CHANGED,
 } from './data/profiles';
 import { C } from './data/colors';
 
@@ -90,6 +96,10 @@ export default function App() {
   const [activeProfile, setActiveProfile] = useState<Profile | null>(() => {
     try {
       const saved = localStorage.getItem('arbol-active-profile');
+      if (saved && isProfileArchived(saved)) {
+        clearStoredActiveProfile();
+        return null;
+      }
       if (saved) return getProfileById(saved) ?? null;
     } catch {}
     return null;
@@ -105,14 +115,12 @@ export default function App() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null);
-  const [showCoach, setShowCoach] = useState(false);
+  const [onboardingModal, setOnboardingModal] = useState<OnboardingModal | null>(null);
   const [showInstallTutorial, setShowInstallTutorial] = useState(false);
   const [showPostInstallNotif, setShowPostInstallNotif] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationBadges, setCelebrationBadges] = useState<Badge[]>([]);
-  const [showDailySummary, setShowDailySummary] = useState(false);
   const [summaryDataVersion, setSummaryDataVersion] = useState(0);
-  const [showFeedback, setShowFeedback] = useState(false);
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [badgeSupported] = useState(() => 'setAppBadge' in navigator);
@@ -129,6 +137,24 @@ export default function App() {
   }, []);
 
   useEffect(() => { fetchAppSettings(); fetchEmailSettings(); fetchLiveCheckInSettings(); }, []);
+
+  useEffect(() => {
+    const onArchiveChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ clearedActiveSession?: boolean; profileId?: string; archived?: boolean }>).detail;
+      if (detail?.clearedActiveSession) {
+        setActiveProfile(null);
+        setProfileSelectorUnlocked(false);
+        return;
+      }
+      if (activeProfile && isProfileArchived(activeProfile.id)) {
+        clearStoredActiveProfile();
+        setActiveProfile(null);
+        setProfileSelectorUnlocked(false);
+      }
+    };
+    window.addEventListener(PROFILE_ARCHIVE_CHANGED, onArchiveChanged);
+    return () => window.removeEventListener(PROFILE_ARCHIVE_CHANGED, onArchiveChanged);
+  }, [activeProfile?.id]);
 
   // ── PWA setup: meta tags + manifest link + canvas icon injection
   useEffect(() => {
@@ -356,7 +382,7 @@ export default function App() {
       });
     };
 
-    import('./data/cloudBackup').then(({ syncProfileFromCloud }) => {
+    import('./data/cloudBackup').then(({ syncProfileFromCloud, pushQualificationAfterSync }) => {
       syncProfileFromCloud(profileId).then(result => {
         sessionStorage.setItem(sessionKey, 'true');
         if (result === 'full-restore') {
@@ -366,42 +392,48 @@ export default function App() {
         if (result === 'merged') {
           try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
         }
-        tryHydrate();
+        pushQualificationAfterSync(profileId).finally(() => {
+          tryHydrate();
+        });
       });
     });
   }, [activeProfile?.id]);
 
-  // ── Coach marks for first-time users
-  useEffect(() => {
+  const advanceOnboarding = useCallback((completed: OnboardingModal) => {
     if (!activeProfile) return;
-    if (areToursDismissedForProfile(activeProfile.id)) return;
-    if (localStorage.getItem(coachStorageKey(activeProfile.id))) return;
-    const t = setTimeout(() => {
-      if (areToursDismissedForProfile(activeProfile.id)) return;
-      if (localStorage.getItem(coachStorageKey(activeProfile.id))) return;
-      setShowCoach(true);
-    }, 600);
-    return () => clearTimeout(t);
+    setOnboardingModal(nextOnboardingAfter(activeProfile.id, completed));
   }, [activeProfile?.id]);
 
+  const onboardingQueueActive = onboardingModal !== null;
+  const showCoach = onboardingModal === 'coach';
+  const showDailySummary = onboardingModal === 'summary';
+  const showFeedback = onboardingModal === 'feedback';
 
-  // ── Daily summary: auto-show on launch (after coach marks, not during)
+  // ── First-visit modal queue (WP-20): coach → summary → feedback, one at a time
   useEffect(() => {
     if (!activeProfile) return;
-    if (showCoach) return;
-    if (!isSummaryEnabled(activeProfile.id)) return;
-    if (wasSummaryShownToday(activeProfile.id)) return;
     const profileId = activeProfile.id;
-    const t = setTimeout(() => {
-      if (showCoach) return;
-      if (!areToursDismissedForProfile(profileId) && !localStorage.getItem(coachStorageKey(profileId))) return;
-      setSummaryDataVersion(v => v + 1);
-      setShowDailySummary(true);
-    }, 800);
-    return () => clearTimeout(t);
-  }, [activeProfile?.id, showCoach]);
+    const t = window.setTimeout(() => {
+      setOnboardingModal(peekOnboardingModal(profileId));
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [activeProfile?.id]);
 
-  // ── Keep summary modal in sync with task/goal changes
+  // ── Feedback nudge when queue is idle (streak milestone or 9 p.m. — PD-05)
+  useEffect(() => {
+    if (!activeProfile || onboardingModal) return;
+    const profileId = activeProfile.id;
+    const check = () => {
+      if (onboardingModal) return;
+      if (shouldShowFeedbackNudge(profileId)) setOnboardingModal('feedback');
+    };
+    const interval = window.setInterval(check, 60_000);
+    window.addEventListener('arbol-goals-updated', check);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('arbol-goals-updated', check);
+    };
+  }, [activeProfile?.id, onboardingModal]);
   useEffect(() => {
     const bump = () => setSummaryDataVersion(v => v + 1);
     window.addEventListener(DASHBOARD_REFRESH_EVENT, bump);
@@ -416,15 +448,9 @@ export default function App() {
     };
   }, []);
 
-  // ── Feedback nudge
   useEffect(() => {
-    if (!activeProfile) return;
-    if (!shouldShowFeedbackNudge(activeProfile.id)) return;
-    const t = setTimeout(() => {
-      if (shouldShowFeedbackNudge(activeProfile.id)) setShowFeedback(true);
-    }, 90_000);
-    return () => clearTimeout(t);
-  }, [activeProfile?.id]);
+    if (onboardingModal === 'summary') setSummaryDataVersion(v => v + 1);
+  }, [onboardingModal]);
 
   const syncBadge = useCallback((profileId: string) => {
     const count = getBadgeCount(profileId);
@@ -494,8 +520,8 @@ export default function App() {
   };
 
   const handleCoachDone = () => {
-    setShowCoach(false);
-    if (activeProfile) dismissAllToursForProfile(activeProfile.id);
+    if (activeProfile) markCoachDone(activeProfile.id);
+    advanceOnboarding('coach');
   };
 
   if (showAdmin) {
@@ -566,17 +592,18 @@ export default function App() {
           installPrompt={installPrompt}
           onInstall={handleInstall}
           swRegistration={swRegistration}
-          onCoachMark={() => setShowCoach(true)}
+          onCoachMark={() => setOnboardingModal('coach')}
           onNavigateTasks={() => setActiveTab('tasks')}
           onNavigateGoals={() => setActiveTab('goals')}
+          onNavigateReminders={() => setActiveTab('reminders')}
           onShowSummary={() => {
             setSummaryDataVersion(v => v + 1);
-            setShowDailySummary(true);
+            setOnboardingModal('summary');
           }}
-          onShowFeedback={() => setShowFeedback(true)}
+          onShowFeedback={() => setOnboardingModal('feedback')}
           onStartCheckIn={() => setShowCheckIn(true)}
           isActive={activeTab === 'home'}
-          canStartPageTours={!showCoach && !showDailySummary}
+          canStartPageTours={!onboardingQueueActive}
         />
       )}
       {activeTab === 'goals' && (
@@ -687,12 +714,12 @@ export default function App() {
             profile={activeProfile}
             dataVersion={summaryDataVersion}
             onClose={() => {
-              markSummaryShownToday(activeProfile.id);
-              setShowDailySummary(false);
+              if (activeProfile) markSummaryShownToday(activeProfile.id);
+              advanceOnboarding('summary');
             }}
             onStartTasks={() => {
-              markSummaryShownToday(activeProfile.id);
-              setShowDailySummary(false);
+              if (activeProfile) markSummaryShownToday(activeProfile.id);
+              advanceOnboarding('summary');
               setActiveTab('tasks');
             }}
           />
@@ -701,8 +728,8 @@ export default function App() {
           <FeedbackModal
             open={showFeedback}
             profileId={activeProfile.id}
-            onSubmit={() => setShowFeedback(false)}
-            onLater={() => setShowFeedback(false)}
+            onSubmit={() => advanceOnboarding('feedback')}
+            onLater={() => advanceOnboarding('feedback')}
           />
 
           {/* Celebration modal */}

@@ -10,36 +10,11 @@ import {
 import {
   getTaskCategoriesForProfile, getTaskStatus, isTaskActiveForDate, getTodayKey,
 } from '../data/profiles';
+import { getGoalTaskBreakdown } from '../data/goalProgressUtils';
 import { getUserTasks, createUserTask, orphanUserTasksForGoal, deleteUserTask, isTaskScheduledForDate } from '../data/userTasks';
 import { ManageGoalModal } from './ManageGoalModal';
 import { C } from '../data/colors';
 import type { Profile } from '../data/profiles';
-
-type TaskBreakdown = { done: number; inprogress: number; notStarted: number; total: number };
-
-function getGoalTaskBreakdown(profileId: string, goalId: string, dateKey: string): TaskBreakdown {
-  const categories = getTaskCategoriesForProfile(profileId);
-  const userTasks = getUserTasks(profileId);
-  let done = 0, inprogress = 0, notStarted = 0;
-  const count = (taskId: string) => {
-    if (!isTaskActiveForDate(profileId, taskId, dateKey)) return;
-    const s = getTaskStatus(profileId, taskId, dateKey);
-    if (s === 'skipped') return;
-    if (s === 'done') done++;
-    else if (s === 'inprogress') inprogress++;
-    else notStarted++;
-  };
-  categories.forEach(cat => {
-    if (cat.goalId !== goalId) return;
-    cat.tasks.forEach(t => count(t.id));
-  });
-  userTasks.forEach(ut => {
-    if (ut.goalId !== goalId) return;
-    if (!isTaskScheduledForDate(ut, dateKey)) return;
-    count(ut.id);
-  });
-  return { done, inprogress, notStarted, total: done + inprogress + notStarted };
-}
 
 function getWeekDays(): Array<{ label: string; short: string; dateKey: string; isToday: boolean }> {
   const now = new Date();
@@ -146,7 +121,7 @@ function goalAccent(goalId: string) {
 }
 
 export function GoalsPage({ profile, onNavigateTasks }: Props) {
-  const [goals, setGoals] = useState<PersonalGoal[]>([]);
+  const [goals, setGoals] = useState<PersonalGoal[]>(() => getPersonalGoals(profile.id));
   const [manageGoalOpen, setManageGoalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<PersonalGoal | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PersonalGoal | null>(null);

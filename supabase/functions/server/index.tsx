@@ -30,11 +30,17 @@ app.get("/health", (c) => {
   return c.json({ status: "ok" });
 });
 
-// Save a full profile backup
+// Save a full profile backup (reject stale overwrites)
 app.post("/backup/:profileId", async (c) => {
   const profileId = c.req.param("profileId");
   try {
     const payload = await c.req.json();
+    const existing = await kv.get(`arbol-backup-${profileId}`);
+    const incomingAt = typeof payload?.savedAt === "number" ? payload.savedAt : 0;
+    const existingAt = typeof existing?.savedAt === "number" ? existing.savedAt : 0;
+    if (existing && incomingAt > 0 && existingAt > incomingAt) {
+      return c.json({ ok: false, reason: "stale_backup", cloudSavedAt: existingAt });
+    }
     await kv.set(`arbol-backup-${profileId}`, payload);
     return c.json({ ok: true });
   } catch (err) {
@@ -173,6 +179,47 @@ app.post("/run-daily-email-nudges", async (c) => {
   } catch (err) {
     console.log("[RunDailyEmailNudges] Error:", err);
     return c.json({ ok: false, reason: String(err) }, 500);
+  }
+});
+
+// AI-assisted context parsing (LLM optional; rule-based edge fallback)
+app.post("/parse-context-tasks", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const text = typeof body?.text === "string" ? body.text : "";
+    const preferRules = Boolean(body?.preferRules);
+    const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "anon";
+    const { parseContextTasks } = await import("./parseContextTasks.ts");
+    const result = await parseContextTasks(text, { rateLimitKey: ip, preferRules });
+    return c.json(result);
+  } catch (err) {
+    console.log("[ParseContextTasks] Error:", err);
+    return c.json({ ok: false, groups: [], source: "rules", reason: String(err) }, 500);
+  }
+});
+
+// Admin: last cron run summary (observability)
+app.get("/cron-last-run", async (c) => {
+  try {
+    const { getCronLastRun } = await import("./emailNudgeCron.ts");
+    const data = await getCronLastRun();
+    return c.json({ ok: true, data });
+  } catch (err) {
+    console.log("[CronLastRun] Error:", err);
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+// Admin: rolling email attempt log (7-day window)
+app.get("/cron-attempt-log", async (c) => {
+  try {
+    const profileId = c.req.query("profileId")?.trim() || undefined;
+    const { getCronAttemptLog } = await import("./emailNudgeCron.ts");
+    const data = await getCronAttemptLog(profileId);
+    return c.json({ ok: true, data });
+  } catch (err) {
+    console.log("[CronAttemptLog] Error:", err);
+    return c.json({ error: String(err) }, 500);
   }
 });
 

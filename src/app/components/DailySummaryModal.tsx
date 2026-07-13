@@ -154,11 +154,14 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
       footer={null}
       centered
       closable={false}
-      width="min(400px, calc(100vw - 16px))"
+      destroyOnHidden
+      width={400}
       styles={{
         content: {
           borderRadius: 24, padding: 0, overflow: 'hidden',
-          maxWidth: 'min(400px, calc(100vw - 16px))',
+          maxWidth: 'calc(100vw - 24px)',
+          width: 'min(400px, calc(100vw - 24px))',
+          margin: '0 auto',
           maxHeight: '90vh', display: 'flex', flexDirection: 'column',
         },
         body: { padding: 0, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' },

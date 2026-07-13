@@ -13,6 +13,7 @@ import { getTaskNote } from '../data/liveCheckInFeedback';
 import { truncateRemark, SKIPPED_BADGE, shouldShowRemark } from './taskCardDisplay';
 import { TaskCalendarButton } from './TaskCalendarButton';
 import { C } from '../data/colors';
+import { getGoalTaskBreakdown } from '../data/goalProgressUtils';
 
 interface Props { profile: Profile }
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -30,31 +31,6 @@ function getDateForDay(day: string) {
 }
 function dateKey(day: string) {
   return getDateKey(getDateForDay(day));
-}
-
-function getGoalTaskProgress(profileId: string, goalId: string, allUserTasks: UserTask[]) {
-  const today = getTodayKey();
-  const cats = getTaskCategoriesForProfile(profileId);
-  let done = 0, total = 0;
-  cats.forEach(cat => {
-    if (cat.goalId !== goalId) return;
-    cat.tasks.forEach(t => {
-      if (!isTaskActiveForDate(profileId, t.id, today)) return;
-      const st = getTaskStatus(profileId, t.id, today);
-      if (st === 'skipped') return;
-      total++;
-      if (st === 'done') done++;
-    });
-  });
-  allUserTasks.forEach(ut => {
-    if (ut.goalId !== goalId) return;
-    if (!isTaskActiveForDate(profileId, ut.id, today)) return;
-    const st = getTaskStatus(profileId, ut.id, today);
-    if (st === 'skipped') return;
-    total++;
-    if (st === 'done') done++;
-  });
-  return { done, total, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
 }
 
 type StatusMap = Record<string, Record<string, TaskStatus | null>>;
@@ -259,7 +235,7 @@ export function WeekPlan({ profile }: Props) {
     ACCENT_COLORS[Math.abs(goalId.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % ACCENT_COLORS.length];
 
   return (
-    <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 16px', background: C.bg, minHeight: '100dvh' }}>
+    <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px calc(100px + env(safe-area-inset-bottom, 0px))', background: C.bg, minHeight: '100dvh' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.headline }}>Week Plan</h2>
@@ -293,7 +269,8 @@ export function WeekPlan({ profile }: Props) {
           </div>
           {personalGoals.map(goal => {
             const accent = goalAccent(goal.id);
-            const prog = getGoalTaskProgress(profile.id, goal.id, userTasks);
+            const breakdown = getGoalTaskBreakdown(profile.id, goal.id, getTodayKey());
+            const prog = { done: breakdown.done, total: breakdown.total, pct: breakdown.total > 0 ? Math.round((breakdown.done / breakdown.total) * 100) : 0 };
             return (
               <div key={goal.id} style={{ marginBottom: personalGoals.indexOf(goal) < personalGoals.length - 1 ? 12 : 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, alignItems: 'center' }}>

@@ -12,6 +12,9 @@ import {
   getTodayKey,
 } from './profiles';
 import { getActiveUserTasksForDate } from './userTasks';
+import { getTodayTaskRows } from './dashboardSnapshot';
+import { getPersonalGoals } from './personalGoals';
+import { pickTopRankedTask, type PrioritizedTask } from './taskPrioritization';
 
 export type MovementState = 'up' | 'flat' | 'down';
 export type WarningType = null | 'blocker' | 'open_loops' | 'decline' | 'urgent_safety';
@@ -334,52 +337,55 @@ export function recommendNextAction(
     }
   }
 
-  const highInProgress = tasks.find(t =>
-    t.type === 'priority' && getTaskStatus(profileId, t.id, dateKey) === 'inprogress',
-  );
-  if (highInProgress) {
+  const goals = getPersonalGoals(profileId);
+  const goalMap = Object.fromEntries(goals.map(g => [g.id, g.title]));
+  const ranked: PrioritizedTask[] = getTodayTaskRows(profileId, dateKey)
+    .filter(t => t.disposition === 'active' && t.status !== 'done' && t.status !== 'skipped')
+    .map(t => ({
+      id: t.id,
+      label: t.label,
+      timeOfDay: t.timeOfDay,
+      type: t.type,
+      goalId: t.goalId,
+      goalTitle: t.goalId ? goalMap[t.goalId] : undefined,
+      status: t.status,
+    }));
+  const top = pickTopRankedTask(ranked);
+  if (top) {
+    if (top.status === 'inprogress' && top.type === 'priority') {
+      return {
+        label: top.label,
+        reason: pace === 'catch_up'
+          ? 'stay on this priority — finishing it moves the whole day'
+          : 'you already started the highest-leverage work',
+        taskId: top.id,
+        adjustment: pace === 'catch_up' ? 'increase_pace' : 'maintain',
+      };
+    }
+    if (top.type === 'priority') {
+      return {
+        label: top.label,
+        reason: pace === 'catch_up' || pace === 'behind'
+          ? 'pick up the priority task now to make up ground'
+          : 'highest leverage if you want the day to feel different',
+        taskId: top.id,
+        adjustment: pace === 'catch_up' ? 'increase_pace' : 'narrow_focus',
+      };
+    }
+    if (top.status === 'inprogress') {
+      return {
+        label: top.label,
+        reason: 'close what you already opened before spreading out',
+        taskId: top.id,
+        adjustment: counts.inProgressTaskCount > 1 ? 'close_loops' : 'maintain',
+      };
+    }
     return {
-      label: highInProgress.label,
-      reason: pace === 'catch_up'
-        ? 'stay on this priority — finishing it moves the whole day'
-        : 'you already started the highest-leverage work',
-      taskId: highInProgress.id,
-      adjustment: pace === 'catch_up' ? 'increase_pace' : 'maintain',
-    };
-  }
-
-  const highNotStarted = tasks.find(t =>
-    t.type === 'priority' && !getTaskStatus(profileId, t.id, dateKey),
-  );
-  if (highNotStarted) {
-    return {
-      label: highNotStarted.label,
-      reason: pace === 'catch_up' || pace === 'behind'
-        ? 'pick up the priority task now to make up ground'
-        : 'highest leverage if you want the day to feel different',
-      taskId: highNotStarted.id,
-      adjustment: pace === 'catch_up' ? 'increase_pace' : 'narrow_focus',
-    };
-  }
-
-  const anyInProgress = tasks.find(t => getTaskStatus(profileId, t.id, dateKey) === 'inprogress');
-  if (anyInProgress) {
-    return {
-      label: anyInProgress.label,
-      reason: 'close what you already opened before spreading out',
-      taskId: anyInProgress.id,
-      adjustment: counts.inProgressTaskCount > 1 ? 'close_loops' : 'maintain',
-    };
-  }
-
-  const anyNotStarted = tasks.find(t => !getTaskStatus(profileId, t.id, dateKey));
-  if (anyNotStarted) {
-    return {
-      label: anyNotStarted.label,
+      label: top.label,
       reason: remaining <= 2
         ? 'one of the last open items on your list'
         : 'next sensible step without overloading the day',
-      taskId: anyNotStarted.id,
+      taskId: top.id,
       adjustment: pace === 'catch_up' ? 'increase_pace' : 'maintain',
     };
   }

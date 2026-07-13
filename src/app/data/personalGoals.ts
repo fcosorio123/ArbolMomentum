@@ -3,6 +3,7 @@
 // ──────────────────────────────────────────────
 
 import { getTodayKey } from './profiles';
+import { clearTaskGoalLinksForGoal } from './goalTaskResolution';
 
 export type MilestoneLevel = 'light' | 'medium' | 'medium-high' | 'hard' | 'epic';
 
@@ -713,6 +714,73 @@ export const DEFAULT_PERSONAL_GOALS: PersonalGoal[] = [
       },
     ],
   },
+  // ── John (demo weekly profile) ─────────────────
+  {
+    id: 'john-priorities',
+    profileId: 'john',
+    title: 'Show Up for People Who Matter',
+    deepWhy: 'Relationships and family moments are the foundation everything else is built on.',
+    targetValue: 100,
+    currentValue: 0,
+    unit: '%',
+    createdAt: Date.now(),
+    milestones: [
+      {
+        id: 'john-pri-m1', level: 'light',
+        title: 'One meaningful act this week',
+        tasks: ['Cook for someone you care about', 'Help with an important deadline', 'Be present without distractions'],
+        completed: false,
+      },
+      {
+        id: 'john-pri-m2', level: 'medium',
+        title: 'Consistent follow-through',
+        tasks: ['Complete two priority commitments', 'Check in with family', 'Plan one shared activity'],
+        completed: false,
+      },
+    ],
+  },
+  {
+    id: 'john-career',
+    profileId: 'john',
+    title: 'Land a Part-Time Role',
+    deepWhy: 'Steady income and creative work that builds toward the career I want.',
+    targetValue: 100,
+    currentValue: 0,
+    unit: '%',
+    createdAt: Date.now(),
+    milestones: [
+      {
+        id: 'john-car-m1', level: 'light',
+        title: 'Job search in motion',
+        tasks: ['Apply to 3 roles this week', 'Update resume', 'Finish video editing project'],
+        completed: false,
+      },
+      {
+        id: 'john-car-m2', level: 'medium',
+        title: 'Interview-ready',
+        tasks: ['Practice interview answers', 'Portfolio piece complete', 'Follow up on applications'],
+        completed: false,
+      },
+    ],
+  },
+  {
+    id: 'john-wellness',
+    profileId: 'john',
+    title: 'Feel Confident & Put Together',
+    deepWhy: 'Small self-care wins boost confidence for everything else on the list.',
+    targetValue: 100,
+    currentValue: 0,
+    unit: '%',
+    createdAt: Date.now(),
+    milestones: [
+      {
+        id: 'john-well-m1', level: 'light',
+        title: 'Fresh start',
+        tasks: ['Get a haircut', 'Pick out a go-to outfit', 'Hydrate and sleep well tonight'],
+        completed: false,
+      },
+    ],
+  },
   // ── Favio ──────────────────────────────────────
   {
     id: 'favio-lose-weight',
@@ -1137,7 +1205,7 @@ function progressLogKey(logId: string) {
 
 // Bump this version string when DEFAULT_PERSONAL_GOALS changes significantly,
 // so returning users get the updated goal set on their next load.
-const GOALS_DATA_VERSION = 'v5-2026-06-09';
+const GOALS_DATA_VERSION = 'v6-2026-07-13';
 
 function goalsVersionKey(profileId: string) {
   return `arbol-goals-version-${profileId}`;
@@ -1186,7 +1254,8 @@ export function getPersonalGoals(profileId: string): PersonalGoal[] {
   }
 
   if (stored && storedVersion === GOALS_DATA_VERSION) {
-    return JSON.parse(stored);
+    const parsed: PersonalGoal[] = JSON.parse(stored);
+    if (parsed.length > 0) return parsed;
   }
 
   const defaults = DEFAULT_PERSONAL_GOALS
@@ -1241,6 +1310,7 @@ export function updateUserGoal(profileId: string, goalId: string, data: { title:
 
 export function deleteUserGoal(profileId: string, goalId: string) {
   recordDeletedDefaultGoal(profileId, goalId);
+  clearTaskGoalLinksForGoal(profileId, goalId);
   const goals = getPersonalGoals(profileId);
   savePersonalGoals(profileId, goals.filter(g => g.id !== goalId));
   localStorage.setItem(goalsVersionKey(profileId), GOALS_DATA_VERSION);
@@ -1279,7 +1349,7 @@ export function resetGoalProgress(profileId: string, goalId: string) {
   // Clear all progress logs for this goal
   for (let i = localStorage.length - 1; i >= 0; i--) {
     const key = localStorage.key(i);
-    if (key?.startsWith('arbol-goal-progress-') || key?.startsWith(`goal-task-${profileId}-${goalId}-`)) {
+    if (key?.startsWith('arbol-goal-progress-') || key?.startsWith(`arbol-gtask-${profileId}-${goalId}-`)) {
       try {
         const item = localStorage.getItem(key);
         if (item && key.includes(goalId)) {

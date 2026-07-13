@@ -242,7 +242,7 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
   });
 
   if (!result.ok) {
-    return { ok: false, reason: result.error ?? "send_failed" };
+    return { ok: false, reason: result.error ? `send_failed:${result.error}` : "send_failed" };
   }
 
   if (payload.type !== "test") {

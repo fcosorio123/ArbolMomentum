@@ -109,14 +109,7 @@ export function recordNudge(profileId: string) {
   }));
 }
 
-export function shouldShowFeedbackNudge(profileId: string): boolean {
-  if (hasFeedbackToday(profileId)) return false;
-  const state = getNudgeState(profileId);
-  if (state.count >= 2) return false;
-  if (state.count === 0) return true;
-  // After first dismissal, wait at least 3 hours
-  return Date.now() - state.lastShownAt >= 3 * 60 * 60 * 1000;
-}
+export { shouldShowFeedbackNudge, evaluateFeedbackTrigger } from './feedbackTriggers';
 
 // ──────────────────────────────────────────────
 // Hourly activity tracking

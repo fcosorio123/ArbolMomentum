@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button, Progress, Input } from 'antd';
 import { LogoutOutlined, SettingOutlined, FireOutlined, TrophyOutlined, ThunderboltOutlined, HomeOutlined, BellOutlined, ArrowRightOutlined, MailOutlined } from '@ant-design/icons';
-import { type Profile, PROFILES, getEarnedBadges, computeLiveStreak } from '../data/profiles';
+import { type Profile, PROFILES, getEarnedBadges, computeLiveStreak, computeBestStreak } from '../data/profiles';
 import { getProfileEmail, saveProfileEmail } from '../data/profileContact';
 import { BadgesSection } from './BadgesSection';
 import { C } from '../data/colors';
@@ -15,18 +15,19 @@ export function ProfileScreen({ profile, onSwitch, onAdmin, onAlerts }: Props) {
   const rank = [...PROFILES].sort((a, b) => b.streak - a.streak).findIndex(p => p.id === profile.id) + 1;
   const earned = getEarnedBadges(profile);
   const liveStreak = computeLiveStreak(profile.id);
+  const bestStreak = Math.max(computeBestStreak(profile.id), liveStreak);
 
   const dayLabel = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
 
   const stats = [
     { icon: <FireOutlined style={{ color: C.streak }} />, label: 'Current Streak', value: dayLabel(liveStreak) },
-    { icon: <TrophyOutlined style={{ color: C.streak }} />, label: 'Best Streak', value: dayLabel(profile.bestStreak) },
+    { icon: <TrophyOutlined style={{ color: C.streak }} />, label: 'Best Streak', value: dayLabel(bestStreak) },
     { icon: <ThunderboltOutlined style={{ color: C.primary }} />, label: 'Avg. Completion', value: `${profile.completionRate}%` },
     { icon: <HomeOutlined style={{ color: C.primary }} />, label: 'Week on Program', value: `Week ${profile.joinedWeek}` },
   ];
 
   return (
-    <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 32px', background: C.bg, minHeight: '100dvh' }}>
+    <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px calc(130px + env(safe-area-inset-bottom, 0px))', background: C.bg, minHeight: '100dvh' }}>
       {/* Hero */}
       <div style={{
         background: `linear-gradient(160deg, ${C.headline} 0%, #1a6da8 100%)`,
@@ -121,7 +122,7 @@ export function ProfileScreen({ profile, onSwitch, onAdmin, onAlerts }: Props) {
             </div>
           </div>
 
-          <div style={{ background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16, padding: '16px 18px', boxShadow: C.shadow, marginBottom: 12 }}>
+          <div style={{ background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16, padding: '16px 18px', boxShadow: C.shadow, marginBottom: 56, scrollMarginBottom: 'calc(72px + env(safe-area-inset-bottom, 0px))' }}>
             {onAlerts && (
               <button
                 onClick={onAlerts}

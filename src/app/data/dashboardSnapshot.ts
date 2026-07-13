@@ -6,6 +6,11 @@ import {
 import { getPersonalGoals, type PersonalGoal } from './personalGoals';
 import { getUserTasks, isTaskScheduledForDate, type UserTask } from './userTasks';
 import { getPrimaryGoalIdForTask } from './taskGoalLinks';
+import {
+  type PrioritizedTask,
+  pickTopRankedTask,
+  rankOpenTasks,
+} from './taskPrioritization';
 
 export const DASHBOARD_REFRESH_EVENT = 'arbol-dashboard-refresh';
 export const DAILY_CHECKIN_KEY = (profileId: string, dateKey: string) =>
@@ -241,26 +246,28 @@ export function getPeriodTaskCounts(profileId: string, dateKey = getTodayKey()) 
 export function pickDoNowTask(profileId: string, dateKey = getTodayKey()): {
   id: string; label: string; timeOfDay: string; goalTitle?: string;
 } | null {
-  const hour = new Date().getHours();
-  const preferredTime = hour >= 17 ? 'evening' : 'morning';
   const goals = getPersonalGoals(profileId);
   const goalMap = Object.fromEntries(goals.map(g => [g.id, g.title]));
-  const candidates = getTodayTaskRows(profileId, dateKey)
+  const candidates: PrioritizedTask[] = getTodayTaskRows(profileId, dateKey)
     .filter(t => t.disposition === 'active' && t.status !== 'done' && t.status !== 'skipped')
     .map(t => ({
       id: t.id,
       label: t.label,
       timeOfDay: t.timeOfDay,
+      type: t.type,
+      goalId: t.goalId,
       goalTitle: t.goalId ? goalMap[t.goalId] : undefined,
       status: t.status,
     }));
 
-  return (
-    candidates.find(t => t.status === 'inprogress' && t.timeOfDay === preferredTime) ??
-    candidates.find(t => t.timeOfDay === preferredTime) ??
-    candidates[0] ??
-    null
-  );
+  const top = pickTopRankedTask(candidates);
+  if (!top) return null;
+  return {
+    id: top.id,
+    label: top.label,
+    timeOfDay: top.timeOfDay,
+    goalTitle: top.goalTitle,
+  };
 }
 
 /** Actionable tasks still open today (seed + user, excludes skipped/removed). */
@@ -283,13 +290,23 @@ export function getTopPendingTasks(
 ): Array<{ label: string; goalTitle?: string }> {
   const goals = getPersonalGoals(profileId);
   const goalMap = new Map(goals.map(g => [g.id, g.title]));
-  return getTodayTaskRows(profileId, dateKey)
-    .filter(r => r.disposition === 'active' && r.status !== 'done' && r.status !== 'skipped')
-    .slice(0, limit)
-    .map(r => ({
-      label: r.label,
-      goalTitle: r.goalId ? goalMap.get(r.goalId) : undefined,
-    }));
+  const ranked = rankOpenTasks(
+    getTodayTaskRows(profileId, dateKey)
+      .filter(r => r.disposition === 'active' && r.status !== 'done' && r.status !== 'skipped')
+      .map(r => ({
+        id: r.id,
+        label: r.label,
+        timeOfDay: r.timeOfDay,
+        type: r.type,
+        goalId: r.goalId,
+        goalTitle: r.goalId ? goalMap.get(r.goalId) : undefined,
+        status: r.status,
+      })),
+  );
+  return ranked.slice(0, limit).map(r => ({
+    label: r.label,
+    goalTitle: r.goalTitle,
+  }));
 }
 
 /** Snapshot for server-side scheduled email nudges (cloud backup). */

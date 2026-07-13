@@ -153,7 +153,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
   const firedToday = getFiredNudgesToday(profile.id);
 
   return (
-    <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 16px', background: C.bg, minHeight: '100dvh' }}>
+    <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px calc(100px + env(safe-area-inset-bottom, 0px))', background: C.bg, minHeight: '100dvh' }}>
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.headline }}>Alerts & Reminders</h2>
         <p style={{ margin: '4px 0 0', color: C.body, fontSize: 13 }}>

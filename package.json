@@ -9,7 +9,11 @@
     "build:figma": "vite build && node scripts/prepare-figma-dist.mjs",
     "pack:figma-sync": "git archive --format=zip --output=figma-sync-from-github.zip HEAD",
     "backup:running": "node scripts/update-running-backup.mjs",
-    "dev": "vite"
+    "dev": "vite",
+    "deploy:edge": "powershell -ExecutionPolicy Bypass -File scripts/deploy-email.ps1",
+    "test:pre-c6": "node scripts/verify-pre-c6.mjs",
+    "test:c7": "node scripts/test-c7-gate.mjs",
+    "test:c8": "node scripts/verify-c8-go-live.mjs"
   },
   "dependencies": {
     "@ant-design/colors": "^8.0.1",
