@@ -13,7 +13,8 @@
     "deploy:edge": "powershell -ExecutionPolicy Bypass -File scripts/deploy-email.ps1",
     "test:pre-c6": "node scripts/verify-pre-c6.mjs",
     "test:c7": "node scripts/test-c7-gate.mjs",
-    "test:c8": "node scripts/verify-c8-go-live.mjs"
+    "test:c8": "node scripts/verify-c8-go-live.mjs",
+    "test:post-push": "node scripts/verify-post-push.mjs"
   },
   "dependencies": {
     "@ant-design/colors": "^8.0.1",
