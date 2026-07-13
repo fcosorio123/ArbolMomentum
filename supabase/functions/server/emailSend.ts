@@ -155,20 +155,27 @@ function sentLogKey(profileId: string, type: EmailType, dedupe: string): string 
   return `arbol-sent-email-${profileId}-${type}-${dedupe}`;
 }
 
+/**
+ * Resolve outbound email recipient for a profile.
+ * Priority: explicit override → profile backup email → admin profileEmails map.
+ * The user's profileEmail from cloud backup always wins over admin-configured addresses.
+ */
 async function resolveRecipient(
   profileId: string,
   settings: EmailSettings,
   explicit?: string,
 ): Promise<string | null> {
   if (explicit && isValidEmail(explicit)) return explicit.trim();
-  const adminEmail = settings.profileEmails?.[profileId];
-  if (adminEmail && isValidEmail(adminEmail)) return adminEmail.trim();
 
   const backup = await kv.get(`arbol-backup-${profileId}`);
   const backupEmail = backup?.profileEmail;
   if (typeof backupEmail === "string" && isValidEmail(backupEmail)) {
     return backupEmail.trim();
   }
+
+  const adminEmail = settings.profileEmails?.[profileId];
+  if (adminEmail && isValidEmail(adminEmail)) return adminEmail.trim();
+
   return null;
 }
 

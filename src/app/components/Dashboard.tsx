@@ -163,7 +163,10 @@ export function Dashboard({
     if (!isActive) return;
     const today = snapshot.dateKey;
     const vk = `visit-${profile.id}-${today}`;
-    localStorage.setItem(vk, String((parseInt(localStorage.getItem(vk) || '0') + 1)));
+    const count = parseInt(localStorage.getItem(vk) || '0', 10) + 1;
+    import('../data/supabaseSync').then(({ syncProfileVisit }) => {
+      syncProfileVisit(profile.id, today, count);
+    });
   }, [profile.id, isActive, snapshot.dateKey]);
 
   useEffect(() => {

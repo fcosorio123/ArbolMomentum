@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Progress } from 'antd';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { Progress, message } from 'antd';
 import { CloseOutlined, CheckOutlined, RightOutlined, LeftOutlined } from '@ant-design/icons';
 import { getPersonalGoals, type PersonalGoal } from '../data/personalGoals';
 import {
@@ -131,19 +131,34 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
   });
 
   const [screen, setScreen] = useState<Screen>('landing');
-  const [taskIdx, setTaskIdx] = useState(0); // current task index in allTasks
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const sessionTasksRef = useRef<FlatTask[]>([]);
+  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const checkInRecordedRef = useRef(false);
   const [answeredIds, setAnsweredIds] = useState<Set<string>>(new Set(
     allTasks.filter(t => t.preExisting !== null).map(t => t.id)
   ));
   const [processingStep, setProcessingStep] = useState(0);
   const [slideDir, setSlideDir] = useState<'forward' | 'back'>('forward');
 
-  const currentTask = allTasks[taskIdx];
+  const sessionTasks = sessionTasksRef.current.length > 0 ? sessionTasksRef.current : allTasks;
+  const currentTask = sessionTasks.find(t => t.id === currentTaskId) ?? null;
+  const taskIdx = currentTask ? sessionTasks.findIndex(t => t.id === currentTaskId) : 0;
   const answeredCount = answeredIds.size;
   const overallPct = totalTasks > 0 ? Math.round((answeredCount / totalTasks) * 100) : 100;
 
-  const selectStatus = (taskId: string, status: TaskStatus | null) => {
-    const task = allTasks.find(t => t.id === taskId);
+  const cancelAdvance = useCallback(() => {
+    if (advanceTimerRef.current) {
+      clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => cancelAdvance(), [cancelAdvance]);
+
+  const selectStatus = useCallback((taskId: string, status: TaskStatus | null) => {
+    const task = sessionTasksRef.current.find(t => t.id === taskId)
+      ?? allTasks.find(t => t.id === taskId);
     applyTaskStatusUpdate({
       profileId: profile.id,
       taskId,
@@ -154,12 +169,11 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
     });
     setSelections(prev => ({ ...prev, [taskId]: status }));
     setAnsweredIds(prev => new Set([...prev, taskId]));
-  };
+  }, [profile.id, profile.name, today, allTasks]);
 
-  const allTasksReviewed = totalTasks === 0 || answeredIds.size >= totalTasks;
-
-  const markDoneToday = () => {
+  const markDoneToday = useCallback(() => {
     localStorage.setItem(`arbol-checkin-${profile.id}-${today}`, 'true');
+    checkInRecordedRef.current = true;
     try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
     import('../data/dashboardSnapshot').then(({ dispatchDashboardRefresh }) => dispatchDashboardRefresh());
 
@@ -177,50 +191,91 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
         });
       });
     });
-  };
+  }, [profile.id, profile.name, today]);
 
-  const finishCheckInFlow = (includeCurrentAsReviewed = false) => {
+  const finishCheckInFlow = useCallback((includeCurrentAsReviewed = false) => {
+    cancelAdvance();
+    const list = sessionTasksRef.current.length > 0 ? sessionTasksRef.current : allTasks;
     const reviewedIds = new Set(answeredIds);
-    if (includeCurrentAsReviewed && currentTask) reviewedIds.add(currentTask.id);
-    if (includeCurrentAsReviewed && currentTask && !answeredIds.has(currentTask.id)) {
-      setAnsweredIds(reviewedIds);
+    if (includeCurrentAsReviewed && currentTaskId) {
+      const cur = list.find(t => t.id === currentTaskId);
+      if (cur && !reviewedIds.has(cur.id)) {
+        const curStatus = selections[cur.id];
+        if (curStatus === undefined) {
+          selectStatus(cur.id, 'skipped');
+        }
+        reviewedIds.add(cur.id);
+        setAnsweredIds(reviewedIds);
+      }
     }
     setScreen('processing');
     setProcessingStep(0);
-    if (totalTasks === 0 || reviewedIds.size >= totalTasks) markDoneToday();
-  };
+    if (list.length === 0 || reviewedIds.size >= list.length) {
+      markDoneToday();
+    }
+  }, [answeredIds, allTasks, cancelAdvance, currentTaskId, markDoneToday, selectStatus, selections]);
+
+  const advanceToNext = useCallback(() => {
+    const list = sessionTasksRef.current.length > 0 ? sessionTasksRef.current : allTasks;
+    const idx = list.findIndex(t => t.id === currentTaskId);
+    if (idx >= 0 && idx < list.length - 1) {
+      setSlideDir('forward');
+      setCurrentTaskId(list[idx + 1].id);
+      return;
+    }
+    finishCheckInFlow(true);
+  }, [allTasks, currentTaskId, finishCheckInFlow]);
+
+  const scheduleAdvance = useCallback(() => {
+    cancelAdvance();
+    advanceTimerRef.current = setTimeout(() => {
+      advanceTimerRef.current = null;
+      advanceToNext();
+    }, 380);
+  }, [advanceToNext, cancelAdvance]);
 
   const goNext = () => {
+    cancelAdvance();
     setSlideDir('forward');
-    if (taskIdx < allTasks.length - 1) {
-      if (currentTask && !answeredIds.has(currentTask.id)) {
-        setAnsweredIds(prev => new Set([...prev, currentTask.id]));
-      }
-      setTaskIdx(i => i + 1);
-    } else {
-      finishCheckInFlow(true);
+    if (currentTask && !answeredIds.has(currentTask.id)) {
+      selectStatus(currentTask.id, 'skipped');
     }
+    advanceToNext();
   };
 
   const goPrev = () => {
-    if (taskIdx > 0) {
+    cancelAdvance();
+    const list = sessionTasksRef.current.length > 0 ? sessionTasksRef.current : allTasks;
+    const idx = list.findIndex(t => t.id === currentTaskId);
+    if (idx > 0) {
       setSlideDir('back');
-      setTaskIdx(i => i - 1);
+      setCurrentTaskId(list[idx - 1].id);
     }
   };
 
-  const skipToProcessing = () => {
-    if (!allTasksReviewed) return;
-    finishCheckInFlow();
+  const startTaskFlow = () => {
+    if (allTasks.length === 0) return;
+    sessionTasksRef.current = [...allTasks];
+    const firstUnanswered = sessionTasksRef.current.find(t => !answeredIds.has(t.id));
+    setCurrentTaskId((firstUnanswered ?? sessionTasksRef.current[0]).id);
+    setScreen('task');
   };
 
   // Processing auto-advance
   useEffect(() => {
     if (screen !== 'processing') return;
-    if (processingStep >= PROCESSING_STEPS.length) { setScreen('success'); return; }
+    if (processingStep >= PROCESSING_STEPS.length) {
+      if (!checkInRecordedRef.current && totalTasks > 0) {
+        message.warning('Check-in could not be fully recorded. Please try again.');
+        setScreen('landing');
+        return;
+      }
+      setScreen('success');
+      return;
+    }
     const t = setTimeout(() => setProcessingStep(s => s + 1), 1100);
     return () => clearTimeout(t);
-  }, [screen, processingStep]);
+  }, [screen, processingStep, totalTasks]);
 
   // Success stats
   const successStats = useMemo(() => {
@@ -332,13 +387,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
 
         {/* CTA */}
         <button
-          onClick={() => {
-            if (allTasks.length === 0) return;
-            // Start from first unanswered task
-            const firstUnanswered = allTasks.findIndex(t => !answeredIds.has(t.id));
-            setTaskIdx(firstUnanswered === -1 ? 0 : firstUnanswered);
-            setScreen('task');
-          }}
+          onClick={startTaskFlow}
           style={{
             position: 'fixed', bottom: 'max(24px, calc(env(safe-area-inset-bottom, 0px) + 12px))', left: '50%', transform: 'translateX(-50%)',
             width: 'calc(100% - 40px)', maxWidth: 390,
@@ -362,10 +411,10 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
     if (!currentTask) return null;
     const { id, label, timeOfDay, goalTitle, accentColor, preExisting } = currentTask;
     const status = selections[id] ?? null;
-    const isFirst = taskIdx === 0;
-    const isLast = taskIdx === allTasks.length - 1;
+    const isFirst = taskIdx <= 0;
+    const isLast = taskIdx >= sessionTasks.length - 1;
     const isAutoDetected = preExisting === 'done';
-    const remainingUnanswered = allTasks.slice(taskIdx + 1).filter(t => !answeredIds.has(t.id)).length;
+    const remainingUnanswered = sessionTasks.slice(taskIdx + 1).filter(t => !answeredIds.has(t.id)).length;
 
     const STATUS_OPTIONS: Array<{
       value: TaskStatus; label: string; sub: string; dot: string;
@@ -422,8 +471,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
                   key={opt.value}
                   onClick={() => {
                     selectStatus(id, opt.value);
-                    // Auto-advance after a short delay so user sees the selection
-                    setTimeout(goNext, 380);
+                    scheduleAdvance();
                   }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 14,
@@ -449,7 +497,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
             <button
               onClick={() => {
                 selectStatus(id, null);
-                setTimeout(goNext, 380);
+                scheduleAdvance();
               }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 12,
@@ -480,7 +528,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
             </button>
           )}
           <button
-            onClick={isLast ? skipToProcessing : goNext}
+            onClick={isLast ? () => finishCheckInFlow(true) : goNext}
             style={{
               flex: 1, height: 44, borderRadius: 12,
               background: status !== null
@@ -623,7 +671,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
   // ── Shell ─────────────────────────────────────────────────────────────
   const topBarTitle =
     screen === 'landing' ? 'Check-in' :
-    screen === 'task' ? `${taskIdx + 1} / ${totalTasks}` :
+    screen === 'task' ? `${taskIdx + 1} / ${sessionTasks.length}` :
     screen === 'processing' ? 'Saving…' : '✓ Complete';
 
   return (
@@ -653,7 +701,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
           {screen === 'task' && (
             <div style={{ marginTop: 6 }}>
               <Progress
-                percent={Math.round(((taskIdx + 1) / totalTasks) * 100)}
+                percent={sessionTasks.length > 0 ? Math.round(((taskIdx + 1) / sessionTasks.length) * 100) : 0}
                 showInfo={false} size={['100%', 4]}
                 strokeColor={currentTask?.accentColor ?? C.primary} railColor={C.bgAlt}
               />

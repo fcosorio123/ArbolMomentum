@@ -19,7 +19,7 @@ export function FeedbackModal({ open, profileId, onSubmit, onLater }: Props) {
   const [worked, setWorked] = useState<Set<string>>(new Set());
   const [didnt, setDidnt] = useState<Set<string>>(new Set());
   const [suggestion, setSuggestion] = useState('');
-  const [step, setStep] = useState<'prompt' | 'form'>('prompt');
+  const [step, setStep] = useState<'prompt' | 'form' | 'success'>('prompt');
 
   const toggle = (set: Set<string>, val: string, setter: (s: Set<string>) => void) => {
     const next = new Set(set);
@@ -35,7 +35,11 @@ export function FeedbackModal({ open, profileId, onSubmit, onLater }: Props) {
       suggestion: suggestion.trim(), timestamp: Date.now(),
     };
     saveFeedback(entry);
-    onSubmit();
+    setStep('success');
+    setTimeout(() => {
+      reset();
+      onSubmit();
+    }, 1500);
   };
 
   const handleLater = () => {
@@ -50,10 +54,15 @@ export function FeedbackModal({ open, profileId, onSubmit, onLater }: Props) {
 
   const handleClose = () => { reset(); handleLater(); };
 
+  const handleDismiss = () => {
+    reset();
+    onLater();
+  };
+
   return (
     <Modal
       open={open}
-      onCancel={handleClose}
+      onCancel={step === 'success' ? handleDismiss : handleClose}
       footer={null}
       centered
       closable={false}
@@ -71,7 +80,17 @@ export function FeedbackModal({ open, profileId, onSubmit, onLater }: Props) {
         mask: { backdropFilter: 'blur(6px)', background: 'rgba(9,64,103,0.25)' },
       }}
     >
-      {step === 'prompt' ? (
+      {step === 'success' ? (
+        <div style={{ padding: '40px 24px 36px', textAlign: 'center' }}>
+          <div style={{ fontSize: 52, marginBottom: 16 }}>✅</div>
+          <h3 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 800, color: C.headline }}>
+            Thank you!
+          </h3>
+          <p style={{ color: C.body, fontSize: 14, margin: 0, lineHeight: 1.5 }}>
+            Your feedback was saved and helps us improve Arbol Momentum.
+          </p>
+        </div>
+      ) : step === 'prompt' ? (
         /* ── Prompt step ── */
         <div style={{ padding: '32px 24px 28px', textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>💬</div>

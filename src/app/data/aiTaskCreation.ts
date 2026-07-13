@@ -53,3 +53,47 @@ export async function parseContextTasksFromEdge(
     return { ok: false, groups: [], source: 'rules', reason: 'network_error' };
   }
 }
+
+// ──────────────────────────────────────────────
+// AI-assisted task simplification (edge simplify-task)
+// ──────────────────────────────────────────────
+
+export interface SimplifyTaskInput {
+  taskLabel: string;
+  goalTitle?: string;
+  goalWhy?: string;
+  answers: string[];
+}
+
+export interface SimplifiedTaskSuggestion {
+  label: string;
+  timeOfDay: 'morning' | 'evening';
+}
+
+export interface SimplifyTaskResult {
+  ok: boolean;
+  tasks: SimplifiedTaskSuggestion[];
+  source: ParseContextSource;
+  reason?: string;
+}
+
+export async function simplifyTaskFromEdge(input: SimplifyTaskInput): Promise<SimplifyTaskResult> {
+  try {
+    const { data, error } = await supabase.functions.invoke(`${FN}/simplify-task`, {
+      method: 'POST',
+      body: input,
+    });
+    if (error) {
+      return { ok: false, tasks: [], source: 'rules', reason: 'network_error' };
+    }
+    const payload = data as SimplifyTaskResult | null;
+    return {
+      ok: Boolean(payload?.ok),
+      tasks: Array.isArray(payload?.tasks) ? payload.tasks : [],
+      source: payload?.source === 'llm' ? 'llm' : 'rules',
+      reason: payload?.reason,
+    };
+  } catch {
+    return { ok: false, tasks: [], source: 'rules', reason: 'network_error' };
+  }
+}

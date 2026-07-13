@@ -175,16 +175,16 @@ export function parseGoalInput(text: string): SeedSuggestionGroup[] {
       continue;
     }
 
-    // Unmatched lines become their own concise goal + single task
+    // Unmatched lines become their own goal (no duplicate task with same label)
     groups.push({
       id: nextId('goal'),
       goal: { title: label, deepWhy: 'A goal you set when creating this profile.' },
       selected: true,
-      tasks: [makeTask(line, label, recurrence)],
+      tasks: [],
     });
   }
 
-  return groups.filter(g => g.tasks.length > 0);
+  return groups.filter(g => g.goal.title.length > 0);
 }
 
 export function recurrenceSummary(recurrence: Recurrence): string {

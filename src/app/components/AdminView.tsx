@@ -29,6 +29,7 @@ import { getDataCollectionStats, downloadCentralDataBackup } from '../data/centr
 import {
   fetchAllTaskCompletions, fetchAllGoalProgress, fetchAllFeedback,
   fetchAllDeviceRecords, fetchAllEventLogs, fetchAllTaskDeletions,
+  fetchVisitCountForAdmin,
 } from '../data/supabaseSync';
 import { getUserTasks, type UserTask } from '../data/userTasks';
 import { C } from '../data/colors';
@@ -117,8 +118,8 @@ function OverviewTab() {
         const completions = await fetchAllTaskCompletions();
         const deletions = await fetchAllTaskDeletions();
 
-        const profileStats = getActiveProfiles(true).map(p => {
-          const todayVisits = parseInt(localStorage.getItem(`visit-${p.id}-${today}`) || '0');
+        const profileStats = await Promise.all(getActiveProfiles(true).map(async p => {
+          const todayVisits = await fetchVisitCountForAdmin(p.id, today);
 
           const calculateDayStats = (date: string) => {
             const overlay = buildRemoteDayOverlay(p.id, date, completions, deletions);
@@ -152,25 +153,25 @@ function OverviewTab() {
             : 0;
 
           return { ...p, todayVisits, todayDetail, weekDays, weekAvg, prevWeekDays, prevWeekAvg, liveStreak: computeLiveStreak(p.id, hasActivityOnDate(p.id, today)) };
-        });
+        }));
 
         setStats(profileStats);
       } catch (error) {
         console.error('Failed to fetch Supabase data:', error);
         // Fallback to localStorage
-        loadFromLocalStorage();
+        await loadFromLocalStorage();
       }
     } else {
-      loadFromLocalStorage();
+      await loadFromLocalStorage();
     }
 
     setLoading(false);
   };
 
-  const loadFromLocalStorage = () => {
+  const loadFromLocalStorage = async () => {
     const today = getTodayKey();
-    setStats(getActiveProfiles(true).map(p => {
-      const todayVisits = parseInt(localStorage.getItem(`visit-${p.id}-${today}`) || '0');
+    const profileStats = await Promise.all(getActiveProfiles(true).map(async p => {
+      const todayVisits = await fetchVisitCountForAdmin(p.id, today);
       const todayDetail = computeDayStatsFromPersisted(p.id, today);
 
       const weekDays = DAYS_SHORT.map(day => {
@@ -191,6 +192,7 @@ function OverviewTab() {
 
       return { ...p, todayVisits, todayDetail, weekDays, weekAvg, prevWeekDays, prevWeekAvg, liveStreak: computeLiveStreak(p.id, hasActivityOnDate(p.id, today)) };
     }));
+    setStats(profileStats);
   };
 
   useEffect(() => { load(); const iv = setInterval(load, 30000); return () => clearInterval(iv); }, []);
@@ -424,13 +426,17 @@ function AnalyticsTab() {
   const [customEndDate, setCustomEndDate] = useState('');
   const [engagementData, setEngagementData] = useState<EngagementData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [todayVisits, setTodayVisits] = useState(0);
 
   const profile = getOperativeProfiles().find(p => p.id === selectedId)!;
   const today = getTodayKey();
 
+  useEffect(() => {
+    fetchVisitCountForAdmin(selectedId, today).then(setTodayVisits);
+  }, [selectedId, today]);
+
   const hourlyData = getActivityChartData(selectedId, today);
   const todayDetail = computeDayStatsFromPersisted(selectedId, today);
-  const todayVisits = parseInt(localStorage.getItem(`visit-${selectedId}-${today}`) || '0');
   const liveStreak = computeLiveStreak(selectedId, hasActivityOnDate(selectedId, today));
   const bestStreak = Math.max(computeBestStreak(selectedId), liveStreak, profile.bestStreak);
 

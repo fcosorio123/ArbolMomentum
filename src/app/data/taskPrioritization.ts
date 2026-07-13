@@ -1,6 +1,8 @@
 // Centralized task ranking (WP-11) — shared by Dashboard, nudge snapshot, live check-in.
 
 import type { TaskStatus, TaskType } from './profiles';
+import type { PotentialValue } from './potentialValue';
+import { potentialValuePriorityBonus } from './potentialValue';
 
 export interface PrioritizedTask {
   id: string;
@@ -10,6 +12,7 @@ export interface PrioritizedTask {
   goalId?: string;
   goalTitle?: string;
   status: TaskStatus | null;
+  potentialValue?: PotentialValue;
 }
 
 export function preferredTimeOfDay(hour = new Date().getHours()): 'morning' | 'evening' {
@@ -28,6 +31,7 @@ export function taskPriorityScore(
   else if (task.type === 'goal') score -= 25;
   if (task.timeOfDay === preferred) score -= 30;
   if (!task.status || task.status === 'notstarted') score -= 5;
+  score -= potentialValuePriorityBonus(task.potentialValue);
   return score;
 }
 

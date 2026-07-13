@@ -88,12 +88,67 @@ export function getLinksForTask(profileId: string, taskId: string): TaskGoalLink
   return links.filter(l => l.taskId === taskId);
 }
 
+function unassignedKey(profileId: string) {
+  return `arbol-task-unassigned-${profileId}`;
+}
+
+export function isTaskExplicitlyUnassigned(profileId: string, taskId: string): boolean {
+  try {
+    const ids = JSON.parse(localStorage.getItem(unassignedKey(profileId)) || '[]') as string[];
+    return ids.includes(taskId);
+  } catch {
+    return false;
+  }
+}
+
+export function markTaskExplicitlyUnassigned(profileId: string, taskId: string) {
+  const ids = new Set(JSON.parse(localStorage.getItem(unassignedKey(profileId)) || '[]') as string[]);
+  ids.add(taskId);
+  localStorage.setItem(unassignedKey(profileId), JSON.stringify([...ids]));
+  clearUserGoalLinksForTask(profileId, taskId);
+  import('./cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId));
+}
+
+export function clearTaskExplicitUnassigned(profileId: string, taskId: string) {
+  const ids = (JSON.parse(localStorage.getItem(unassignedKey(profileId)) || '[]') as string[])
+    .filter(id => id !== taskId);
+  localStorage.setItem(unassignedKey(profileId), JSON.stringify(ids));
+}
+
+export function suggestGoalsForLabel(profileId: string, label: string): TaskGoalSuggestion[] {
+  if (!label.trim()) return [];
+  const draft: Task = {
+    id: '__draft__',
+    label: label.trim(),
+    category: 'user',
+    timeOfDay: 'morning',
+    type: 'routine',
+  };
+  return getSmartSuggestions(profileId, draft);
+}
+
+/** Unified UI save path for seed vs user task goal association. */
+export function setTaskGoalAssociation(
+  profileId: string,
+  taskId: string,
+  goalId: string | null | undefined,
+  opts?: { isSeed?: boolean },
+) {
+  if (!goalId) {
+    if (opts?.isSeed) markTaskExplicitlyUnassigned(profileId, taskId);
+    return;
+  }
+  if (opts?.isSeed) setPrimaryGoalLinkForTask(profileId, taskId, goalId);
+  else clearTaskExplicitUnassigned(profileId, taskId);
+}
+
 /** Resolve goal for a seed or routine task: user link overrides category default. */
 export function getPrimaryGoalIdForTask(
   profileId: string,
   taskId: string,
   categoryGoalId?: string,
 ): string | undefined {
+  if (isTaskExplicitlyUnassigned(profileId, taskId)) return undefined;
   const links = getLinksForTask(profileId, taskId);
   const userLinks = links.filter(l => l.isUserCreated);
   const pool = userLinks.length > 0 ? userLinks : links;
@@ -105,6 +160,7 @@ export function getPrimaryGoalIdForTask(
 
 /** Assign a seed/routine task to a goal without converting it to a user task. */
 export function setPrimaryGoalLinkForTask(profileId: string, taskId: string, goalId: string) {
+  clearTaskExplicitUnassigned(profileId, taskId);
   const links = getTaskGoalLinks(profileId).filter(
     l => !(l.taskId === taskId && l.isUserCreated),
   );
@@ -127,7 +183,6 @@ export function clearUserGoalLinksForTask(profileId: string, taskId: string) {
   import('./cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId));
 }
 
-// Track rejected suggestions to avoid re-suggesting
 export function markSuggestionRejected(profileId: string, taskId: string, goalId: string) {
   const stored = localStorage.getItem(rejectedKey(profileId));
   const rejected: Record<string, string[]> = stored ? JSON.parse(stored) : {};

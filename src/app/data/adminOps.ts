@@ -26,9 +26,27 @@ export function formatSyncDirection(direction: string): string {
   }
 }
 
-export function summarizeBackupQualification(backup: Record<string, unknown> | null): {
+export type EmailRecipientSource = 'profile' | 'admin' | 'none';
+
+export function resolveEmailRecipientSource(
+  profileId: string,
+  backup: Record<string, unknown> | null,
+  adminProfileEmails: Record<string, string> = {},
+): EmailRecipientSource {
+  const backupEmail = typeof backup?.profileEmail === 'string' ? backup.profileEmail.trim() : '';
+  if (backupEmail && backupEmail.includes('@')) return 'profile';
+  const adminEmail = adminProfileEmails[profileId]?.trim() ?? '';
+  if (adminEmail && adminEmail.includes('@')) return 'admin';
+  return 'none';
+}
+
+export function summarizeBackupQualification(
+  backup: Record<string, unknown> | null,
+  opts?: { profileId?: string; adminProfileEmails?: Record<string, string> },
+): {
   hasEmail: boolean;
   emailMasked: string;
+  emailSource: EmailRecipientSource;
   emailEnabled: boolean;
   archived: boolean;
   snapshotDate: string;
@@ -36,9 +54,11 @@ export function summarizeBackupQualification(backup: Record<string, unknown> | n
   savedAt: string;
 } {
   if (!backup) {
+    const adminOnly = opts?.profileId && opts?.adminProfileEmails?.[opts.profileId];
     return {
-      hasEmail: false,
-      emailMasked: '—',
+      hasEmail: !!adminOnly,
+      emailMasked: maskEmail(adminOnly),
+      emailSource: adminOnly ? 'admin' : 'none',
       emailEnabled: true,
       archived: false,
       snapshotDate: '—',
@@ -52,9 +72,15 @@ export function summarizeBackupQualification(backup: Record<string, unknown> | n
   const savedAt = typeof backup.savedAt === 'number'
     ? new Date(backup.savedAt).toLocaleString()
     : '—';
+  const emailSource = opts?.profileId
+    ? resolveEmailRecipientSource(opts.profileId, backup, opts.adminProfileEmails ?? {})
+    : (email.trim() ? 'profile' : 'none');
+  const adminFallback = opts?.adminProfileEmails?.[opts.profileId ?? ''] ?? '';
+  const effectiveEmail = email.trim() || adminFallback.trim();
   return {
-    hasEmail: !!email.trim(),
-    emailMasked: maskEmail(email),
+    hasEmail: !!effectiveEmail,
+    emailMasked: maskEmail(effectiveEmail),
+    emailSource,
     emailEnabled: prefs?.emailEnabled !== false,
     archived: backup.profileArchived === true,
     snapshotDate: snap?.dateKey ?? '—',

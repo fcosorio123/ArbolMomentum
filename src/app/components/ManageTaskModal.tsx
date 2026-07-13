@@ -3,6 +3,11 @@ import { Modal, Input, Select, Button } from 'antd';
 import { C } from '../data/colors';
 import type { UserTask, Recurrence } from '../data/userTasks';
 import type { PersonalGoal } from '../data/personalGoals';
+import { suggestGoalsForLabel } from '../data/taskGoalLinks';
+import {
+  PV_LABELS, defaultPotentialValue, normalizePotentialValue,
+  type PotentialValue, type PotentialValueScore,
+} from '../data/potentialValue';
 
 type ApplyTo = 'this' | 'all';
 
@@ -12,6 +17,7 @@ interface SaveData extends Omit<UserTask, 'id' | 'profileId' | 'createdAt'> {
 
 interface Props {
   open: boolean;
+  profileId: string;
   task?: UserTask | null;
   defaultGoalId?: string;
   goals: PersonalGoal[];
@@ -85,13 +91,15 @@ function isRecurring(rec?: Recurrence): boolean {
 }
 
 // ── Main modal ────────────────────────────────────────────────────────
-export function ManageTaskModal({ open, task, defaultGoalId, goals, currentDate, onSave, onCancel }: Props) {
+export function ManageTaskModal({ open, profileId, task, defaultGoalId, goals, currentDate, onSave, onCancel }: Props) {
   const isEdit = !!task;
 
   const [label, setLabel] = useState('');
   const [description, setDescription] = useState('');
   const [timeOfDay, setTimeOfDay] = useState<'morning' | 'evening'>('morning');
   const [goalId, setGoalId] = useState<string | undefined>(undefined);
+  const [recommendedGoalId, setRecommendedGoalId] = useState<string | undefined>(undefined);
+  const [potentialValue, setPotentialValue] = useState<PotentialValue>(defaultPotentialValue('manual'));
 
   // Recurrence
   const [recType, setRecType] = useState<Recurrence['type']>('daily');
@@ -108,6 +116,8 @@ export function ManageTaskModal({ open, task, defaultGoalId, goals, currentDate,
       setDescription(task?.description ?? '');
       setTimeOfDay(task?.timeOfDay ?? 'morning');
       setGoalId(task?.goalId ?? (!task ? defaultGoalId : undefined));
+      setRecommendedGoalId(undefined);
+      setPotentialValue(normalizePotentialValue(task?.potentialValue) ?? defaultPotentialValue('manual'));
       setApplyTo('all');
 
       const rec = task?.recurrence;
@@ -117,6 +127,23 @@ export function ManageTaskModal({ open, task, defaultGoalId, goals, currentDate,
       setSpecificDate(rec?.specificDate ?? currentDate ?? '');
     }
   }, [open, task, defaultGoalId, currentDate]);
+
+  const handleLabelBlur = () => {
+    if (!label.trim() || goalId) return;
+    const suggestions = suggestGoalsForLabel(profileId, label);
+    const top = suggestions[0];
+    if (top) setRecommendedGoalId(top.goal.id);
+  };
+
+  const setPotentialScore = (score: PotentialValueScore) => {
+    setPotentialValue({
+      ...potentialValue,
+      score,
+      label: PV_LABELS[score],
+      source: 'manual',
+      updatedAt: Date.now(),
+    });
+  };
 
   const buildRecurrence = (): Recurrence | undefined => {
     if (recType === 'daily') return undefined; // no recurrence field = daily
@@ -144,6 +171,7 @@ export function ManageTaskModal({ open, task, defaultGoalId, goals, currentDate,
       type: goalId ? 'goal' : 'routine',
       goalId: goalId || undefined,
       recurrence,
+      potentialValue,
       // Pass applyTo only when editing a recurring task
       applyTo: isEdit && isRecurring(task?.recurrence) ? applyTo : undefined,
     });
@@ -185,12 +213,50 @@ export function ManageTaskModal({ open, task, defaultGoalId, goals, currentDate,
           <Input
             value={label}
             onChange={e => setLabel(e.target.value)}
+            onBlur={handleLabelBlur}
             placeholder="e.g. Review budget for the week"
             size="large"
             style={{ borderRadius: 12 }}
             autoFocus
             onPressEnter={() => valid && handleSave()}
           />
+          {recommendedGoalId && !goalId && (
+            <button
+              type="button"
+              onClick={() => { setGoalId(recommendedGoalId); setRecommendedGoalId(undefined); }}
+              style={{
+                marginTop: 8, padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.primary}40`,
+                background: `${C.primary}10`, fontSize: 11, fontWeight: 600, color: C.primary, cursor: 'pointer',
+              }}
+            >
+              Recommended goal: {goals.find(g => g.id === recommendedGoalId)?.title ?? 'Link goal'}
+            </button>
+          )}
+        </div>
+
+        {/* Potential value */}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ fontSize: 12, fontWeight: 700, color: C.secondary, display: 'block', marginBottom: 8 }}>
+            Potential value
+          </label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {([1, 2, 3, 4] as PotentialValueScore[]).map(score => (
+              <button
+                key={score}
+                type="button"
+                onClick={() => setPotentialScore(score)}
+                style={{
+                  flex: '1 1 40%', minWidth: 80, padding: '8px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700,
+                  border: `1.5px solid ${potentialValue.score === score ? C.primary : C.border}`,
+                  background: potentialValue.score === score ? `${C.primary}15` : C.bgAlt,
+                  color: potentialValue.score === score ? C.primary : C.secondary,
+                  cursor: 'pointer',
+                }}
+              >
+                {PV_LABELS[score]}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Description */}

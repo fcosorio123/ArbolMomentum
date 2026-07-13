@@ -121,6 +121,7 @@ export function createCustomProfile(input: CreateProfileInput): Profile {
       });
       for (const task of group.tasks) {
         if (!task.selected) continue;
+        if (task.label.trim().toLowerCase() === group.goal.title.trim().toLowerCase()) continue;
         createUserTask(id, {
           label: task.label,
           timeOfDay: task.timeOfDay,

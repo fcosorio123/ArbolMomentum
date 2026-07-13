@@ -248,6 +248,34 @@ export async function syncEventLog(
   }
 }
 
+/** Sync daily visit count (local + event_logs for admin). */
+export async function syncProfileVisit(profileId: string, date: string, count: number): Promise<void> {
+  localStorage.setItem(`visit-${profileId}-${date}`, String(count));
+  if (!shouldCollectData()) return;
+  await syncEventLog(profileId, 'profile_visit', { date, count });
+}
+
+/** Visit count for admin: Supabase when published, else local. */
+export async function fetchVisitCountForAdmin(profileId: string, date: string): Promise<number> {
+  const local = parseInt(localStorage.getItem(`visit-${profileId}-${date}`) || '0', 10);
+  if (!isPublishedVersion()) return local;
+  try {
+    const { data, error } = await supabase
+      .from('event_logs')
+      .select('metadata')
+      .eq('profile_id', profileId)
+      .eq('event', 'profile_visit')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    const match = (data ?? []).find((row: { metadata?: { date?: string; count?: number } }) => row.metadata?.date === date);
+    if (match?.metadata?.count != null) return Number(match.metadata.count);
+    return local;
+  } catch {
+    return local;
+  }
+}
+
 // ── Admin Data Fetching ──────────────────────────
 
 /**

@@ -28,6 +28,9 @@ export interface UserTask {
   skippedDates?: string[];
   /** Set when a seed task was converted to a user task under a goal */
   sourceSeedTaskId?: string;
+  /** Simplification / replacement lineage */
+  sourceSimplifiedFrom?: string;
+  potentialValue?: import('./potentialValue').PotentialValue;
 }
 
 // ── Scheduling helpers ────────────────────────────────────────────────

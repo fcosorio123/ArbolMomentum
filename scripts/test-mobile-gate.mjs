@@ -82,5 +82,11 @@ assert('viewport-fit=cover meta', /viewport-fit=cover/.test(app));
 assert('no 90s feedback timer', !/setTimeout\([^,]+,\s*90000/.test(app));
 assert('feedback trigger polling', /evaluateFeedbackTrigger|feedbackTriggers/.test(app));
 
+const taskList = readFileSync(join(root, 'src/app/components/TaskList.tsx'), 'utf8');
+assert('touch targets in TaskList', /touchIconButton|MIN_TOUCH/.test(taskList));
+assert('ContextAssistModal wired', existsSync(join(src, 'ContextAssistModal.tsx')));
+assert('SimplifyTaskModal wired', existsSync(join(src, 'SimplifyTaskModal.tsx')));
+assert('potentialValue module', existsSync(join(root, 'src/app/data/potentialValue.ts')));
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

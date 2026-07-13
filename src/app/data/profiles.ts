@@ -1696,7 +1696,7 @@ export function getTasksForToday(profileId: string): Task[] {
 
 export function getWeekPlanForProfile(profileId: string): Record<string, string[]> {
   const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  if (isFreshProfile(profileId)) {
+  if (isFreshProfile(profileId) || isUserDefinedProfile(profileId)) {
     return Object.fromEntries(DAYS.map(d => [d, []]));
   }
   let plan: Record<string, string[]>;

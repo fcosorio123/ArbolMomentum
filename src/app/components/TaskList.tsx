@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { App, Button, Progress } from 'antd';
-import { DeleteOutlined, CheckCircleFilled, PlayCircleOutlined, ArrowRightOutlined, EditOutlined, PlusOutlined, CloseOutlined } from '@ant-design/icons';
+import { DeleteOutlined, CheckCircleFilled, PlayCircleOutlined, ArrowRightOutlined, EditOutlined, PlusOutlined, CloseOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import {
   type Profile, type Task, type TaskStatus,
   getTaskCategoriesForProfile, getTaskStatus,
@@ -10,6 +10,7 @@ import {
 import { isUserDefinedProfile } from '../data/customProfiles';
 import {
   getPersonalGoals,
+  createUserGoal,
   type PersonalGoal,
 } from '../data/personalGoals';
 
@@ -19,8 +20,13 @@ import {
   recurrenceLabel, type UserTask, type Recurrence,
 } from '../data/userTasks';
 import { ManageTaskModal } from './ManageTaskModal';
+import { ContextAssistModal } from './ContextAssistModal';
+import { SimplifyTaskModal } from './SimplifyTaskModal';
 import { DeleteTaskModal, type DeleteTaskChoice } from './DeleteTaskModal';
 import { C } from '../data/colors';
+import { PV_LABELS } from '../data/potentialValue';
+import { touchIconButton } from '../styles/touchTargets';
+import type { SeedSuggestionGroup } from '../data/profileSeedParser';
 import { trackActivity } from '../data/feedback';
 import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile } from './AppTour';
 import { CongratModal } from './CongratModal';
@@ -50,7 +56,7 @@ interface Props {
 
 type StatusMap = Record<string, TaskStatus | null>;
 type NotesMap = Record<string, string>;
-type UserTask_ = Task & { isUserCreated?: boolean; recurrence?: Recurrence };
+type UserTask_ = Task & { isUserCreated?: boolean; recurrence?: Recurrence; potentialValue?: UserTask['potentialValue'] };
 
 function isRecurringUT(task: UserTask): boolean {
   return !!task.recurrence && task.recurrence.type !== 'daily' && task.recurrence.type !== 'one-time';
@@ -69,13 +75,14 @@ function taskDurationLabel(task: UserTask_): string {
 
 // ── Task item
 function TaskItem({
-  task, catColor, status, remark, onOpenUpdate, onDelete, onEdit, statusLocked,
+  task, catColor, status, remark, onOpenUpdate, onDelete, onEdit, onSimplify, statusLocked,
   profileId, profileName, calendarDateKey,
   selectionMode, selected, onToggleSelect,
 }: {
   task: UserTask_; catColor: string; status: TaskStatus | null; remark?: string;
   onOpenUpdate: () => void; onDelete: () => void;
   onEdit?: () => void;
+  onSimplify?: () => void;
   statusLocked?: boolean;
   profileId: string;
   profileName: string;
@@ -153,6 +160,14 @@ function TaskItem({
         </div>
         <div style={{ fontSize: 11, color: C.secondary, marginTop: 3 }}>
           {taskDurationLabel(task)}
+          {task.potentialValue && (
+            <span style={{
+              marginLeft: 8, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 5,
+              background: `${C.primary}15`, color: C.primary,
+            }}>
+              {PV_LABELS[task.potentialValue.score]}
+            </span>
+          )}
         </div>
         {statusLocked && (
           <div style={{ fontSize: 10, color: C.tertiary, marginTop: 4, fontWeight: 600 }}>
@@ -187,6 +202,21 @@ function TaskItem({
       )}
 
       <div style={{ display: 'flex', gap: 2, flexShrink: 0, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+        {!isSkipped && status !== 'done' && onSimplify && (
+          <button
+            onClick={onSimplify}
+            type="button"
+            title="Simplify for me!"
+            style={{
+              ...touchIconButton,
+              background: 'none', border: 'none', color: '#7c3aed', fontSize: 14,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#7c3aed12'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
+          >
+            <ThunderboltOutlined />
+          </button>
+        )}
         {!isSkipped && status !== 'done' && (
           <TaskCalendarButton
             profileId={profileId}
@@ -199,9 +229,8 @@ function TaskItem({
         )}
         {onEdit && (
           <button onClick={onEdit} type="button" style={{
-            background: 'none', border: 'none', cursor: 'pointer', color: C.secondary,
-            fontSize: 13, padding: 10, borderRadius: 8, minWidth: 40, minHeight: 40,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            ...touchIconButton,
+            background: 'none', border: 'none', color: C.secondary, fontSize: 13,
           }}
             onMouseEnter={e => { e.currentTarget.style.color = C.primary; e.currentTarget.style.background = `${C.primary}12`; }}
             onMouseLeave={e => { e.currentTarget.style.color = C.secondary; e.currentTarget.style.background = 'none'; }}
@@ -210,9 +239,8 @@ function TaskItem({
           </button>
         )}
         <button onClick={onDelete} type="button" style={{
-          background: 'none', border: 'none', cursor: 'pointer', color: C.secondary,
-          fontSize: 15, padding: 10, borderRadius: 8, minWidth: 40, minHeight: 40,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          ...touchIconButton,
+          background: 'none', border: 'none', color: C.secondary, fontSize: 15,
         }}
           onMouseEnter={e => { e.currentTarget.style.color = C.tertiary; e.currentTarget.style.background = `${C.tertiary}12`; }}
           onMouseLeave={e => { e.currentTarget.style.color = C.secondary; e.currentTarget.style.background = 'none'; }}
@@ -329,7 +357,7 @@ function goalAccentColor(goalId: string) {
 // ── Goal group: goal header + flat task list
 function GoalGroup({
   goal, tasks, statuses, notes, onOpenUpdate, onDelete, timeFilter,
-  onEditTask, onAddSuggestedTask, isFirst, profileId, profileName, calendarDateKey,
+  onEditTask, onAddSuggestedTask, onSimplifyTask, isFirst, profileId, profileName, calendarDateKey,
   selectionMode, selectedTaskIds, onToggleTaskSelect, showExploreSuggestions = true,
 }: {
   goal: PersonalGoal; tasks: UserTask_[];
@@ -339,6 +367,7 @@ function GoalGroup({
   timeFilter: 'all' | 'morning' | 'evening';
   onEditTask: (t: UserTask_) => void;
   onAddSuggestedTask: (label: string, goalId: string) => void;
+  onSimplifyTask?: (t: UserTask_, goal: PersonalGoal) => void;
   isFirst?: boolean;
   profileId: string;
   profileName: string;
@@ -474,6 +503,7 @@ function GoalGroup({
               onOpenUpdate={() => onOpenUpdate(task, goal, doneTasks, totalTasks)}
               onDelete={() => onDelete(task)}
               onEdit={() => onEditTask(task)}
+              onSimplify={task.isUserCreated && onSimplifyTask ? () => onSimplifyTask(task, goal) : undefined}
             />
           ))}
         </div>
@@ -597,6 +627,9 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   const [liveCheckInEnabled, setLiveCheckInEnabled] = useState(() => isLiveCheckInEnabled());
   const [momentumEntry, setMomentumEntry] = useState<ReportEntry | null>(null);
   const [taskUpdateContext, setTaskUpdateContext] = useState<TaskUpdateContext | null>(null);
+  const [fabMenuOpen, setFabMenuOpen] = useState(false);
+  const [contextAssistOpen, setContextAssistOpen] = useState(false);
+  const [simplifyTarget, setSimplifyTarget] = useState<{ task: UserTask_; goal?: PersonalGoal } | null>(null);
   const { capture: captureScroll, restore: restoreScroll, allowProgrammaticScroll } = useScrollPositionLock([
     statuses, notes, taskUpdateContext, momentumEntry,
   ]);
@@ -842,9 +875,65 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   };
 
   const handleAddSuggestedTask = (label: string, goalId: string) => {
-    createUserTask(profile.id, { label, goalId, timeOfDay: 'morning', type: 'goal' });
-    message.success({ content: `Task added!`, duration: 2 });
+    setDefaultTaskGoalId(goalId);
+    setEditingTask({
+      id: '',
+      profileId: profile.id,
+      label,
+      timeOfDay: 'morning',
+      type: 'goal',
+      goalId,
+      createdAt: 0,
+    } as UserTask);
+    setEditingSeedTaskId(null);
+    setManageTaskOpen(true);
+  };
+
+  const handleContextAssistConfirm = (groups: SeedSuggestionGroup[]) => {
+    groups.forEach(group => {
+      let goal = goals.find(g => g.title.toLowerCase() === group.goal.title.toLowerCase());
+      if (!goal && group.selected) {
+        goal = createUserGoal(profile.id, {
+          title: group.goal.title,
+          deepWhy: group.goal.deepWhy,
+        });
+      }
+      if (!goal) return;
+      group.tasks.forEach(task => {
+        createUserTask(profile.id, {
+          label: task.label,
+          timeOfDay: task.timeOfDay,
+          type: task.type,
+          goalId: goal!.id,
+          recurrence: task.recurrence.type === 'daily' ? undefined : task.recurrence,
+        });
+      });
+    });
     loadState();
+    try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch {}
+    message.success({ content: 'Tasks added!', duration: 2 });
+  };
+
+  const handleSimplifyConfirm = (replacements: Array<{ label: string; timeOfDay: 'morning' | 'evening' }>) => {
+    if (!simplifyTarget) return;
+    const { task, goal } = simplifyTarget;
+    const existing = userTasks.find(u => u.id === task.id);
+    if (!existing) return;
+    replacements.forEach(rep => {
+      createUserTask(profile.id, {
+        label: rep.label,
+        timeOfDay: rep.timeOfDay,
+        type: goal ? 'goal' : existing.type,
+        goalId: goal?.id ?? existing.goalId,
+        sourceSimplifiedFrom: existing.id,
+      });
+    });
+    deleteUserTask(profile.id, existing.id);
+    setSimplifyTarget(null);
+    loadState();
+    try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch {}
+    message.success({ content: 'Task simplified into smaller steps!', duration: 2 });
   };
 
   // Build goal → tasks map directly (no category layer)
@@ -882,6 +971,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     const taskObj: UserTask_ = {
       id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, type: ut.type,
       category: 'user', isUserCreated: true, recurrence: ut.recurrence,
+      potentialValue: ut.potentialValue,
     };
     if (ut.goalId && goalTaskMap[ut.goalId] !== undefined) {
       goalTaskMap[ut.goalId].push(taskObj);
@@ -1129,6 +1219,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                 isFirst={idx === 0}
                 onEditTask={t => handleEditAnyTask(t, goal.id)}
                 onAddSuggestedTask={handleAddSuggestedTask}
+                onSimplifyTask={(t, g) => setSimplifyTarget({ task: t, goal: g })}
                 showExploreSuggestions={!hideExploreSuggestions}
                 selectionMode={selectMode}
                 selectedTaskIds={selectedTaskIds}
@@ -1163,6 +1254,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
                     onOpenUpdate={() => openTaskUpdate(task)}
                     onDelete={() => openDeleteTask(task)}
                     onEdit={() => handleEditAnyTask(task, undefined)}
+                    onSimplify={task.isUserCreated ? () => setSimplifyTarget({ task }) : undefined}
                   />
                 ))}
             </div>
@@ -1170,10 +1262,45 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
         </>
       )}
 
-      {/* FAB - Add Task */}
+      {/* FAB - Add Task menu */}
+      {fabMenuOpen && (
+        <div
+          onClick={() => setFabMenuOpen(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 47 }}
+        />
+      )}
+      {fabMenuOpen && (
+        <div style={{
+          position: 'fixed', bottom: 'calc(72px + env(safe-area-inset-bottom, 0px) + 72px)', right: 20, zIndex: 48,
+          background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 14,
+          boxShadow: C.shadow, overflow: 'hidden', minWidth: 160,
+        }}>
+          <button
+            type="button"
+            onClick={() => { setFabMenuOpen(false); setEditingTask(null); setEditingSeedTaskId(null); setDefaultTaskGoalId(undefined); setManageTaskOpen(true); }}
+            style={{
+              display: 'block', width: '100%', padding: '12px 16px', border: 'none', background: 'none',
+              textAlign: 'left', fontSize: 13, fontWeight: 600, color: C.headline, cursor: 'pointer',
+            }}
+          >
+            Add manually
+          </button>
+          <button
+            type="button"
+            onClick={() => { setFabMenuOpen(false); setContextAssistOpen(true); }}
+            style={{
+              display: 'block', width: '100%', padding: '12px 16px', border: 'none', background: C.bgAlt,
+              borderTop: `1px solid ${C.border}`, textAlign: 'left', fontSize: 13, fontWeight: 600,
+              color: C.primary, cursor: 'pointer',
+            }}
+          >
+            ✨ Add with AI
+          </button>
+        </div>
+      )}
       <button
         data-tour-id="tasks-add-btn"
-        onClick={() => { setEditingTask(null); setEditingSeedTaskId(null); setManageTaskOpen(true); }}
+        onClick={() => setFabMenuOpen(o => !o)}
         style={{
           position: 'fixed', bottom: 'calc(72px + env(safe-area-inset-bottom, 0px) + 12px)', right: 20, zIndex: 48,
           width: 52, height: 52, borderRadius: '50%',
@@ -1192,6 +1319,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
 
       <ManageTaskModal
         open={manageTaskOpen}
+        profileId={profile.id}
         task={editingTask}
         defaultGoalId={defaultTaskGoalId}
         goals={goals}
@@ -1199,6 +1327,25 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
         onSave={handleSaveUserTask}
         onCancel={() => { setManageTaskOpen(false); setEditingTask(null); setDefaultTaskGoalId(undefined); setEditingSeedTaskId(null); }}
       />
+
+      <ContextAssistModal
+        open={contextAssistOpen}
+        onClose={() => setContextAssistOpen(false)}
+        profileId={profile.id}
+        mode="tasks"
+        onConfirm={handleContextAssistConfirm}
+      />
+
+      {simplifyTarget && (
+        <SimplifyTaskModal
+          open={!!simplifyTarget}
+          onClose={() => setSimplifyTarget(null)}
+          taskLabel={simplifyTarget.task.label}
+          goalTitle={simplifyTarget.goal?.title}
+          goalWhy={simplifyTarget.goal?.deepWhy}
+          onConfirm={handleSimplifyConfirm}
+        />
+      )}
 
       <DeleteTaskModal
         open={!!deleteTarget}

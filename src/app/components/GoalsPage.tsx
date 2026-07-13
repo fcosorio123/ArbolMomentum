@@ -13,8 +13,10 @@ import {
 import { getGoalTaskBreakdown } from '../data/goalProgressUtils';
 import { getUserTasks, createUserTask, orphanUserTasksForGoal, deleteUserTask, isTaskScheduledForDate } from '../data/userTasks';
 import { ManageGoalModal } from './ManageGoalModal';
+import { ContextAssistModal } from './ContextAssistModal';
 import { C } from '../data/colors';
 import type { Profile } from '../data/profiles';
+import type { SeedSuggestionGroup } from '../data/profileSeedParser';
 
 function getWeekDays(): Array<{ label: string; short: string; dateKey: string; isToday: boolean }> {
   const now = new Date();
@@ -134,6 +136,7 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
   const [showTour, setShowTour] = useState(false);
   const [congratGoal, setCongratGoal] = useState<PersonalGoal | null>(null);
   const [pendingSuggestionGoal, setPendingSuggestionGoal] = useState<PersonalGoal | null>(null);
+  const [contextAssistOpen, setContextAssistOpen] = useState(false);
 
   const loadGoals = useCallback(() => {
     setGoals(getPersonalGoals(profile.id));
@@ -216,6 +219,27 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
     try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
   };
 
+  const handleContextAssistConfirm = (groups: SeedSuggestionGroup[]) => {
+    groups.forEach(group => {
+      const goal = createUserGoal(profile.id, {
+        title: group.goal.title,
+        deepWhy: group.goal.deepWhy,
+      });
+      group.tasks.forEach(task => {
+        createUserTask(profile.id, {
+          label: task.label,
+          timeOfDay: task.timeOfDay,
+          type: task.type,
+          goalId: goal.id,
+          recurrence: task.recurrence.type === 'daily' ? undefined : task.recurrence,
+        });
+      });
+    });
+    loadGoals();
+    try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch {}
+  };
+
   return (
     <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 100px', background: C.bg, minHeight: '100dvh' }}>
 
@@ -235,6 +259,16 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
 
       {goals.length > 0 && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setContextAssistOpen(true)}
+            style={{
+              padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.primary}40`,
+              background: `${C.primary}10`, color: C.primary, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            ✨ Add with AI
+          </button>
           <button type="button" onClick={() => { setSelectMode(m => !m); setSelectedGoalIds(new Set()); }} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.border}`, background: selectMode ? `${C.primary}15` : C.bgCard, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
             {selectMode ? 'Cancel select' : 'Select goals'}
           </button>
@@ -352,6 +386,14 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
         goal={editingGoal}
         onSave={handleSaveGoal}
         onCancel={() => { setManageGoalOpen(false); setEditingGoal(null); }}
+      />
+
+      <ContextAssistModal
+        open={contextAssistOpen}
+        onClose={() => setContextAssistOpen(false)}
+        profileId={profile.id}
+        mode="goals"
+        onConfirm={handleContextAssistConfirm}
       />
 
       <Modal

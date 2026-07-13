@@ -16,6 +16,7 @@ import {
 import {
   fetchCronAttemptLog,
   fetchCronLastRun,
+  fetchEmailSettings,
   type CronAttemptLogEntry,
   type CronLastRun,
 } from '../../data/emailSettings';
@@ -60,21 +61,24 @@ export function OpsTab() {
   const [cronLastRun, setCronLastRun] = useState<CronLastRun | null>(null);
   const [loading, setLoading] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [adminProfileEmails, setAdminProfileEmails] = useState<Record<string, string>>({});
 
   const load = async () => {
     if (!profileId) return;
     setLoading(true);
     try {
-      const [b, s, a, c] = await Promise.all([
+      const [b, s, a, c, emailSettings] = await Promise.all([
         fetchProfileBackupForAdmin(profileId),
         getProfileSyncStatus(profileId),
         isPublishedVersion() ? fetchCronAttemptLog(profileId) : Promise.resolve([]),
         isPublishedVersion() ? fetchCronLastRun() : Promise.resolve(null),
+        fetchEmailSettings().catch(() => null),
       ]);
       setBackup(b);
       setSyncStatus(s);
       setAttempts(a);
       setCronLastRun(c);
+      setAdminProfileEmails(emailSettings?.profileEmails ?? {});
     } finally {
       setLoading(false);
     }
@@ -82,7 +86,12 @@ export function OpsTab() {
 
   useEffect(() => { load(); }, [profileId]);
 
-  const qual = summarizeBackupQualification(backup);
+  const qual = summarizeBackupQualification(backup, { profileId, adminProfileEmails });
+  const emailSourceLabel = qual.emailSource === 'profile'
+    ? 'profile backup (user)'
+    : qual.emailSource === 'admin'
+      ? 'admin settings'
+      : 'none';
   const cronStale = cronLastRun?.ranAt
     ? Date.now() - cronLastRun.ranAt > 2 * 60 * 60 * 1000
     : false;
@@ -136,6 +145,8 @@ export function OpsTab() {
         </div>
         <div style={{ fontSize: 12, color: C.body, lineHeight: 1.6 }}>
           Email: {qual.emailMasked} {qual.hasEmail ? '' : '(missing — cron will skip)'}
+          <br />
+          Email source: {emailSourceLabel}
           <br />
           User email enabled: {qual.emailEnabled ? 'yes' : 'no'}
           <br />

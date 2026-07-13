@@ -28,6 +28,8 @@ const REGRESSION_SCRIPTS = [
   'test-alert-prefs.mjs',
   'test-day-stats.mjs',
   'test-beta-fixes.mjs',
+  'test-check-in-flow.mjs',
+  'test-admin-sync.mjs',
   'test-ai-parse-schema.mjs',
   'test-cloud-backup-merge.mjs',
   'test-cron-runtime.mjs',
@@ -99,7 +101,7 @@ for (const r of routes) {
 
 // V-01..V-12 matrix (automated vs manual)
 const vMatrix = [
-  { id: 'V-01', item: 'Deploy recency (GitHub SHA)', auto: false, note: 'Waiver: no GitHub push yet — verify after publish' },
+  { id: 'V-01', item: 'Deploy recency (GitHub SHA)', auto: false, note: 'Manual: confirm GitHub Pages deploy SHA matches HEAD' },
   { id: 'V-02', item: 'CRON_SECRET in GitHub Secrets', auto: false, note: 'Manual: confirm repo secret matches supabase/.secrets.env' },
   { id: 'V-03', item: 'Cron schedule runs', auto: false, note: 'Manual: GitHub Actions email-nudge-cron history' },
   { id: 'V-04', item: 'Cron auth 401 without secret', auto: scriptFails === 0, note: 'test-cron-runtime + c1-email-evidence' },
@@ -139,8 +141,8 @@ const secretsOk = loadCronSecret();
 console.log('\n▶ Local prerequisites');
 console.log(`  ${secretsOk ? '✓' : '○'} supabase/.secrets.env (CRON_SECRET)`);
 console.log(`  ${edgeMissing === 0 ? '✓' : '✗'} Edge deployed to Supabase project`);
-console.log('  ○ GitHub: not pushed (per request)');
-console.log('  ○ Frontend publish: run npm run build:pages when ready');
+console.log('  ○ GitHub: confirm repo secrets (CRON_SECRET, SUPABASE_ACCESS_TOKEN) + Actions green');
+console.log('  ○ Frontend publish: verify https://fcosorio123.github.io/ArbolMomentum/ after push');
 
 console.log('\n══════════════════════════════════════════════════');
 console.log(' Summary');

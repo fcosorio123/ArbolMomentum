@@ -81,24 +81,44 @@ function assignIds(groups: Array<{ goal: { title: string; deepWhy: string }; tas
   }));
 }
 
+function dedupeTaskLabels(tasks: { label: string }[], goalTitle: string): typeof tasks {
+  const seen = new Set<string>();
+  const goalNorm = goalTitle.trim().toLowerCase();
+  return tasks.filter((t) => {
+    const norm = t.label.trim().toLowerCase();
+    if (norm.length < 3 || norm === goalNorm || seen.has(norm)) return false;
+    seen.add(norm);
+    return true;
+  });
+}
+
 function normalizeLlmGroups(raw: RawLlmGroup[]): SeedSuggestionGroup[] {
+  const globalSeen = new Set<string>();
   const trimmed = raw.slice(0, MAX_GOALS).map((g) => {
     const title = (g.goal?.title ?? "Goal").trim();
     const deepWhy = (g.goal?.deepWhy ?? "A goal from your description.").trim();
-    const tasks = (g.tasks ?? []).slice(0, MAX_TASKS_PER_GOAL).map((t) => ({
-      label: (t.label ?? "").trim(),
-      timeOfDay: normalizeTimeOfDay(t.timeOfDay),
-      type: normalizeTaskType(t.type),
-      recurrence: normalizeRecurrence(t.recurrence),
-      selected: true,
-    })).filter((t) => t.label.length >= 3);
+    const tasks = dedupeTaskLabels(
+      (g.tasks ?? []).slice(0, MAX_TASKS_PER_GOAL).map((t) => ({
+        label: (t.label ?? "").trim(),
+        timeOfDay: normalizeTimeOfDay(t.timeOfDay),
+        type: normalizeTaskType(t.type),
+        recurrence: normalizeRecurrence(t.recurrence),
+        selected: true,
+      })).filter((t) => t.label.length >= 3),
+      title,
+    ).filter((t) => {
+      const norm = t.label.trim().toLowerCase();
+      if (globalSeen.has(norm)) return false;
+      globalSeen.add(norm);
+      return true;
+    });
 
     return {
       goal: { title: title || "Goal", deepWhy: deepWhy || "A goal from your description." },
       tasks,
       selected: true,
     };
-  }).filter((g) => g.tasks.length > 0);
+  }).filter((g) => g.goal.title.length > 0);
 
   return assignIds(trimmed);
 }

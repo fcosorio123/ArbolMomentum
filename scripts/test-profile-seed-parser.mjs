@@ -60,10 +60,10 @@ function parseGoalInput(text) {
         group.tasks.push({ label, recurrence: detectRecurrence(line) });
       }
     } else {
-      groups.push({ goal: { title: label }, tasks: [{ label, recurrence: detectRecurrence(line) }] });
+      groups.push({ goal: { title: label }, tasks: [] });
     }
   }
-  return groups.filter(g => g.tasks.length > 0);
+  return groups.filter(g => g.goal.title.length > 0);
 }
 
 const commaInput = 'Complete FAFSA, track monthly expenses, exercise MWF';
@@ -84,6 +84,11 @@ const health = groups.find(g => g.goal.title === 'Health & Fitness');
 assert.ok(health);
 assert.equal(health.tasks[0].label, 'Exercise');
 assert.deepEqual(health.tasks[0].recurrence.weekdays, [0, 2, 4], 'MWF → Mon/Wed/Fri');
+
+const standalone = parseGoalInput('Finish capstone presentation');
+assert.equal(standalone.length, 1);
+assert.equal(standalone[0].goal.title, 'Finish capstone presentation');
+assert.equal(standalone[0].tasks.length, 0, 'standalone goal line does not duplicate as task');
 
 assert.equal(detectRecurrence('track expenses daily').type, 'daily');
 assert.equal(detectRecurrence('budget check weekly').type, 'weekly');
