@@ -68,6 +68,7 @@ import {
 interface Props {
   profile: Profile;
   onNavigateWeek?: () => void;
+  onNavigateMonth?: () => void;
   onPerfectDay?: (newBadges: Badge[]) => void;
   onTasksChange?: (pending: number) => void;
 }
@@ -747,7 +748,7 @@ function suggestTasksForGoal(goal: PersonalGoal): Array<{ label: string; timeOfD
 // Main TaskList
 // ──────────────────────────────────────────────
 
-export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDay, onTasksChange }: Props) {
+export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfectDay, onTasksChange }: Props) {
   const { message } = App.useApp();
   const [taskView, setTaskView] = useState<TaskViewMode>(() => loadTaskView(profile.id));
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>('active');
@@ -1746,6 +1747,7 @@ export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDa
         onClose={() => setContextAssistOpen(false)}
         profileId={profile.id}
         mode="tasks"
+        existingGoals={goals.map(g => ({ id: g.id, title: g.title }))}
         onConfirm={handleContextAssistConfirm}
       />
 

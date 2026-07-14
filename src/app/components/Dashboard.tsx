@@ -9,6 +9,7 @@ import {
   getDateKey, hasActivityOnDate, getEarnedBadges, BADGES,
 } from '../data/profiles';
 import { ActiveGoalsList } from './ActiveGoalsList';
+import { TasksMonthView } from './TasksMonthView';
 import { useDashboardRefresh } from '../hooks/useDashboardRefresh';
 import { pickDoNowTask } from '../data/dashboardSnapshot';
 import { C } from '../data/colors';
@@ -21,6 +22,7 @@ interface Props {
   onCoachMark: () => void;
   onNavigateTasks?: () => void;
   onNavigateGoals?: () => void;
+  onNavigateMonth?: () => void;
   onNavigateReminders?: () => void;
   onShowSummary?: () => void;
   onShowFeedback?: () => void;
@@ -36,20 +38,6 @@ function getGreeting() {
   if (h < 12) return 'Good morning';
   if (h < 17) return 'Good afternoon';
   return 'Good evening';
-}
-
-function getDailyTaskCount(profileId: string, dateKey: string): number {
-  let count = 0;
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (
-      key &&
-      key.startsWith(`task-${profileId}-`) &&
-      key.endsWith(`-${dateKey}`) &&
-      localStorage.getItem(key) === 'done'
-    ) count++;
-  }
-  return count;
 }
 
 // Mon-Sun ISO week dots (PRD 5.4)
@@ -71,25 +59,6 @@ function buildWeekDots(profileId: string, todayHasActivity: boolean) {
   });
 }
 
-function buildMonthGrid(profileId: string, year: number, month: number) {
-  const firstDay = new Date(year, month, 1);
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const todayKey = getDateKey(new Date());
-  const startOffset = firstDay.getDay(); // 0 = Sun
-  let activeDays = 0;
-
-  const days = Array.from({ length: daysInMonth }, (_, idx) => {
-    const date = new Date(year, month, idx + 1);
-    const dk = getDateKey(date);
-    const isFuture = dk > todayKey;
-    const count = isFuture ? 0 : getDailyTaskCount(profileId, dk);
-    if (count > 0) activeDays++;
-    return { dateKey: dk, count, isFuture, isToday: dk === todayKey };
-  });
-
-  return { days, startOffset, activeDays, daysInMonth };
-}
-
 function streakMotivation(streak: number, completionPct: number): string {
   if (completionPct === 100) return "Perfect day. Every task done. Your streak is safe.";
   if (streak === 0) return "Complete one task today to start your streak.";
@@ -97,15 +66,6 @@ function streakMotivation(streak: number, completionPct: number): string {
   if (streak <= 6) return "You're building a habit. Keep showing up every day.";
   if (streak <= 13) return "Impressive consistency. You're in the habit zone.";
   return "Two weeks strong. This is what commitment looks like.";
-}
-
-
-function heatColor(count: number, isFuture: boolean, isToday: boolean): string {
-  if (isFuture) return 'rgba(0,0,0,0.04)';
-  if (count === 0) return isToday ? 'rgba(9,64,103,0.10)' : 'rgba(0,0,0,0.06)';
-  if (count === 1) return '#4ade80aa';
-  if (count === 2) return '#22c55e';
-  return '#15803d';
 }
 
 function DashboardSkeleton() {
@@ -137,7 +97,7 @@ function DashboardSkeleton() {
 
 export function Dashboard({
   profile, installPrompt, onInstall, onCoachMark,
-  onNavigateTasks, onNavigateGoals, onNavigateReminders, onShowSummary, onShowFeedback, onGoals: _onGoals, onStartCheckIn,
+  onNavigateTasks, onNavigateGoals, onNavigateMonth, onNavigateReminders, onShowSummary, onShowFeedback, onGoals: _onGoals, onStartCheckIn,
   isActive = true,
   canStartPageTours = true,
 }: Props) {
@@ -196,61 +156,12 @@ export function Dashboard({
     [profile.id, snapshot.dateKey, snapshot.doneCount, snapshot.totalCount],
   );
 
-  // Two-month grids
-  const now = useMemo(() => new Date(), []);
-  const currentGrid = useMemo(
-    () => buildMonthGrid(profile.id, now.getFullYear(), now.getMonth()),
-    [profile.id, now]
-  );
-  const prevDate = useMemo(() => new Date(now.getFullYear(), now.getMonth() - 1, 1), [now]);
-  const prevGrid = useMemo(
-    () => buildMonthGrid(profile.id, prevDate.getFullYear(), prevDate.getMonth()),
-    [profile.id, prevDate]
-  );
-  const currentMonthLabel = now.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-  const prevMonthLabel = prevDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  // kept week streak dots; month calendar is TasksMonthView below
 
   const card: React.CSSProperties = {
     background: C.bgCard, border: `1.5px solid ${C.border}`,
     borderRadius: 20, padding: 20, marginBottom: 14, boxShadow: C.shadow,
   };
-
-  const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
-  function MonthHeatmap({ grid, label }: {
-    grid: ReturnType<typeof buildMonthGrid>;
-    label: string;
-  }) {
-    return (
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: C.headline }}>{label}</span>
-          <span style={{ fontSize: 10, color: C.secondary }}>
-            {grid.activeDays} / {grid.daysInMonth} days
-          </span>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 3 }}>
-          {DAY_LABELS.map((d, i) => (
-            <div key={i} style={{ textAlign: 'center', fontSize: 7, color: C.secondary, fontWeight: 600 }}>{d}</div>
-          ))}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
-          {Array.from({ length: grid.startOffset }, (_, i) => <div key={`e${i}`} />)}
-          {grid.days.map(({ dateKey, count, isFuture, isToday }) => (
-            <div
-              key={dateKey}
-              title={isFuture ? '' : `${count} task${count !== 1 ? 's' : ''}`}
-              style={{
-                aspectRatio: '1', borderRadius: 3,
-                background: heatColor(count, isFuture, isToday),
-                border: isToday ? `1.5px solid ${C.primary}` : '1px solid transparent',
-              }}
-            />
-          ))}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px calc(100px + env(safe-area-inset-bottom, 0px))', background: C.bg, minHeight: '100dvh' }}>
@@ -514,31 +425,30 @@ export function Dashboard({
         borderRadius: 1,
       }} />
 
-      {/* ── [4] Two-Month Streak Heatmap */}
+      {/* ── Monthly tasks calendar (same as Tasks → Month) */}
       <div data-tour-id="home-heatmap" style={{ ...card, padding: '16px 18px' }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: C.headline, marginBottom: 14 }}>
-          Streak History
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.headline }}>
+            Month overview
+          </div>
+          {onNavigateMonth && (
+            <button
+              type="button"
+              onClick={onNavigateMonth}
+              style={{
+                border: 'none', background: 'none', color: C.primary,
+                fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0,
+              }}
+            >
+              Open Month →
+            </button>
+          )}
         </div>
-
-        <div style={{ display: 'flex', gap: 10 }}>
-          <MonthHeatmap grid={prevGrid} label={prevMonthLabel} />
-          <div style={{ width: 1, background: C.border, flexShrink: 0 }} />
-          <MonthHeatmap grid={currentGrid} label={currentMonthLabel} />
-        </div>
-
-        {/* Legend - keep green scale */}
-        <div style={{ display: 'flex', gap: 12, marginTop: 14, alignItems: 'center' }}>
-          {[
-            { color: '#4ade80aa', label: '1 task' },
-            { color: '#22c55e',   label: '2 tasks' },
-            { color: '#15803d',   label: '3+ tasks' },
-          ].map(({ color, label }) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <div style={{ width: 9, height: 9, borderRadius: 2, background: color }} />
-              <span style={{ fontSize: 9, color: C.secondary }}>{label}</span>
-            </div>
-          ))}
-        </div>
+        <TasksMonthView
+          profileId={profile.id}
+          onManageTask={() => onNavigateTasks?.()}
+          onGoAllTasks={() => onNavigateTasks?.()}
+        />
       </div>
 
       {/* ── [5] Why This Matters */}

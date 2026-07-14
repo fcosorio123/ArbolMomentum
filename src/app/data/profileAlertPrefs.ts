@@ -67,8 +67,21 @@ export function getEffectiveSmartSlots(profileId: string): SmartSlotsConfig {
   };
 }
 
-export function formatSlotTime(slot: SmartSlotConfig): string {
+export function toHtmlTimeValue(slot: SmartSlotConfig): string {
   return `${String(slot.hour).padStart(2, '0')}:${String(slot.minute).padStart(2, '0')}`;
+}
+
+/** 12-hour display (e.g. 8:00 AM) — avoid military time in the UI. */
+export function formatSlotTime(slot: SmartSlotConfig): string {
+  const h24 = slot.hour;
+  const period = h24 >= 12 ? 'PM' : 'AM';
+  const h12 = h24 % 12 || 12;
+  const mm = String(slot.minute).padStart(2, '0');
+  return `${h12}:${mm} ${period}`;
+}
+
+export function formatHourMinute12(hour: number, minute: number): string {
+  return formatSlotTime({ enabled: true, hour, minute });
 }
 
 export function parseSlotTime(time: string): Pick<SmartSlotConfig, 'hour' | 'minute'> {

@@ -8,9 +8,11 @@ interface Props {
   goal?: PersonalGoal | null;
   onSave: (data: { title: string; deepWhy: string }) => void;
   onCancel: () => void;
+  /** Opens the unified AI Assist flow (new goals only). */
+  onOpenAiAssist?: () => void;
 }
 
-export function ManageGoalModal({ open, goal, onSave, onCancel }: Props) {
+export function ManageGoalModal({ open, goal, onSave, onCancel, onOpenAiAssist }: Props) {
   const isEdit = !!goal;
   const [title, setTitle] = useState('');
   const [deepWhy, setDeepWhy] = useState('');
@@ -42,6 +44,23 @@ export function ManageGoalModal({ open, goal, onSave, onCancel }: Props) {
         <h3 style={{ margin: '0 0 18px', fontSize: 17, fontWeight: 800, color: C.headline }}>
           {isEdit ? 'Edit Goal' : 'Add Goal'}
         </h3>
+
+        {!isEdit && onOpenAiAssist && (
+          <button
+            type="button"
+            onClick={() => { onCancel(); onOpenAiAssist(); }}
+            style={{
+              width: '100%', marginBottom: 16, padding: '12px 14px', borderRadius: 12,
+              border: `1.5px solid ${C.primary}40`, background: `${C.primary}10`,
+              color: C.primary, fontWeight: 700, fontSize: 13, cursor: 'pointer', textAlign: 'left',
+            }}
+          >
+            ✨ AI Assist
+            <div style={{ fontSize: 11, fontWeight: 500, color: C.body, marginTop: 4 }}>
+              Describe what you want — we&apos;ll draft a Goal and Tasks
+            </div>
+          </button>
+        )}
 
         <div style={{ marginBottom: 14 }}>
           <label style={{ fontSize: 12, fontWeight: 700, color: C.secondary, display: 'block', marginBottom: 6 }}>

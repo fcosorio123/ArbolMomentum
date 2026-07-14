@@ -219,7 +219,7 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
     return { ok: false, skipped: true, reason: "global_disabled" };
   }
 
-  if (payload.type !== "test" && !typeEnabled(settings, payload.type)) {
+  if (payload.type !== "test" && !typeEnabled(settings, payload.type) && !payload.force) {
     return { ok: false, skipped: true, reason: "type_or_global_disabled" };
   }
 

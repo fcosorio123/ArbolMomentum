@@ -1989,8 +1989,14 @@ function SettingsTab() {
     }));
   };
 
-  const formatSlotTime = (hour: number, minute: number) =>
+  const formatSlotTimeInput = (hour: number, minute: number) =>
     `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+
+  const formatSlotTimeDisplay = (hour: number, minute: number) => {
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const h12 = hour % 12 || 12;
+    return `${h12}:${String(minute).padStart(2, '0')} ${period}`;
+  };
 
   const cardStyle = { background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16, padding: '16px 18px', marginBottom: 14, boxShadow: C.shadow };
   const inputStyle = { borderRadius: 10, marginTop: 6 };
@@ -2247,9 +2253,12 @@ function SettingsTab() {
                 style={{ background: slot.enabled ? C.primary : undefined }}
               />
               <span style={{ fontSize: 13, color: C.headline, minWidth: 120 }}>{label}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: C.secondary, minWidth: 72 }}>
+                {formatSlotTimeDisplay(slot.hour, slot.minute)}
+              </span>
               <Input
                 type="time"
-                value={formatSlotTime(slot.hour, slot.minute)}
+                value={formatSlotTimeInput(slot.hour, slot.minute)}
                 disabled={!slot.enabled}
                 onChange={e => {
                   const [h, m] = e.target.value.split(':').map(Number);

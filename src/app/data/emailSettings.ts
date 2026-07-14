@@ -182,8 +182,14 @@ export async function sendTestEmail(recipient?: string): Promise<{ ok: boolean; 
       method: 'POST',
       body: recipient ? { recipient } : {},
     });
-    if (error) return { ok: false, reason: 'Could not reach email service.' };
-    return data ?? { ok: false, reason: 'unknown' };
+    if (error) return { ok: false, reason: error || 'Could not reach email service.' };
+    if (data?.ok) return { ok: true };
+    const reason = data?.reason === 'no_test_recipient'
+      ? 'Set a test recipient email above, then try again.'
+      : typeof data?.reason === 'string' && data.reason.startsWith('send_failed')
+        ? `Email provider error — check RESEND_API_KEY (${data.reason})`
+        : data?.reason || data?.error || 'unknown';
+    return { ok: false, reason };
   } catch {
     return { ok: false, reason: 'Could not send test email.' };
   }
@@ -274,9 +280,15 @@ export async function sendManualNudge(opts: {
     if (!data?.ok) {
       const reason = data?.reason === 'no_valid_recipient'
         ? 'No valid email on this profile. Enter an address and try again.'
-        : data?.reason === 'global_disabled'
-          ? 'Email sending is turned off in settings.'
-          : 'Send failed. Check the address and try again.';
+        : data?.reason === 'global_disabled' || data?.reason === 'type_or_global_disabled'
+          ? 'Email or this nudge type is turned off — try again after enabling, or use Send nudge now (force may still apply after redeploy).'
+          : data?.reason === 'no_test_recipient'
+            ? 'Set a test recipient email first.'
+            : typeof data?.reason === 'string' && data.reason.startsWith('send_failed')
+              ? `Email provider error: ${data.reason.replace(/^send_failed:?/, '') || 'check RESEND_API_KEY'}`
+              : data?.reason
+                ? `Send failed (${data.reason}).`
+                : 'Send failed. Check the address and try again.';
       console.warn('[Email] Manual nudge failed:', data?.reason);
       return { ok: false, reason };
     }

@@ -137,6 +137,7 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
   const [congratGoal, setCongratGoal] = useState<PersonalGoal | null>(null);
   const [pendingSuggestionGoal, setPendingSuggestionGoal] = useState<PersonalGoal | null>(null);
   const [contextAssistOpen, setContextAssistOpen] = useState(false);
+  const [fabMenuOpen, setFabMenuOpen] = useState(false);
 
   const loadGoals = useCallback(() => {
     setGoals(getPersonalGoals(profile.id));
@@ -221,17 +222,21 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
 
   const handleContextAssistConfirm = (groups: SeedSuggestionGroup[]) => {
     groups.forEach(group => {
-      const goal = createUserGoal(profile.id, {
-        title: group.goal.title,
-        deepWhy: group.goal.deepWhy,
-      });
+      let goal = goals.find(g => g.title.toLowerCase() === group.goal.title.toLowerCase());
+      if (!goal && group.selected !== false) {
+        goal = createUserGoal(profile.id, {
+          title: group.goal.title,
+          deepWhy: group.goal.deepWhy,
+        });
+      }
+      if (!goal) return;
       group.tasks.forEach(task => {
-        if (task.label.trim().toLowerCase() === goal.title.trim().toLowerCase()) return;
+        if (task.label.trim().toLowerCase() === goal!.title.trim().toLowerCase()) return;
         createUserTask(profile.id, {
           label: task.label,
           timeOfDay: task.timeOfDay,
           type: task.type,
-          goalId: goal.id,
+          goalId: goal!.id,
           recurrence: task.recurrence.type === 'daily' ? undefined : task.recurrence,
         });
       });
@@ -353,23 +358,60 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
         </div>
       )}
 
-      {/* Add Goal FAB */}
+      {/* Add Goal FAB — match Tasks: manual vs AI */}
       {goals.length > 0 && (
-        <button
-          data-tour-id="goals-add-btn"
-          onClick={() => { setEditingGoal(null); setManageGoalOpen(true); }}
-          style={{
-            position: 'fixed', bottom: 'calc(72px + env(safe-area-inset-bottom, 0px) + 12px)', right: 20, zIndex: 48,
-            width: 52, height: 52, borderRadius: '50%',
-            background: `linear-gradient(135deg, #ef4565, #f5a623)`,
-            border: 'none', cursor: 'pointer', color: '#fff', fontSize: 22,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 6px 24px #ef456540',
-          }}
-          title="Add a new goal"
-        >
-          <PlusOutlined />
-        </button>
+        <>
+          {fabMenuOpen && (
+            <div
+              onClick={() => setFabMenuOpen(false)}
+              style={{ position: 'fixed', inset: 0, zIndex: 47, background: 'rgba(9,64,103,0.18)' }}
+            />
+          )}
+          {fabMenuOpen && (
+            <div style={{
+              position: 'fixed', bottom: 'calc(132px + env(safe-area-inset-bottom, 0px))', right: 20, zIndex: 49,
+              display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'stretch',
+            }}>
+              <button
+                type="button"
+                onClick={() => { setFabMenuOpen(false); setEditingGoal(null); setManageGoalOpen(true); }}
+                style={{
+                  padding: '10px 16px', borderRadius: 12, border: `1.5px solid ${C.border}`,
+                  background: C.bgCard, fontWeight: 600, fontSize: 13, cursor: 'pointer', textAlign: 'left',
+                  boxShadow: C.shadow,
+                }}
+              >
+                Add manually
+              </button>
+              <button
+                type="button"
+                onClick={() => { setFabMenuOpen(false); setContextAssistOpen(true); }}
+                style={{
+                  padding: '10px 16px', borderRadius: 12, border: `1.5px solid ${C.primary}40`,
+                  background: `${C.primary}10`, color: C.primary, fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                  textAlign: 'left', boxShadow: C.shadow,
+                }}
+              >
+                ✨ Add with AI
+              </button>
+            </div>
+          )}
+          <button
+            data-tour-id="goals-add-btn"
+            onClick={() => setFabMenuOpen(m => !m)}
+            style={{
+              position: 'fixed', bottom: 'calc(72px + env(safe-area-inset-bottom, 0px) + 12px)', right: 20, zIndex: 48,
+              width: 52, height: 52, borderRadius: '50%',
+              background: `linear-gradient(135deg, #ef4565, #f5a623)`,
+              border: 'none', cursor: 'pointer', color: '#fff', fontSize: 22,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 6px 24px #ef456540',
+            }}
+            title="Add a new goal"
+          >
+            <PlusOutlined />
+          </button>
+        </>
       )}
 
       {/* Link to Tasks */}
@@ -399,6 +441,7 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
         goal={editingGoal}
         onSave={handleSaveGoal}
         onCancel={() => { setManageGoalOpen(false); setEditingGoal(null); }}
+        onOpenAiAssist={() => setContextAssistOpen(true)}
       />
 
       <ContextAssistModal
@@ -406,6 +449,7 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
         onClose={() => setContextAssistOpen(false)}
         profileId={profile.id}
         mode="goals"
+        existingGoals={goals.map(g => ({ id: g.id, title: g.title }))}
         onConfirm={handleContextAssistConfirm}
       />
 

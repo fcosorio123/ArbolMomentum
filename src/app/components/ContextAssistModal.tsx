@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Modal, Input, Button, Checkbox, Switch } from 'antd';
+import { Modal, Input, Button, Checkbox, Switch, Select } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { C } from '../data/colors';
 import { parseContextTasksFromEdge, type ParseContextSource } from '../data/aiTaskCreation';
@@ -7,41 +7,49 @@ import { recurrenceSummary, type SeedSuggestionGroup } from '../data/profileSeed
 
 const { TextArea } = Input;
 
-type Step = 'paste' | 'review';
+type Step = 'kind' | 'taskLink' | 'paste' | 'review';
 type AssistMode = 'profile' | 'goals' | 'tasks';
+type AssistKind = 'goal' | 'task';
+type TaskLinkMode = 'existing' | 'new';
+
+export interface AssistGoalOption {
+  id: string;
+  title: string;
+}
 
 interface Props {
   open: boolean;
   onClose: () => void;
   profileId?: string;
+  /** Legacy entry hint — unified flow still asks Goal vs Task unless profile mode. */
   mode: AssistMode;
+  existingGoals?: AssistGoalOption[];
   onConfirm: (groups: SeedSuggestionGroup[]) => void;
 }
 
-const MODE_COPY: Record<AssistMode, { title: string; hint: string; placeholder: string; confirm: string }> = {
-  profile: {
-    title: 'Describe your goals',
-    hint: 'Use a paragraph or bullet list — we\'ll suggest goals and tasks for your new profile.',
-    placeholder: 'Complete FAFSA, track monthly expenses, exercise MWF...',
-    confirm: 'Use selections',
-  },
+const MODE_COPY: Record<'goals' | 'tasks', { title: string; hint: string; placeholder: string; confirm: string }> = {
   goals: {
-    title: 'Add goals with AI',
-    hint: 'Paste goals, deadlines, or a brain dump — we\'ll turn it into goals and starter tasks.',
+    title: 'Describe your goal',
+    hint: 'Paste an outcome, deadline, or brain dump — we\'ll turn it into a Goal (outcome) plus starter Tasks (actions).',
     placeholder: 'Save $2k by December, finish capstone proposal, gym 3x/week...',
     confirm: 'Create goals & tasks',
   },
   tasks: {
-    title: 'Add tasks with AI',
-    hint: 'Paste tasks, routines, or context — we\'ll suggest tasks you can link to goals.',
+    title: 'Describe your tasks',
+    hint: 'Paste actions or a routine — we\'ll suggest Tasks you can attach to a Goal.',
     placeholder: 'Review budget every Sunday, call advisor Tuesday, submit lab report Friday...',
     confirm: 'Add selected tasks',
   },
 };
 
-export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
-  const copy = MODE_COPY[mode];
-  const [step, setStep] = useState<Step>('paste');
+export function ContextAssistModal({ open, onClose, mode, existingGoals = [], onConfirm }: Props) {
+  const unified = mode !== 'profile';
+  const [step, setStep] = useState<Step>(unified ? 'kind' : 'paste');
+  const [kind, setKind] = useState<AssistKind>(mode === 'tasks' ? 'task' : 'goal');
+  const [taskLink, setTaskLink] = useState<TaskLinkMode>(existingGoals.length > 0 ? 'existing' : 'new');
+  const [existingGoalId, setExistingGoalId] = useState<string>(existingGoals[0]?.id ?? '');
+  const [newGoalTitle, setNewGoalTitle] = useState('');
+  const [newGoalWhy, setNewGoalWhy] = useState('');
   const [text, setText] = useState('');
   const [groups, setGroups] = useState<SeedSuggestionGroup[]>([]);
   const [useAiAssist, setUseAiAssist] = useState(true);
@@ -49,9 +57,18 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
   const [parseSource, setParseSource] = useState<ParseContextSource | null>(null);
   const [parseReason, setParseReason] = useState<string | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
+
+  const activeMode: 'goals' | 'tasks' = kind === 'goal' ? 'goals' : 'tasks';
+  const copy = MODE_COPY[activeMode];
 
   const reset = () => {
-    setStep('paste');
+    setStep(unified ? 'kind' : 'paste');
+    setKind(mode === 'tasks' ? 'task' : 'goal');
+    setTaskLink(existingGoals.length > 0 ? 'existing' : 'new');
+    setExistingGoalId(existingGoals[0]?.id ?? '');
+    setNewGoalTitle('');
+    setNewGoalWhy('');
     setText('');
     setGroups([]);
     setUseAiAssist(true);
@@ -59,15 +76,46 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
     setParseSource(null);
     setParseReason(null);
     setParseError(null);
+    setLinkError(null);
   };
 
   useEffect(() => {
     if (!open) reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  useEffect(() => {
+    if (open && existingGoals.length > 0 && !existingGoalId) {
+      setExistingGoalId(existingGoals[0].id);
+    }
+  }, [open, existingGoals, existingGoalId]);
 
   const handleClose = () => {
     reset();
     onClose();
+  };
+
+  const continueFromKind = (next: AssistKind) => {
+    setKind(next);
+    if (next === 'task') {
+      setStep('taskLink');
+    } else {
+      setStep('paste');
+    }
+  };
+
+  const continueFromTaskLink = () => {
+    setLinkError(null);
+    if (taskLink === 'existing') {
+      if (!existingGoalId) {
+        setLinkError('Pick a goal, or create a new one.');
+        return;
+      }
+    } else if (newGoalTitle.trim().length < 3) {
+      setLinkError('Enter a short outcome-style goal name (at least 3 characters).');
+      return;
+    }
+    setStep('paste');
   };
 
   const handleParse = async () => {
@@ -76,7 +124,7 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
     try {
       const result = await parseContextTasksFromEdge(text, {
         preferRules: !useAiAssist,
-        mode,
+        mode: activeMode,
       });
       if (!result.ok || result.groups.length === 0) {
         const reason = result.reason === 'network_error'
@@ -144,7 +192,7 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
     try {
       const result = await parseContextTasksFromEdge(text, {
         preferRules: !useAiAssist,
-        mode,
+        mode: activeMode,
       });
       if (!result.ok || result.groups.length === 0) {
         setParseError('Could not regenerate. Try editing your input or try again.');
@@ -164,6 +212,49 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
 
   const aiFallbackWarning = useAiAssist && parseSource === 'rules';
 
+  const finalizeGroups = (raw: SeedSuggestionGroup[]): SeedSuggestionGroup[] => {
+    if (kind !== 'task') return raw;
+
+    if (taskLink === 'existing') {
+      const eg = existingGoals.find(g => g.id === existingGoalId);
+      if (!eg) return raw;
+      const tasks = raw
+        .filter(g => g.selected)
+        .flatMap(g => g.tasks.filter(t => t.selected));
+      if (tasks.length === 0) return [];
+      return [{
+        id: `link-${eg.id}`,
+        selected: true,
+        goal: {
+          title: eg.title,
+          deepWhy: 'Existing goal — tasks added from AI Assist.',
+        },
+        tasks: tasks.map((t, i) => ({ ...t, id: t.id || `t-${i}`, selected: true })),
+      }];
+    }
+
+    // New goal created during task flow
+    const title = newGoalTitle.trim();
+    const deepWhy = newGoalWhy.trim() || 'Goal created while adding tasks with AI Assist.';
+    const tasks = raw
+      .filter(g => g.selected)
+      .flatMap(g => g.tasks.filter(t => t.selected));
+    if (tasks.length === 0) {
+      return [{
+        id: 'new-goal',
+        selected: true,
+        goal: { title, deepWhy },
+        tasks: [],
+      }];
+    }
+    return [{
+      id: 'new-goal',
+      selected: true,
+      goal: { title, deepWhy },
+      tasks: tasks.map((t, i) => ({ ...t, id: t.id || `t-${i}`, selected: true })),
+    }];
+  };
+
   const handleConfirm = () => {
     const selected = groups
       .filter(g => g.selected)
@@ -171,13 +262,24 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
         ...g,
         tasks: g.tasks.filter(t => t.selected),
       }))
-      .filter(g => g.tasks.length > 0 || mode !== 'tasks');
-    if (selected.length === 0) return;
-    onConfirm(selected);
+      .filter(g => g.tasks.length > 0 || activeMode !== 'tasks');
+
+    const finalized = finalizeGroups(selected);
+    if (finalized.length === 0) return;
+    if (kind === 'goal' && finalized.every(g => g.tasks.length === 0) && finalized.every(g => !g.goal.title.trim())) {
+      return;
+    }
+    onConfirm(finalized);
     handleClose();
   };
 
   const sourceBadge = parseSource === 'llm' ? 'AI' : 'Rules';
+
+  const backFromPaste = () => {
+    if (!unified) return;
+    if (kind === 'task') setStep('taskLink');
+    else setStep('kind');
+  };
 
   return (
     <Modal
@@ -196,8 +298,153 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
     >
       <div style={{ height: 5, background: `linear-gradient(90deg, ${C.primary}, #1a6da8)` }} />
       <div style={{ padding: '20px 22px 18px' }}>
+        {step === 'kind' && (
+          <>
+            <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, color: C.headline }}>
+              What are you creating?
+            </h2>
+            <p style={{ margin: '0 0 16px', fontSize: 12, color: C.body, lineHeight: 1.45 }}>
+              Goals are outcomes. Tasks are actions. We&apos;ll guide you based on what you pick.
+            </p>
+            <button
+              type="button"
+              onClick={() => continueFromKind('goal')}
+              style={{
+                width: '100%', textAlign: 'left', marginBottom: 10, padding: '14px 16px',
+                borderRadius: 14, border: `1.5px solid ${C.primary}40`, background: `${C.primary}10`,
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.headline }}>Goal</div>
+              <div style={{ fontSize: 12, color: C.body, marginTop: 4 }}>
+                An outcome you want — we&apos;ll also suggest starter tasks.
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => continueFromKind('task')}
+              style={{
+                width: '100%', textAlign: 'left', padding: '14px 16px',
+                borderRadius: 14, border: `1.5px solid ${C.border}`, background: C.bgCard,
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.headline }}>Task</div>
+              <div style={{ fontSize: 12, color: C.body, marginTop: 4 }}>
+                Actions to do — we&apos;ll ask which Goal they belong to.
+              </div>
+            </button>
+          </>
+        )}
+
+        {step === 'taskLink' && (
+          <>
+            <button
+              type="button"
+              onClick={() => setStep('kind')}
+              style={{ border: 'none', background: 'none', padding: 0, marginBottom: 12, color: C.secondary, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}
+            >
+              <ArrowLeftOutlined /> Back
+            </button>
+            <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, color: C.headline }}>
+              Link tasks to a Goal
+            </h2>
+            <p style={{ margin: '0 0 14px', fontSize: 12, color: C.body, lineHeight: 1.45 }}>
+              Associate these tasks with an existing Goal, or create a new Goal (it syncs to the Goals page).
+            </p>
+            <label style={{
+              display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10,
+              padding: '12px', borderRadius: 12, border: `1.5px solid ${taskLink === 'existing' ? C.primary : C.border}`,
+              background: taskLink === 'existing' ? `${C.primary}10` : C.bgCard, cursor: existingGoals.length ? 'pointer' : 'not-allowed',
+              opacity: existingGoals.length ? 1 : 0.55,
+            }}>
+              <input
+                type="radio"
+                name="task-link"
+                checked={taskLink === 'existing'}
+                disabled={existingGoals.length === 0}
+                onChange={() => setTaskLink('existing')}
+                style={{ marginTop: 3 }}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.headline }}>Existing goal</div>
+                {existingGoals.length === 0 ? (
+                  <div style={{ fontSize: 11, color: C.secondary, marginTop: 4 }}>No goals yet — create one below.</div>
+                ) : (
+                  <Select
+                    value={existingGoalId || undefined}
+                    onChange={setExistingGoalId}
+                    onClick={e => e.stopPropagation()}
+                      options={existingGoals.map(g => ({ value: g.id, label: g.title }))}
+                    style={{ width: '100%', marginTop: 8 }}
+                    placeholder="Choose a goal"
+                  />
+                )}
+              </div>
+            </label>
+            <label style={{
+              display: 'block', marginBottom: 14, padding: '12px', borderRadius: 12,
+              border: `1.5px solid ${taskLink === 'new' ? C.primary : C.border}`,
+              background: taskLink === 'new' ? `${C.primary}10` : C.bgCard, cursor: 'pointer',
+            }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <input
+                  type="radio"
+                  name="task-link"
+                  checked={taskLink === 'new'}
+                  onChange={() => setTaskLink('new')}
+                  style={{ marginTop: 3 }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.headline }}>Create a new goal</div>
+                  <div style={{ fontSize: 11, color: C.body, marginTop: 2 }}>Saved on Goals when you confirm.</div>
+                </div>
+              </div>
+              {taskLink === 'new' && (
+                <div style={{ marginTop: 10, marginLeft: 26 }}>
+                  <Input
+                    value={newGoalTitle}
+                    onChange={e => setNewGoalTitle(e.target.value)}
+                    placeholder="Goal outcome (e.g. Eat well & feel nourished)"
+                    style={{ borderRadius: 8, marginBottom: 8 }}
+                    onClick={e => e.stopPropagation()}
+                  />
+                  <Input
+                    value={newGoalWhy}
+                    onChange={e => setNewGoalWhy(e.target.value)}
+                    placeholder="Why this matters (optional)"
+                    style={{ borderRadius: 8 }}
+                    onClick={e => e.stopPropagation()}
+                  />
+                </div>
+              )}
+            </label>
+            {linkError && (
+              <p style={{ margin: '0 0 12px', fontSize: 12, color: '#c0392b' }}>{linkError}</p>
+            )}
+            <Button
+              type="primary"
+              block
+              size="large"
+              onClick={continueFromTaskLink}
+              style={{ borderRadius: 12, height: 46, background: C.primary, fontWeight: 700, border: 'none' }}
+            >
+              Continue
+            </Button>
+          </>
+        )}
+
         {step === 'paste' && (
           <>
+            {unified && (
+              <button
+                type="button"
+                onClick={backFromPaste}
+                style={{ border: 'none', background: 'none', padding: 0, marginBottom: 12, color: C.secondary, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}
+              >
+                <ArrowLeftOutlined /> Back
+              </button>
+            )}
             <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, color: C.headline }}>
               {copy.title}
             </h2>
@@ -300,12 +547,14 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
                         onChange={e => updateGoalTitle(group.id, e.target.value)}
                         placeholder="Outcome you want…"
                         style={{ fontWeight: 700, fontSize: 14, marginBottom: 6, borderRadius: 8 }}
+                        disabled={kind === 'task'}
                       />
                       <Input
                         value={group.goal.deepWhy}
                         onChange={e => updateGoalWhy(group.id, e.target.value)}
                         placeholder="Why this matters…"
                         style={{ fontSize: 12, borderRadius: 8 }}
+                        disabled={kind === 'task'}
                       />
                     </div>
                     <button
@@ -358,7 +607,7 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
                 type="primary"
                 block
                 size="large"
-                disabled={(selectedTaskCount === 0 && mode === 'tasks') || parsing}
+                disabled={(selectedTaskCount === 0 && kind === 'task') || parsing}
                 onClick={handleConfirm}
                 style={{ borderRadius: 12, height: 46, background: C.primary, fontWeight: 700, border: 'none', flex: '1.4 1 160px' }}
               >

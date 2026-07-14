@@ -6,18 +6,20 @@ import {
   ScheduleOutlined,
   UserOutlined,
   TrophyOutlined,
+  BellOutlined,
 } from '@ant-design/icons';
 import { C } from '../data/colors';
 
-type Tab = 'home' | 'goals' | 'tasks' | 'week' | 'calendar' | 'reminders' | 'profile';
+type Tab = 'home' | 'goals' | 'tasks' | 'week' | 'month' | 'calendar' | 'reminders' | 'profile';
 
 const TABS: { key: Tab; icon: ReactNode; label: string }[] = [
-  { key: 'home',     icon: <HomeOutlined />,        label: 'My Crib' },
-  { key: 'goals',    icon: <TrophyOutlined />,      label: 'Goals' },
-  { key: 'tasks',    icon: <CheckSquareOutlined />, label: 'Tasks' },
-  { key: 'week',     icon: <ScheduleOutlined />,    label: 'Week' },
-  { key: 'calendar', icon: <CalendarOutlined />,    label: 'Calendar' },
-  { key: 'profile',  icon: <UserOutlined />,        label: 'Profile' },
+  { key: 'home',      icon: <HomeOutlined />,        label: 'My Crib' },
+  { key: 'goals',     icon: <TrophyOutlined />,      label: 'Goals' },
+  { key: 'tasks',     icon: <CheckSquareOutlined />, label: 'Tasks' },
+  { key: 'month',     icon: <ScheduleOutlined />,    label: 'Month' },
+  { key: 'calendar',  icon: <CalendarOutlined />,    label: 'Calendar' },
+  { key: 'reminders', icon: <BellOutlined />,        label: 'Alerts' },
+  { key: 'profile',   icon: <UserOutlined />,        label: 'Profile' },
 ];
 
 export function BottomNav({ activeTab, onChange, pendingCount = 0, isDesktop = false }: {
@@ -176,7 +178,7 @@ export function BottomNav({ activeTab, onChange, pendingCount = 0, isDesktop = f
                 </span>
               )}
             </span>
-            <span style={{ fontSize: 9, fontWeight: active ? 700 : 400 }}>{tab.label}</span>
+            <span style={{ fontSize: 8, fontWeight: active ? 700 : 400, lineHeight: 1.1 }}>{tab.label}</span>
           </button>
         );
       })}

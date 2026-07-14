@@ -5,7 +5,7 @@ import { AccessCodeGate } from './components/AccessCodeGate';
 import { Dashboard } from './components/Dashboard';
 import { GoalsPage } from './components/GoalsPage';
 import { TaskList } from './components/TaskList';
-import { WeekPlan } from './components/WeekPlan';
+import { MonthPlan } from './components/MonthPlan';
 import { RemindersScreen } from './components/RemindersScreen';
 import { CalendarScreen } from './components/CalendarScreen';
 import { ProfileScreen } from './components/ProfileScreen';
@@ -45,7 +45,7 @@ import {
 } from './data/profiles';
 import { C } from './data/colors';
 
-type Tab = 'home' | 'goals' | 'tasks' | 'week' | 'calendar' | 'reminders' | 'profile';
+type Tab = 'home' | 'goals' | 'tasks' | 'week' | 'month' | 'calendar' | 'reminders' | 'profile';
 
 const arbolTheme = {
   algorithm: antTheme.defaultAlgorithm,
@@ -621,6 +621,7 @@ export default function App() {
           onCoachMark={() => setOnboardingModal('coach')}
           onNavigateTasks={() => setActiveTab('tasks')}
           onNavigateGoals={() => setActiveTab('goals')}
+          onNavigateMonth={() => setActiveTab('month')}
           onNavigateReminders={() => setActiveTab('reminders')}
           onShowSummary={() => {
             setSummaryDataVersion(v => v + 1);
@@ -641,7 +642,7 @@ export default function App() {
       {activeTab === 'tasks' && (
         <TaskList
           profile={activeProfile}
-          onNavigateWeek={() => setActiveTab('week')}
+          onNavigateMonth={() => setActiveTab('month')}
           onPerfectDay={(newBadges) => {
             setCelebrationBadges(newBadges);
             setShowCelebration(true);
@@ -650,7 +651,12 @@ export default function App() {
           onTasksChange={() => syncBadge(activeProfile.id)}
         />
       )}
-      {activeTab === 'week' && <WeekPlan profile={activeProfile} />}
+      {(activeTab === 'month' || activeTab === 'week') && (
+        <MonthPlan
+          profile={activeProfile}
+          onGoAllTasks={() => setActiveTab('tasks')}
+        />
+      )}
       {activeTab === 'calendar' && (
         <CalendarScreen
           profile={activeProfile}
@@ -764,7 +770,7 @@ export default function App() {
             streak={activeProfile.streak}
             newBadges={celebrationBadges}
             onClose={() => setShowCelebration(false)}
-            onViewWeek={() => { setActiveTab('week'); setShowCelebration(false); }}
+            onViewWeek={() => { setActiveTab('month'); setShowCelebration(false); }}
           />
 
           {/* Coach marks */}

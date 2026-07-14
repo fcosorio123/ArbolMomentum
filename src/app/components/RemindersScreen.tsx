@@ -11,6 +11,7 @@ import {
   saveProfileAlertPrefs,
   getEffectiveSmartSlots,
   formatSlotTime,
+  toHtmlTimeValue,
   parseSlotTime,
   type ProfileAlertPrefs,
 } from '../data/profileAlertPrefs';
@@ -369,16 +370,19 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
                 <div style={{ fontSize: 13, fontWeight: 600, color: C.headline }}>{label}</div>
                 <div style={{ fontSize: 11, color: C.secondary, marginTop: 2 }}>{desc}</div>
               </div>
-              <Input
-                type="time"
-                value={formatSlotTime(slot)}
-                disabled={!slot.enabled}
-                onChange={e => {
-                  const { hour, minute } = parseSlotTime(e.target.value);
-                  updateUserSlot(key, { hour, minute });
-                }}
-                style={{ width: 110, borderRadius: 8 }}
-              />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: C.headline }}>{formatSlotTime(slot)}</span>
+                <Input
+                  type="time"
+                  value={toHtmlTimeValue(slot)}
+                  disabled={!slot.enabled}
+                  onChange={e => {
+                    const { hour, minute } = parseSlotTime(e.target.value);
+                    updateUserSlot(key, { hour, minute });
+                  }}
+                  style={{ width: 110, borderRadius: 8 }}
+                />
+              </div>
             </div>
           );
         })}
