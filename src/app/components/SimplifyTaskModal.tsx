@@ -179,7 +179,7 @@ export function SimplifyTaskModal({
         {reviewing && result && (
           <>
             <p style={{ margin: '0 0 14px', fontSize: 12, color: C.body }}>
-              Choose 2–5 simpler tasks to replace the original. Uncheck any you don&apos;t want.
+              Choose 2–5 tiny actions that replace the original. Uncheck any you don&apos;t want.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
               {result.tasks.map((t, i) => (

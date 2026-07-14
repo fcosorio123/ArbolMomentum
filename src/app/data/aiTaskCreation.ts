@@ -132,38 +132,97 @@ function normalizeClientAnswers(input: SimplifyTaskInput): {
 /** Client-side mirror of edge ruleBasedSimplify (used when the invoke fails). */
 export function ruleBasedSimplifyClient(input: SimplifyTaskInput): SimplifiedTaskSuggestion[] {
   const label = input.taskLabel.trim().replace(/\s+/g, ' ');
-  const short = label.slice(0, 70);
-  const { blocker, motivation, constraint } = normalizeClientAnswers(input);
+  const answers = normalizeClientAnswers(input);
+  const blob = `${label} ${answers.blocker} ${answers.motivation} ${answers.constraint} ${input.goalTitle ?? ''}`;
+  const t = blob.toLowerCase();
+
+  const domain =
+    /eat|food|meal|healthy|diet|nutrition|protein|fruit|veg|hydrate|water|cook|snack/.test(t) ? 'eating'
+    : /exercise|workout|gym|run|walk|fit|lift|cardio|stretch/.test(t) ? 'exercise'
+    : /sleep|bed|wind.?down|rest|insomnia/.test(t) ? 'sleep'
+    : /study|homework|read|class|exam|assignment|learn/.test(t) ? 'study'
+    : /budget|money|save|spend|bill|expense/.test(t) ? 'money'
+    : /clean|laundry|dishes|chore|organize|tid(y|ying)/.test(t) ? 'chores'
+    : 'generic';
+
+  const tightTime = /time|min|busy|rushed|quick|short|structure|overwhelm|vague|big|hard|complicated/i
+    .test(`${answers.blocker} ${answers.constraint}`);
+  const likesTaste = /taste|tasty|enjoy|good|like|delicious/i.test(answers.motivation);
 
   const steps: string[] = [];
-  steps.push(`5-min start: ${short}`);
-  if (blocker) {
-    steps.push(`Easiest piece of "${short}" (skip: ${blocker.slice(0, 36)})`);
+  if (domain === 'eating') {
+    if (/fruit|apple|banana|berry|orange/.test(t)) {
+      steps.push('Buy or grab one piece of fruit today');
+      steps.push('Eat that fruit with one meal');
+    } else {
+      steps.push('Add one fruit to one meal today');
+      steps.push('Find one apple or banana you will actually eat');
+    }
+    steps.push(likesTaste
+      ? 'Choose one healthy food that also tastes good to you'
+      : 'Add one vegetable to lunch or dinner');
+    steps.push(tightTime
+      ? 'Drink a full glass of water with your next meal'
+      : 'Prep one simple healthy snack for tomorrow');
+    steps.push('Swap one processed snack for a whole-food option once');
+  } else if (domain === 'exercise') {
+    steps.push(tightTime ? 'Walk for 10 minutes today' : 'Walk for 20 minutes today');
+    steps.push('Do 5 minutes of stretching after you wake up or before bed');
+    steps.push('Put on workout clothes — no pressure to finish a full session');
+    steps.push('Do one set of a movement you already know');
+  } else if (domain === 'sleep') {
+    steps.push('Set a phone-down reminder 30 minutes before bed');
+    steps.push('Lights low and screens off for the last 15 minutes tonight');
+    steps.push('Write tomorrow’s top 1 task so your brain can settle');
+    steps.push('Get in bed at a set time tonight (even if you aren’t sleepy yet)');
+  } else if (domain === 'study') {
+    steps.push(tightTime ? 'Study the hardest topic for 10 focused minutes' : 'Study for one 25-minute block');
+    steps.push('Open the material and complete only the first page or section');
+    steps.push('Write three bullet notes from what you just covered');
+    steps.push('Schedule tomorrow’s short study block on your calendar');
+  } else if (domain === 'money') {
+    steps.push('Open your account and check today’s balance');
+    steps.push('Write down every purchase from the last 24 hours');
+    steps.push('Move a tiny amount (even $5) into savings once');
+    steps.push('Pick one upcoming bill and confirm the due date');
+  } else if (domain === 'chores') {
+    steps.push('Clear one small surface (desk, counter, or nightstand)');
+    steps.push('Put away 10 items that are out of place');
+    steps.push('Start one load of laundry or wash one sink of dishes');
+    steps.push('Take out the trash or recycling');
   } else {
-    steps.push(`Prep what you need for: ${short}`);
-  }
-  if (constraint) {
-    steps.push(`Finish ${short} within ${constraint.slice(0, 36)}`);
-  } else {
-    steps.push(`Complete a short version of: ${short}`);
-  }
-  if (motivation) {
-    steps.push(`${short} — then note win: ${motivation.slice(0, 40)}`);
+    const noun = label
+      .replace(/^(i\s+need\s+to|i\s+want\s+to|i\s+should|try\s+to|need\s+to|want\s+to)\s+/i, '')
+      .replace(/^to\s+/i, '')
+      .trim()
+      .slice(0, 40) || 'this';
+    steps.push(`Do the smallest possible version of ${noun} for 5 minutes`);
+    steps.push(`Gather only what you need to start ${noun}`);
+    steps.push(`Finish one visible win related to ${noun}`);
+    steps.push(tightTime
+      ? 'Set a 10-minute timer and stop when it rings'
+      : `Repeat that small win once more today`);
   }
 
   const seen = new Set<string>();
-  const unique = steps.filter(s => {
-    const key = s.toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  const unique = steps
+    .map(s => s.replace(/\s+/g, ' ').trim().slice(0, MAX_SIMPLIFY_LABEL))
+    .filter(s => {
+      const key = s.toLowerCase();
+      if (s.length < 8 || seen.has(key)) return false;
+      if (/^(5-min start:|easiest piece|finish .+ within|note win:|clarify |use this motivation|skip:)/i.test(s)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+
   while (unique.length < 2) {
-    unique.push(`Do the first step of: ${short}`);
+    unique.push('Take one tiny action toward your goal in the next 10 minutes');
   }
 
   return unique.slice(0, 5).map((s, i) => ({
-    label: s.slice(0, MAX_SIMPLIFY_LABEL),
+    label: s,
     timeOfDay: (i % 2 === 0 ? 'morning' : 'evening') as 'morning' | 'evening',
   }));
 }
