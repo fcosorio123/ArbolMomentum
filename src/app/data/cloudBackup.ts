@@ -4,13 +4,14 @@
 // Backs up all profile-scoped localStorage data to the server so it
 // survives Figma Make preview URL changes (which wipe localStorage).
 
-import { supabase } from '/utils/supabase/client';
+import { projectId, publicAnonKey } from '/utils/supabase/info';
 import { getStorageKey } from './environment';
 import { getActiveProfiles, isProfileArchived, applyProfileArchivedFromSync } from './profiles';
 import { CALENDAR_PREFS_KEY, CALENDAR_PROVIDER_KEY } from './calendarExport';
 import { buildNudgeSnapshot } from './dashboardSnapshot';
 
 const FN = 'make-server-5d90ddf5';
+const FN_BASE = `https://${projectId}.supabase.co/functions/v1`;
 const PERSONAL_GOALS_KEY = (profileId: string) => `arbol-personal-goals-${profileId}`;
 const LEGACY_GOALS_KEY = (profileId: string) => `arbol-goals-${profileId}`;
 const TASK_GOAL_LINKS_KEY = (profileId: string) => `arbol-task-goal-links-${profileId}`;
@@ -18,15 +19,28 @@ const DELETED_DEFAULT_GOALS_KEY = (profileId: string) => `arbol-deleted-default-
 const LOCAL_CLOUD_AT_KEY = (profileId: string) => `arbol-local-cloud-at-${profileId}`;
 const TZ_OFFSET_KEY = (profileId: string) => `arbol-tz-offset-${profileId}`;
 
+/**
+ * Normalize to Date.getTimezoneOffset() minutes (positive west of UTC).
+ * Older backups accidentally stored ISO-style negatives (e.g. -480 for Pacific).
+ */
+function normalizeTzOffset(offset: number): number {
+  const browser = new Date().getTimezoneOffset();
+  // US/Western devices report positive offsets; flip legacy ISO-style negatives.
+  if (offset < 0 && browser > 0) return -offset;
+  return offset;
+}
+
 export function getStoredTzOffset(profileId: string): number {
   const raw = localStorage.getItem(TZ_OFFSET_KEY(profileId));
-  if (raw != null && raw !== '' && !Number.isNaN(Number(raw))) return Number(raw);
+  if (raw != null && raw !== '' && !Number.isNaN(Number(raw))) {
+    return normalizeTzOffset(Number(raw));
+  }
   return new Date().getTimezoneOffset();
 }
 
 function persistTzOffset(profileId: string, offset: unknown): void {
   if (typeof offset === 'number' && Number.isFinite(offset)) {
-    localStorage.setItem(TZ_OFFSET_KEY(profileId), String(offset));
+    localStorage.setItem(TZ_OFFSET_KEY(profileId), String(normalizeTzOffset(offset)));
   }
 }
 
@@ -289,11 +303,37 @@ function mergeTaskGoalLinksFromCloud(profileId: string, cloudLinks: unknown): bo
 }
 
 function hasLocalProfileData(profileId: string): boolean {
-  // Auto-seeded default goals alone must not block a full cloud restore on new devices.
-  if (localStorage.getItem(`arbol-user-tasks-${profileId}`)) return true;
-  if (localStorage.getItem(`arbol-user-cats-${profileId}`)) return true;
-  if (localStorage.getItem(`arbol-hidden-seed-${profileId}`)) return true;
-  if (localStorage.getItem(`arbol-seed-overrides-${profileId}`)) return true;
+  // Auto-seeded default goals / empty seed-override `{}` must not block a full cloud restore.
+  try {
+    const ut = localStorage.getItem(`arbol-user-tasks-${profileId}`);
+    if (ut) {
+      const parsed = JSON.parse(ut);
+      if (Array.isArray(parsed) && parsed.length > 0) return true;
+    }
+  } catch { /* ignore */ }
+  try {
+    const cats = localStorage.getItem(`arbol-user-cats-${profileId}`);
+    if (cats) {
+      const parsed = JSON.parse(cats);
+      if (Array.isArray(parsed) && parsed.length > 0) return true;
+    }
+  } catch { /* ignore */ }
+  try {
+    const hidden = localStorage.getItem(`arbol-hidden-seed-${profileId}`);
+    if (hidden) {
+      const parsed = JSON.parse(hidden);
+      if (Array.isArray(parsed) && parsed.length > 0) return true;
+    }
+  } catch { /* ignore */ }
+  try {
+    const overrides = localStorage.getItem(`arbol-seed-overrides-${profileId}`);
+    if (overrides) {
+      const parsed = JSON.parse(overrides);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Object.keys(parsed).length > 0) {
+        return true;
+      }
+    }
+  } catch { /* ignore */ }
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     if (!k) continue;
@@ -425,24 +465,47 @@ function applyLocalData(profileId: string, data: Record<string, unknown>): void 
 }
 
 // ── API calls ────────────────────────────────────────────────────────
+// Use raw fetch (Authorization only — no `apikey` header).
+// supabase.functions.invoke always sends `apikey`, which fails CORS preflight on POST
+// (platform OPTIONS returns 204 with no Access-Control-Allow-Headers).
 
 async function invokeWithRetry(
   path: string,
   options: { method: string; body?: Record<string, unknown> },
   maxAttempts = 3,
 ): Promise<{ data: any; error: any }> {
+  const url = `${FN_BASE}/${path.replace(/^\//, '')}`;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      const result = await supabase.functions.invoke(path, {
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${publicAnonKey}`,
+      };
+      if (options.body !== undefined) {
+        headers['Content-Type'] = 'application/json';
+      }
+      const res = await fetch(url, {
         method: options.method,
-        // Pass plain object so the SDK serialises it correctly.
-        // Passing a pre-stringified string causes the SDK to skip body assignment.
-        ...(options.body !== undefined ? { body: options.body } : {}),
+        headers,
+        ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
       });
-      // If the Supabase client returned an error object (non-2xx), don't retry.
-      return result;
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
+      if (!res.ok) {
+        const error = new Error(data?.error || data?.message || `HTTP ${res.status}`);
+        // Retry transient gateway / cold-start failures
+        if (res.status >= 500 && attempt < maxAttempts - 1) {
+          await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+          continue;
+        }
+        return { data, error };
+      }
+      return { data, error: null };
     } catch (err) {
-      // FunctionsFetchError = network-level failure (e.g. cold start). Retry.
+      // Network-level failure (CORS/cold start). Retry.
       if (attempt < maxAttempts - 1) {
         await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
       } else {

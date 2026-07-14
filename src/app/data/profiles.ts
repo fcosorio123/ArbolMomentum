@@ -1851,7 +1851,11 @@ export function getProfileTodayKey(profileId: string): string {
   let offset = new Date().getTimezoneOffset();
   try {
     const raw = localStorage.getItem(`arbol-tz-offset-${profileId}`);
-    if (raw != null && raw !== '' && !Number.isNaN(Number(raw))) offset = Number(raw);
+    if (raw != null && raw !== '' && !Number.isNaN(Number(raw))) {
+      offset = Number(raw);
+      // Legacy backups used ISO-style negatives (e.g. -480 for Pacific).
+      if (offset < 0 && new Date().getTimezoneOffset() > 0) offset = -offset;
+    }
   } catch { /* ignore */ }
   return getDateKeyForTzOffset(new Date(), offset);
 }
@@ -1877,7 +1881,10 @@ export function computeLiveStreak(profileId: string, todayHasActivity = false): 
   let offset = new Date().getTimezoneOffset();
   try {
     const raw = localStorage.getItem(`arbol-tz-offset-${profileId}`);
-    if (raw != null && raw !== '' && !Number.isNaN(Number(raw))) offset = Number(raw);
+    if (raw != null && raw !== '' && !Number.isNaN(Number(raw))) {
+      offset = Number(raw);
+      if (offset < 0 && new Date().getTimezoneOffset() > 0) offset = -offset;
+    }
   } catch { /* ignore */ }
 
   const todayKey = getDateKeyForTzOffset(new Date(), offset);
