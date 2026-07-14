@@ -84,6 +84,12 @@ export function formatHourMinute12(hour: number, minute: number): string {
   return formatSlotTime({ enabled: true, hour, minute });
 }
 
+/** Format stored "HH:MM" (24h) as 12-hour display e.g. "1:00 PM". */
+export function formatTimeString12(time: string): string {
+  const { hour, minute } = parseSlotTime(time);
+  return formatHourMinute12(hour, minute);
+}
+
 export function parseSlotTime(time: string): Pick<SmartSlotConfig, 'hour' | 'minute'> {
   const [h, m] = time.split(':').map(Number);
   return { hour: Number.isFinite(h) ? h : 8, minute: Number.isFinite(m) ? m : 0 };

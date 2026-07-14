@@ -11,6 +11,7 @@ import {
   saveProfileAlertPrefs,
   getEffectiveSmartSlots,
   formatSlotTime,
+  formatTimeString12,
   toHtmlTimeValue,
   parseSlotTime,
   type ProfileAlertPrefs,
@@ -446,7 +447,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
                 </div>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 15, color: r.enabled ? C.headline : C.secondary }}>{r.label}</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: r.enabled ? C.primary : C.secondary, lineHeight: 1.2 }}>{r.time}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: r.enabled ? C.primary : C.secondary, lineHeight: 1.2 }}>{formatTimeString12(r.time)}</div>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
