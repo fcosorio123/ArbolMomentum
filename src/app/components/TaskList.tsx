@@ -37,6 +37,7 @@ import {
   mergeSeedForProfile,
   seedAsEditableUserTask,
   setSeedOverride,
+  setSeedOverrideForSameLabel,
   getSeedOverride,
   applySeedOverride,
   clearSeedOverride,
@@ -962,7 +963,7 @@ export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDa
           potentialValue: taskData.potentialValue,
           recurrence: taskData.recurrence,
         };
-        setSeedOverride(profile.id, seedId, override);
+        setSeedOverrideForSameLabel(profile.id, seedId, override);
         if (taskData.goalId) {
           setPrimaryGoalLinkForTask(profile.id, seedId, taskData.goalId);
         } else {
