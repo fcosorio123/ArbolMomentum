@@ -372,7 +372,12 @@ export default function App() {
     const profileId = activeProfile.id;
     let lastSyncAt = 0;
     let inFlight = false;
-    const MIN_GAP_MS = 12_000;
+    const MIN_GAP_MS = 8_000;
+
+    const notifyUi = () => {
+      try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
+      try { window.dispatchEvent(new CustomEvent(DASHBOARD_REFRESH_EVENT)); } catch {}
+    };
 
     const runSync = (reason: 'mount' | 'focus') => {
       const now = Date.now();
@@ -380,29 +385,28 @@ export default function App() {
       if (reason === 'focus' && now - lastSyncAt < MIN_GAP_MS) return;
       inFlight = true;
 
-      const tryHydrate = () => {
-        import('./data/supabaseSync').then(({ hydrateProfileFromSupabase }) => {
-          hydrateProfileFromSupabase(profileId).then(hydrated => {
-            if (hydrated) window.location.reload();
-          });
-        });
-      };
-
-      import('./data/cloudBackup').then(({ syncProfileFromCloud, pushQualificationAfterSync }) => {
+      import('./data/cloudBackup').then(({ syncProfileFromCloud, pushQualificationAfterSync, saveToCloud }) => {
         syncProfileFromCloud(profileId)
-          .then(result => {
+          .then(async result => {
             lastSyncAt = Date.now();
             if (result === 'full-restore') {
               window.location.reload();
               return;
             }
-            if (result === 'merged') {
-              try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
-              try { window.dispatchEvent(new CustomEvent(DASHBOARD_REFRESH_EVENT)); } catch {}
+            let hydrated = false;
+            try {
+              const { hydrateProfileFromSupabase } = await import('./data/supabaseSync');
+              hydrated = await hydrateProfileFromSupabase(profileId);
+            } catch { /* ignore */ }
+
+            if (result === 'merged' || hydrated) {
+              notifyUi();
+              // Immediately persist the union so the other device can pull it.
+              await saveToCloud(profileId);
+              notifyUi();
+            } else {
+              await pushQualificationAfterSync(profileId);
             }
-            return pushQualificationAfterSync(profileId).finally(() => {
-              if (reason === 'mount') tryHydrate();
-            });
           })
           .finally(() => { inFlight = false; });
       });

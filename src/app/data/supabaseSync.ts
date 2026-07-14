@@ -339,19 +339,9 @@ export async function fetchAllTaskDeletions(
   }
 }
 
-/** Merge Supabase task state into localStorage when local data is empty (new device). */
+/** Merge Supabase task state into localStorage (union). Always runs on published builds. */
 export async function hydrateProfileFromSupabase(profileId: string): Promise<boolean> {
   if (!shouldCollectData()) return false;
-
-  let hasLocal = false;
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (k?.startsWith(`task-${profileId}-`)) {
-      hasLocal = true;
-      break;
-    }
-  }
-  if (hasLocal) return false;
 
   try {
     const [completions, deletions] = await Promise.all([
@@ -360,19 +350,41 @@ export async function hydrateProfileFromSupabase(profileId: string): Promise<boo
     ]);
     if (completions.length === 0 && deletions.length === 0) return false;
 
+    let changed = false;
+    const prefer = (next: string, key: string) => {
+      const cur = localStorage.getItem(key);
+      if (next === 'done' || cur !== 'done') {
+        if (cur !== next) {
+          localStorage.setItem(key, next);
+          return true;
+        }
+      }
+      return false;
+    };
+
     for (const c of completions) {
-      if (c.status === 'done' || c.status === 'inprogress') {
-        localStorage.setItem(`task-${profileId}-${c.task_id}-${c.date}`, c.status);
-        if (c.status === 'done') {
-          localStorage.setItem(`streak-${profileId}-${c.date}`, 'true');
+      if (c.status !== 'done' && c.status !== 'inprogress') continue;
+      const key = `task-${profileId}-${c.task_id}-${c.date}`;
+      if (prefer(c.status, key)) changed = true;
+      if (c.status === 'done') {
+        const sk = `streak-${profileId}-${c.date}`;
+        if (localStorage.getItem(sk) !== 'true') {
+          localStorage.setItem(sk, 'true');
+          changed = true;
         }
       }
     }
     for (const d of deletions) {
       if (d.date === 'permanent') continue;
-      localStorage.setItem(`task-${profileId}-${d.task_id}-${d.date}`, 'skipped');
+      const key = `task-${profileId}-${d.task_id}-${d.date}`;
+      const cur = localStorage.getItem(key);
+      if (cur === 'done') continue; // never downgrade done → skipped from another device
+      if (cur !== 'skipped') {
+        localStorage.setItem(key, 'skipped');
+        changed = true;
+      }
     }
-    return true;
+    return changed;
   } catch (error) {
     console.error('[Supabase Sync] Failed to hydrate profile:', error);
     return false;

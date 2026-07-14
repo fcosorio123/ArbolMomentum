@@ -541,8 +541,89 @@ export async function getProfileSyncStatus(profileId: string): Promise<ProfileSy
   };
 }
 
+function rebuildStreakDaysFromDoneTasks(profileId: string): void {
+  // Derive streak-* flags from any done task-* keys (covers devices that only synced statuses).
+  const dateRe = /(\d{4}-\d{2}-\d{2})$/;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key?.startsWith(`task-${profileId}-`)) continue;
+    if (localStorage.getItem(key) !== 'done') continue;
+    const m = key.match(dateRe);
+    if (!m) continue;
+    localStorage.setItem(`streak-${profileId}-${m[1]}`, 'true');
+  }
+}
+
+function mergeStringMaps(
+  a: unknown,
+  b: unknown,
+  prefer: (local: string | undefined, cloud: string | undefined) => string,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  const left = (a && typeof a === 'object' ? a : {}) as Record<string, string>;
+  const right = (b && typeof b === 'object' ? b : {}) as Record<string, string>;
+  for (const k of new Set([...Object.keys(left), ...Object.keys(right)])) {
+    const next = prefer(left[k], right[k]);
+    if (next) out[k] = next;
+  }
+  return out;
+}
+
+/**
+ * Guarantee a save never drops the other device's activity.
+ * Pull cloud → union into local → collect payload as the union of both.
+ */
+async function buildUnionPayload(profileId: string): Promise<Record<string, unknown>> {
+  const cloud = await fetchCloudBackup(profileId);
+  if (cloud) {
+    mergeCloudActivityUnion(profileId, cloud);
+    rebuildStreakDaysFromDoneTasks(profileId);
+  } else {
+    rebuildStreakDaysFromDoneTasks(profileId);
+  }
+
+  const local = collectLocalData(profileId);
+  if (!cloud) return local;
+
+  local.taskStatuses = mergeStringMaps(local.taskStatuses, cloud.taskStatuses, preferTaskStatus);
+  local.taskDeletions = mergeStringMaps(local.taskDeletions, cloud.taskDeletions, (a, b) => b || a || '');
+  local.streakDays = mergeStringMaps(local.streakDays, cloud.streakDays, preferBooleanish);
+  local.taskNotes = mergeStringMaps(local.taskNotes, cloud.taskNotes, (a, b) => (b && b.length >= (a?.length ?? 0) ? b : a) || '');
+  local.taskBlocked = mergeStringMaps(local.taskBlocked, cloud.taskBlocked, preferBooleanish);
+  local.goalProgressLogs = mergeStringMaps(local.goalProgressLogs, cloud.goalProgressLogs, (a, b) => b || a || '');
+  local.checkInDays = mergeStringMaps(local.checkInDays, cloud.checkInDays, preferBooleanish);
+  local.feedbackEntries = mergeStringMaps(local.feedbackEntries, cloud.feedbackEntries, (a, b) => b || a || '');
+  local.goalTaskChecks = mergeStringMaps(local.goalTaskChecks, cloud.goalTaskChecks, preferBooleanish);
+  local.visitCounts = mergeStringMaps(local.visitCounts, cloud.visitCounts, preferVisitCount);
+  local.tourDismissals = mergeStringMaps(local.tourDismissals, cloud.tourDismissals, preferBooleanish);
+
+  // Keep richer array blobs when cloud has more items (goals/tasks).
+  const cloudTasks = Array.isArray(cloud.userTasks) ? cloud.userTasks : null;
+  const localTasks = Array.isArray(local.userTasks) ? local.userTasks : null;
+  if (cloudTasks && (!localTasks || cloudTasks.length > localTasks.length)) {
+    local.userTasks = cloud.userTasks;
+  }
+  const cloudGoals = Array.isArray(cloud.personalGoals) ? cloud.personalGoals : null;
+  const localGoals = Array.isArray(local.personalGoals) ? local.personalGoals : null;
+  if (cloudGoals && (!localGoals || cloudGoals.length > localGoals.length)) {
+    // Prefer keep-local merge already done; only fill empty
+    if (!localGoals || localGoals.length === 0) local.personalGoals = cloud.personalGoals;
+  }
+
+  local.savedAt = Date.now();
+  return local;
+}
+
 export async function saveToCloud(profileId: string, opts?: { retryOnStale?: boolean }): Promise<boolean> {
-  const payload = collectLocalData(profileId);
+  const payload = await buildUnionPayload(profileId);
+  // Apply unioned maps back into localStorage so the open tab matches what we saved.
+  restoreStringMap(payload.taskStatuses);
+  restoreStringMap(payload.taskDeletions);
+  restoreStringMap(payload.streakDays);
+  restoreStringMap(payload.checkInDays);
+  restoreStringMap(payload.goalTaskChecks);
+  restoreStringMap(payload.visitCounts);
+
   const { data, error } = await invokeWithRetry(`${FN}/backup/${profileId}`, {
     method: 'POST',
     body: payload,
@@ -555,7 +636,7 @@ export async function saveToCloud(profileId: string, opts?: { retryOnStale?: boo
 
   if (data?.reason === 'stale_backup' && opts?.retryOnStale !== false) {
     await syncProfileFromCloud(profileId);
-    const retryPayload = collectLocalData(profileId);
+    const retryPayload = await buildUnionPayload(profileId);
     const retry = await invokeWithRetry(`${FN}/backup/${profileId}`, {
       method: 'POST',
       body: retryPayload,
@@ -572,17 +653,24 @@ export async function saveToCloud(profileId: string, opts?: { retryOnStale?: boo
   return false;
 }
 
-/** After cloud pull, push fresh qualification + snapshot data for email cron. */
+/** After cloud pull, push email/qualification if local has fields cloud is missing. */
 export async function pushQualificationAfterSync(profileId: string): Promise<void> {
   const cloud = await fetchCloudBackup(profileId);
-  const local = collectLocalData(profileId);
-  const cloudAt = typeof cloud?.savedAt === 'number' ? cloud.savedAt : 0;
-  const localEmail = typeof local.profileEmail === 'string' ? local.profileEmail.trim() : '';
-  const cloudEmail = typeof cloud?.profileEmail === 'string' ? cloud.profileEmail.trim() : '';
-  const needsEmailPush = !!localEmail && !cloudEmail;
-  const localNewer = local.savedAt >= cloudAt;
-  if (needsEmailPush || localNewer || !cloud) {
+  if (!cloud) {
     await saveToCloud(profileId);
+    return;
+  }
+  const emailKey = getStorageKey(`arbol-email-${profileId}`);
+  const localEmail = localStorage.getItem(emailKey)?.trim() ?? '';
+  const cloudEmail = typeof cloud.profileEmail === 'string' ? cloud.profileEmail.trim() : '';
+  const needsEmailPush = !!localEmail && !cloudEmail;
+  // Always union-save after sync so the cloud snapshot includes both devices —
+  // buildUnionPayload prevents wipe; never use Date.now() alone to claim "local newer".
+  if (needsEmailPush) {
+    await saveToCloud(profileId);
+  } else {
+    // Light: scheduleSave already queued on merge; ensure one union push settles the other device.
+    scheduleSave(profileId);
   }
 }
 
@@ -620,19 +708,18 @@ export async function syncProfileFromCloud(
   if (mergeArchiveFromCloud(profileId, cloud)) merged = true;
   if (mergeCloudActivityUnion(profileId, cloud)) merged = true;
 
-  if (merged) {
-    const cloudAt = typeof cloud.savedAt === 'number' ? cloud.savedAt : Date.now();
-    const prev = Number(localStorage.getItem(LOCAL_CLOUD_AT_KEY(profileId)) || 0);
-    localStorage.setItem(LOCAL_CLOUD_AT_KEY(profileId), String(Math.max(prev, cloudAt)));
-    // Recalc personal-best streaks after unioning activity from the other device.
-    import('./profiles').then(({ updateStreakBests }) => {
-      try { updateStreakBests(profileId); } catch { /* ignore */ }
-    }).catch(() => {});
-    scheduleSave(profileId);
-    return 'merged';
-  }
+  rebuildStreakDaysFromDoneTasks(profileId);
 
-  return 'noop';
+  // After a successful cloud read, always treat as merged so we union-save + refresh UI.
+  // buildUnionPayload prevents wiping peer-device keys on that save.
+  import('./profiles').then(({ updateStreakBests }) => {
+    try { updateStreakBests(profileId); } catch { /* ignore */ }
+  }).catch(() => {});
+  const cloudAt = typeof cloud.savedAt === 'number' ? cloud.savedAt : Date.now();
+  const prev = Number(localStorage.getItem(LOCAL_CLOUD_AT_KEY(profileId)) || 0);
+  localStorage.setItem(LOCAL_CLOUD_AT_KEY(profileId), String(Math.max(prev, cloudAt)));
+  scheduleSave(profileId);
+  return 'merged';
 }
 
 // ── Debounced save ───────────────────────────────────────────────────

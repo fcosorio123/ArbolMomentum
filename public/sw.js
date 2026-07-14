@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'arbol-v4';
+﻿const CACHE_NAME = 'arbol-v5';
 
 self.addEventListener('install', () => { self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
