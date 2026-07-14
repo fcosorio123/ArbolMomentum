@@ -482,7 +482,9 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
               style={{ borderRadius: 8 }} />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', color: C.body, fontSize: 12, marginBottom: 6 }}>Time</label>
+            <label style={{ display: 'block', color: C.body, fontSize: 12, marginBottom: 6 }}>
+              Time <span style={{ color: C.headline, fontWeight: 700 }}>({formatTimeString12(newTime)})</span>
+            </label>
             <Input type="time" value={newTime} onChange={e => setNewTime(e.target.value)} style={{ borderRadius: 8 }} />
           </div>
           <div>
