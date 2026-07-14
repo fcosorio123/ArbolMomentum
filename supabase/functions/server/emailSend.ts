@@ -71,6 +71,8 @@ export interface SendEmailPayload {
   taskId?: string;
   date?: string;
   recipient?: string;
+  /** Explicit multi-send list (manual nudge). Overrides profile resolution when non-empty. */
+  recipients?: string[];
   profileName?: string;
   title?: string;
   body?: string;
@@ -158,7 +160,7 @@ function sentLogKey(profileId: string, type: EmailType, dedupe: string): string 
 /**
  * Resolve outbound email recipient for a profile.
  * Priority: explicit override → profile backup email → admin profileEmails map.
- * The user's profileEmail from cloud backup always wins over admin-configured addresses.
+ * Never use testRecipient for non-test mail.
  */
 async function resolveRecipient(
   profileId: string,
@@ -179,6 +181,20 @@ async function resolveRecipient(
   return null;
 }
 
+function parseRecipientList(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return [...new Set(
+      raw.map((x) => String(x ?? "").trim().toLowerCase()).filter((e) => isValidEmail(e)),
+    )];
+  }
+  if (typeof raw === "string") {
+    return [...new Set(
+      raw.split(/[,;\s]+/).map((e) => e.trim().toLowerCase()).filter((e) => isValidEmail(e)),
+    )];
+  }
+  return [];
+}
+
 function triggerAllows(type: EmailType, mode: TriggerMode, force?: boolean, scheduled?: boolean): boolean {
   if (force || scheduled) return true;
   if (mode === "manual") return false;
@@ -195,6 +211,7 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
   skipped?: boolean;
   reason?: string;
   resendId?: string;
+  sentTo?: string[];
 }> {
   const settings = await getEmailSettings();
 
@@ -210,11 +227,23 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
     return { ok: false, skipped: true, reason: "trigger_mode_blocked" };
   }
 
-  const to = payload.type === "test"
-    ? (settings.testRecipient?.trim() || payload.recipient?.trim() || "")
-    : await resolveRecipient(payload.profileId, settings, payload.recipient);
+  let targets: string[] = [];
+  if (payload.type === "test") {
+    const one = settings.testRecipient?.trim() || payload.recipient?.trim() || "";
+    targets = one && isValidEmail(one) ? [one.trim().toLowerCase()] : [];
+  } else {
+    const explicitList = parseRecipientList(payload.recipients);
+    if (explicitList.length > 0) {
+      targets = explicitList;
+    } else if (payload.recipient && isValidEmail(payload.recipient)) {
+      targets = [payload.recipient.trim().toLowerCase()];
+    } else {
+      const one = await resolveRecipient(payload.profileId, settings, undefined);
+      if (one) targets = [one.toLowerCase()];
+    }
+  }
 
-  if (!to || !isValidEmail(to)) {
+  if (targets.length === 0) {
     return { ok: false, skipped: true, reason: "no_valid_recipient" };
   }
 
@@ -240,26 +269,48 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
   });
 
   const replyTo = settings.replyTo?.trim() || undefined;
-  const result = await sendViaResend({
-    to,
-    subject: content.subject,
-    html: content.html,
-    text: content.text,
-    replyTo,
-  });
+  const sentTo: string[] = [];
+  let lastId: string | undefined;
+  const failures: string[] = [];
 
-  if (!result.ok) {
-    return { ok: false, reason: result.error ? `send_failed:${result.error}` : "send_failed" };
+  for (const to of targets) {
+    const result = await sendViaResend({
+      to,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+      replyTo,
+    });
+    if (result.ok) {
+      sentTo.push(to);
+      lastId = result.id;
+    } else {
+      failures.push(`${to}:${result.error ?? "send_failed"}`);
+      console.log("[EmailSend] Failed for", to, result.error);
+    }
+  }
+
+  if (sentTo.length === 0) {
+    return {
+      ok: false,
+      reason: failures[0] ? `send_failed:${failures[0]}` : "send_failed",
+    };
   }
 
   if (payload.type !== "test") {
     await kv.set(sentLogKey(payload.profileId, payload.type, dedupe), {
       sentAt: Date.now(),
-      resendId: result.id,
+      resendId: lastId,
       type: payload.type,
       dedupe,
+      sentTo,
     });
   }
 
-  return { ok: true, resendId: result.id };
+  return {
+    ok: true,
+    resendId: lastId,
+    sentTo,
+    reason: failures.length > 0 ? `partial:${failures.join("|")}` : undefined,
+  };
 }

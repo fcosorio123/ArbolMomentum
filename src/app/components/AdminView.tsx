@@ -203,7 +203,20 @@ function OverviewTab() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); const iv = setInterval(load, 30000); return () => clearInterval(iv); }, []);
+  useEffect(() => {
+    load();
+    const iv = setInterval(load, 12_000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, []);
 
   const today = getTodayKey();
   const visibleStats = stats.filter(p => showArchived || !isProfileArchived(p.id));
@@ -1848,6 +1861,7 @@ function SettingsTab() {
   const [testResult, setTestResult] = useState<string | null>(null);
   const [manualProfileId, setManualProfileId] = useState(getOperativeProfiles()[0]?.id ?? '');
   const [manualType, setManualType] = useState<'smart_nudge' | 'welcome' | 'check_in_confirmation'>('smart_nudge');
+  const [manualRecipients, setManualRecipients] = useState('');
   const [manualSending, setManualSending] = useState(false);
   const [manualResult, setManualResult] = useState<string | null>(null);
   const [cronLastRun, setCronLastRun] = useState<CronLastRun | null>(null);
@@ -1862,6 +1876,25 @@ function SettingsTab() {
       setLoading(false);
     });
   }, []);
+
+  // Prefill nudge recipients from profile backup email (SoT), then admin override
+  useEffect(() => {
+    if (!manualProfileId) return;
+    let cancelled = false;
+    (async () => {
+      let email = '';
+      try {
+        const backup = await fetchProfileBackupForAdmin(manualProfileId);
+        const fromBackup = typeof backup?.profileEmail === 'string' ? backup.profileEmail.trim() : '';
+        if (fromBackup) email = fromBackup;
+      } catch { /* ignore */ }
+      if (!email) {
+        email = (emailSettings.profileEmails[manualProfileId] ?? '').trim();
+      }
+      if (!cancelled) setManualRecipients(email);
+    })();
+    return () => { cancelled = true; };
+  }, [manualProfileId, emailSettings.profileEmails]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -1905,16 +1938,35 @@ function SettingsTab() {
     const profile = getOperativeProfiles().find(p => p.id === manualProfileId);
     setManualSending(true);
     setManualResult(null);
+    const list = manualRecipients.split(/[,;\s]+/).map(e => e.trim()).filter(Boolean);
+    if (list.length === 0) {
+      setManualSending(false);
+      setManualResult('Enter at least one valid email address.');
+      return;
+    }
     const result = await sendManualNudge({
       profileId: manualProfileId,
       type: manualType,
       profileName: profile?.name,
+      recipients: list,
       tag: manualType === 'smart_nudge' ? 'manual-nudge' : undefined,
       title: manualType === 'smart_nudge' ? 'Manual nudge from admin' : undefined,
       body: manualType === 'smart_nudge' ? 'This is a manual email nudge triggered from admin settings.' : undefined,
     });
     setManualSending(false);
-    setManualResult(result.ok ? 'Email sent ✓' : `Skipped/failed: ${result.reason ?? 'unknown'}`);
+    if (result.ok) {
+      const to = (result.sentTo ?? list).join(', ');
+      setManualResult(`Sent to ${to} ✓`);
+      // Persist first address onto admin map + student profile SoT for next time
+      const primary = list[0];
+      updateProfileEmail(manualProfileId, primary);
+      try {
+        const { saveProfileEmail } = await import('../data/profileContact');
+        saveProfileEmail(manualProfileId, primary, { profileName: profile?.name, sendWelcome: false });
+      } catch { /* ignore */ }
+    } else {
+      setManualResult(result.reason ?? 'Send failed');
+    }
   };
 
   const updateProfileEmail = (profileId: string, email: string) => {
@@ -2267,6 +2319,18 @@ function SettingsTab() {
               { value: 'welcome', label: 'Welcome' },
               { value: 'check_in_confirmation', label: 'Check-in confirmation' },
             ]}
+          />
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 12, color: C.body, marginBottom: 4 }}>
+            Recipients (auto-filled from profile; edit or add more, comma-separated)
+          </div>
+          <Input.TextArea
+            value={manualRecipients}
+            onChange={e => setManualRecipients(e.target.value)}
+            placeholder="student@school.edu, teammate@school.edu"
+            rows={2}
+            style={{ ...inputStyle, marginTop: 6 }}
           />
         </div>
         <Button loading={manualSending} onClick={handleManualNudge} style={{ marginTop: 12, borderRadius: 10 }}>

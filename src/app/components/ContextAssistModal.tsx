@@ -112,6 +112,52 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
     setGroups(prev => prev.filter(g => g.id !== goalId));
   };
 
+  const updateGoalTitle = (goalId: string, title: string) => {
+    setGroups(prev => prev.map(g =>
+      g.id === goalId ? { ...g, goal: { ...g.goal, title } } : g,
+    ));
+  };
+
+  const updateGoalWhy = (goalId: string, deepWhy: string) => {
+    setGroups(prev => prev.map(g =>
+      g.id === goalId ? { ...g, goal: { ...g.goal, deepWhy } } : g,
+    ));
+  };
+
+  const updateTaskLabel = (goalId: string, taskId: string, label: string) => {
+    setGroups(prev => prev.map(g =>
+      g.id === goalId
+        ? { ...g, tasks: g.tasks.map(t => t.id === taskId ? { ...t, label } : t) }
+        : g,
+    ));
+  };
+
+  const removeTask = (goalId: string, taskId: string) => {
+    setGroups(prev => prev.map(g =>
+      g.id === goalId ? { ...g, tasks: g.tasks.filter(t => t.id !== taskId) } : g,
+    ));
+  };
+
+  const handleRegenerate = async () => {
+    setParsing(true);
+    setParseError(null);
+    try {
+      const result = await parseContextTasksFromEdge(text, {
+        preferRules: !useAiAssist,
+        mode,
+      });
+      if (!result.ok || result.groups.length === 0) {
+        setParseError('Could not regenerate. Try editing your input or try again.');
+        return;
+      }
+      setGroups(result.groups);
+      setParseSource(result.source);
+      setParseReason(result.reason ?? null);
+    } finally {
+      setParsing(false);
+    }
+  };
+
   const selectedTaskCount = groups
     .filter(g => g.selected)
     .reduce((n, g) => n + g.tasks.filter(t => t.selected).length, 0);
@@ -230,7 +276,7 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
                   : 'AI was enabled but the server used rule-based parsing. Results may be less tailored — you can go back and try again.'}
               </div>
             )}
-            <div style={{ maxHeight: 300, overflowY: 'auto', marginBottom: 16 }}>
+            <div style={{ maxHeight: 320, overflowY: 'auto', marginBottom: 12 }}>
               {groups.map(group => (
                 <div key={group.id} style={{ marginBottom: 14, padding: 12, background: C.bgAlt, borderRadius: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
@@ -238,9 +284,17 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
                       checked={group.selected}
                       onChange={e => toggleGoal(group.id, e.target.checked)}
                     />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: C.headline }}>{group.goal.title}</div>
-                      <div style={{ fontSize: 11, color: C.body, marginTop: 2 }}>{group.goal.deepWhy}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <Input
+                        value={group.goal.title}
+                        onChange={e => updateGoalTitle(group.id, e.target.value)}
+                        style={{ fontWeight: 700, fontSize: 14, marginBottom: 6, borderRadius: 8 }}
+                      />
+                      <Input
+                        value={group.goal.deepWhy}
+                        onChange={e => updateGoalWhy(group.id, e.target.value)}
+                        style={{ fontSize: 12, borderRadius: 8 }}
+                      />
                     </div>
                     <button
                       type="button"
@@ -256,23 +310,39 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
                         checked={task.selected}
                         onChange={e => toggleTask(group.id, task.id, e.target.checked)}
                       />
-                      <div style={{ flex: 1, fontSize: 13, color: C.headline }}>{task.label}</div>
-                      <span style={{ fontSize: 10, color: C.secondary }}>{recurrenceSummary(task.recurrence)}</span>
+                      <Input
+                        value={task.label}
+                        onChange={e => updateTaskLabel(group.id, task.id, e.target.value)}
+                        style={{ flex: 1, fontSize: 13, borderRadius: 8 }}
+                      />
+                      <span style={{ fontSize: 10, color: C.secondary, whiteSpace: 'nowrap' }}>{recurrenceSummary(task.recurrence)}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeTask(group.id, task.id)}
+                        style={{ border: 'none', background: 'none', color: C.secondary, fontSize: 11, cursor: 'pointer' }}
+                      >
+                        ✕
+                      </button>
                     </div>
                   ))}
                 </div>
               ))}
             </div>
-            <Button
-              type="primary"
-              block
-              size="large"
-              disabled={selectedTaskCount === 0 && mode === 'tasks'}
-              onClick={handleConfirm}
-              style={{ borderRadius: 12, height: 46, background: C.primary, fontWeight: 700, border: 'none' }}
-            >
-              {copy.confirm}
-            </Button>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+              <Button block onClick={handleRegenerate} loading={parsing} style={{ borderRadius: 12, height: 44 }}>
+                Regenerate
+              </Button>
+              <Button
+                type="primary"
+                block
+                size="large"
+                disabled={(selectedTaskCount === 0 && mode === 'tasks') || parsing}
+                onClick={handleConfirm}
+                style={{ borderRadius: 12, height: 44, background: C.primary, fontWeight: 700, border: 'none', flex: 1.4 }}
+              >
+                {copy.confirm}
+              </Button>
+            </div>
           </>
         )}
       </div>

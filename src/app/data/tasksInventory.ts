@@ -59,22 +59,29 @@ export function buildAllTasksInventory(profileId: string): TasksInventory {
     }
   };
 
-  getTaskCategoriesForProfile(profileId).forEach(cat => {
-    cat.tasks.forEach(t => {
-      if (hiddenSeedIds.has(t.id) || convertedSeedIds.has(t.id) || userTaskIds.has(t.id)) return;
-      const merged = mergeSeedForProfile(profileId, t);
-      const effectiveGoalId = getPrimaryGoalIdForTask(profileId, t.id, cat.goalId);
-      place(
-        {
-          ...merged,
-          potentialValue: getDisplayPotentialValue(merged.potentialValue),
-          goalId: effectiveGoalId,
-          scheduleLabel: merged.recurrence ? recurrenceLabel(merged.recurrence) : 'Daily',
-        },
-        effectiveGoalId,
-      );
+  // All weekdays — not just "today" — so seeded tasks stay stable across days
+  const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const seenSeedIds = new Set<string>();
+  for (const day of DAYS) {
+    getTaskCategoriesForProfile(profileId, day).forEach(cat => {
+      cat.tasks.forEach(t => {
+        if (seenSeedIds.has(t.id)) return;
+        seenSeedIds.add(t.id);
+        if (hiddenSeedIds.has(t.id) || convertedSeedIds.has(t.id) || userTaskIds.has(t.id)) return;
+        const merged = mergeSeedForProfile(profileId, t);
+        const effectiveGoalId = getPrimaryGoalIdForTask(profileId, t.id, cat.goalId);
+        place(
+          {
+            ...merged,
+            potentialValue: getDisplayPotentialValue(merged.potentialValue),
+            goalId: effectiveGoalId,
+            scheduleLabel: merged.recurrence ? recurrenceLabel(merged.recurrence) : `${day} seed`,
+          },
+          effectiveGoalId,
+        );
+      });
     });
-  });
+  }
 
   userTasks.forEach(ut => {
     const taskObj: InventoryTask = {

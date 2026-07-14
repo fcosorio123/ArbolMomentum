@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from 'antd';
 import { FireOutlined, RightOutlined, SettingOutlined, PlusOutlined } from '@ant-design/icons';
 import { getActiveProfiles, type Profile, computeLiveStreak } from '../data/profiles';
@@ -13,8 +13,57 @@ interface Props {
 export function ProfileSelector({ onSelect, onAdmin }: Props) {
   const [createOpen, setCreateOpen] = useState(false);
   const [profileListKey, setProfileListKey] = useState(0);
+  const [streakById, setStreakById] = useState<Record<string, number>>({});
+  const [streaksLoading, setStreaksLoading] = useState(true);
 
   const profiles = getActiveProfiles();
+
+  const refreshStreaks = useCallback(async () => {
+    const list = getActiveProfiles();
+    const next: Record<string, number> = {};
+    // Seed from local immediately so UI isn't blank while cloud loads
+    for (const p of list) {
+      next[p.id] = computeLiveStreak(p.id);
+    }
+    setStreakById({ ...next });
+    setStreaksLoading(true);
+
+    await Promise.all(list.map(async (p) => {
+      try {
+        // Pull peer-device activity into this browser first
+        const { syncProfileFromCloud } = await import('../data/cloudBackup');
+        await syncProfileFromCloud(p.id);
+        next[p.id] = Math.max(next[p.id] ?? 0, computeLiveStreak(p.id));
+      } catch { /* ignore */ }
+      try {
+        const { fetchProfileBackupForAdmin } = await import('../data/cloudBackup');
+        const { computeLiveStreakFromBackup } = await import('../data/adminBackupView');
+        const backup = await fetchProfileBackupForAdmin(p.id);
+        if (backup) {
+          next[p.id] = Math.max(
+            next[p.id] ?? 0,
+            computeLiveStreakFromBackup(backup, p.id),
+          );
+        }
+      } catch { /* ignore */ }
+    }));
+
+    setStreakById({ ...next });
+    setStreaksLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void refreshStreaks();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refreshStreaks();
+    };
+    window.addEventListener('focus', onVisible);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [profileListKey, refreshStreaks]);
 
   const handleCreated = (profile: Profile) => {
     setProfileListKey(k => k + 1);
@@ -60,9 +109,21 @@ export function ProfileSelector({ onSelect, onAdmin }: Props) {
 
       {/* Profiles */}
       <div style={{ padding: '24px 16px 100px' }} key={profileListKey}>
-        <p style={{ color: C.secondary, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12, paddingLeft: 4 }}>
-          Select your profile
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingLeft: 4, paddingRight: 4 }}>
+          <p style={{ color: C.secondary, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, margin: 0 }}>
+            Select your profile
+          </p>
+          <button
+            type="button"
+            onClick={() => void refreshStreaks()}
+            style={{
+              border: 'none', background: 'none', color: C.primary, fontSize: 11,
+              fontWeight: 700, cursor: 'pointer', padding: 0,
+            }}
+          >
+            {streaksLoading ? 'Syncing…' : 'Refresh'}
+          </button>
+        </div>
 
         {profiles.map((profile) => (
           <button
@@ -107,7 +168,9 @@ export function ProfileSelector({ onSelect, onAdmin }: Props) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginRight: 8 }}>
               <FireOutlined style={{ color: C.streak, fontSize: 14 }} />
-              <span style={{ color: C.streak, fontSize: 14, fontWeight: 700 }}>{computeLiveStreak(profile.id)}</span>
+              <span style={{ color: C.streak, fontSize: 14, fontWeight: 700 }}>
+                {streakById[profile.id] ?? computeLiveStreak(profile.id)}
+              </span>
             </div>
             <RightOutlined style={{ color: C.secondary, fontSize: 12 }} />
           </button>

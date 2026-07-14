@@ -99,9 +99,10 @@ function ensureStarterTasks<T extends { label: string; timeOfDay: "morning" | "e
   if (tasks.length >= 2) return tasks.slice(0, MAX_TASKS_PER_GOAL);
   const short = goalTitle.slice(0, 40);
   const extras: T[] = [];
-  if (!tasks.some((t) => /next (small )?step/i.test(t.label))) {
+  // Concrete starter tasks only — never meta/"think about" coaching prompts
+  if (tasks.length === 0) {
     extras.push({
-      label: `Define the next small step for "${short}"`,
+      label: `Take one concrete action toward "${short}" today`,
       timeOfDay: "morning",
       type: "goal",
       recurrence: { type: "daily" },
@@ -110,7 +111,7 @@ function ensureStarterTasks<T extends { label: string; timeOfDay: "morning" | "e
   }
   if (tasks.length + extras.length < 2) {
     extras.push({
-      label: `Spend 15 minutes making progress on "${short}"`,
+      label: `Spend 15 minutes on "${short}"`,
       timeOfDay: "evening",
       type: "routine",
       recurrence: { type: "daily" },
@@ -143,6 +144,13 @@ function normalizeLlmGroups(raw: RawLlmGroup[]): SeedSuggestionGroup[] {
 
     tasks = ensureStarterTasks(title || "Goal", tasks);
 
+    // Drop meta/coaching labels if the model still emits them
+    tasks = tasks.filter((t) =>
+      !/\b(identify (your |the )?goal|think about|consider how|break (this|it) down|define the next|brainstorm)\b/i
+        .test(t.label)
+    );
+    tasks = ensureStarterTasks(title || "Goal", tasks);
+
     return {
       goal: { title: title || "Goal", deepWhy: deepWhy || "A goal from your description." },
       tasks,
@@ -155,10 +163,10 @@ function normalizeLlmGroups(raw: RawLlmGroup[]): SeedSuggestionGroup[] {
 
 function systemPromptForMode(mode: string): string {
   const base =
-    'You organize unstructured student life-planning text into goals and tasks. Return JSON only: {"groups":[{"goal":{"title","deepWhy"},"tasks":[{"label","timeOfDay":"morning|evening","type":"priority|goal|routine","recurrence":{"type":"daily|weekly|monthly|one-time","weekdays":[0-6]}}]}]}. ' +
-    "Goals are outcome-driven (desired result, target, timeframe). Tasks are execution-driven and start with a clear action verb. " +
-    "For each goal invent 2–4 concrete, checkable tasks that advance it — do not paste whole paragraphs as labels; do not duplicate the goal title as a task. " +
-    "When input is vague, make the best reasonable inference. Prefer useful structure over refusing. Max 8 goals, 12 tasks per goal.";
+    'You turn unstructured student text into READY-TO-USE goals and tasks. Return JSON only: {"groups":[{"goal":{"title","deepWhy"},"tasks":[{"label","timeOfDay":"morning|evening","type":"priority|goal|routine","recurrence":{"type":"daily|weekly|monthly|one-time","weekdays":[0-6]}}]}]}. ' +
+    "CRITICAL: Do the planning yourself. Do NOT return coaching/meta tasks like \"identify your goal\", \"think about next steps\", \"break this down\", or \"define the next step\". " +
+    "Goals must be outcome-driven (what they will achieve). Tasks must be execution-driven checklist items that start with an action verb (Submit, Review, Call, Walk, Write…). " +
+    "For each goal invent 2–4 concrete, checkable tasks — not paragraphs, not duplicates of the goal title. Prefer useful structure over refusing. Max 8 goals, 12 tasks per goal.";
   if (mode === "tasks") {
     return base + " Mode=tasks: prioritize actionable next steps; if a larger outcome is clear, still include a short goal title to group them.";
   }

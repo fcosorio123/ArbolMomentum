@@ -2,12 +2,37 @@
 // Global Email Notification Settings
 // ──────────────────────────────────────────────
 
-import { supabase } from '/utils/supabase/client';
+import { projectId, publicAnonKey } from '/utils/supabase/info';
 import { getStorageKey, isPublishedVersion } from './environment';
 import { getTodayKey } from './profiles';
 
 const FN = 'make-server-5d90ddf5';
+const FN_BASE = `https://${projectId}.supabase.co/functions/v1`;
 const STORAGE_KEY = getStorageKey('arbol-email-settings');
+
+/** Avoid apikey header — CORS preflight breaks browser POSTs to edge. */
+async function edgeFetch(
+  path: string,
+  options: { method?: string; body?: Record<string, unknown> } = {},
+): Promise<{ data: any; error: string | null }> {
+  try {
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${publicAnonKey}`,
+    };
+    if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+    const res = await fetch(`${FN_BASE}/${path.replace(/^\//, '')}`, {
+      method: options.method ?? 'GET',
+      headers,
+      ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+    });
+    let data: any = null;
+    try { data = await res.json(); } catch { data = null; }
+    if (!res.ok) return { data, error: data?.error || data?.reason || `HTTP ${res.status}` };
+    return { data, error: null };
+  } catch (err) {
+    return { data: null, error: String(err) };
+  }
+}
 
 export type EmailTriggerMode = 'browser_aligned' | 'event_only' | 'manual';
 
@@ -111,9 +136,7 @@ export async function fetchEmailSettings(): Promise<EmailSettings> {
   if (!isPublishedVersion()) return cached;
 
   try {
-    const { data, error } = await supabase.functions.invoke(`${FN}/email-settings`, {
-      method: 'GET',
-    });
+    const { data, error } = await edgeFetch(`${FN}/email-settings`, { method: 'GET' });
     if (!error && data?.ok && data.data) {
       const merged = { ...DEFAULTS, ...data.data };
       merged.smartSlots = { ...DEFAULT_SMART_SLOTS, ...(merged.smartSlots ?? {}) };
@@ -144,10 +167,7 @@ export async function saveEmailSettings(settings: EmailSettings): Promise<EmailS
 
   if (isPublishedVersion()) {
     try {
-      await supabase.functions.invoke(`${FN}/email-settings`, {
-        method: 'POST',
-        body: next,
-      });
+      await edgeFetch(`${FN}/email-settings`, { method: 'POST', body: next as unknown as Record<string, unknown> });
     } catch {
       // Local save succeeded; cloud sync is best-effort
     }
@@ -158,14 +178,14 @@ export async function saveEmailSettings(settings: EmailSettings): Promise<EmailS
 
 export async function sendTestEmail(recipient?: string): Promise<{ ok: boolean; reason?: string }> {
   try {
-    const { data, error } = await supabase.functions.invoke(`${FN}/send-test-email`, {
+    const { data, error } = await edgeFetch(`${FN}/send-test-email`, {
       method: 'POST',
       body: recipient ? { recipient } : {},
     });
-    if (error) return { ok: false, reason: String(error) };
+    if (error) return { ok: false, reason: 'Could not reach email service.' };
     return data ?? { ok: false, reason: 'unknown' };
-  } catch (err) {
-    return { ok: false, reason: String(err) };
+  } catch {
+    return { ok: false, reason: 'Could not send test email.' };
   }
 }
 
@@ -180,9 +200,7 @@ export interface CronLastRun {
 export async function fetchCronLastRun(): Promise<CronLastRun | null> {
   if (!isPublishedVersion()) return null;
   try {
-    const { data, error } = await supabase.functions.invoke(`${FN}/cron-last-run`, {
-      method: 'GET',
-    });
+    const { data, error } = await edgeFetch(`${FN}/cron-last-run`, { method: 'GET' });
     if (!error && data?.ok && data.data) return data.data as CronLastRun;
   } catch {
     // ignore
@@ -206,7 +224,7 @@ export async function fetchCronAttemptLog(profileId?: string): Promise<CronAttem
     const path = profileId
       ? `${FN}/cron-attempt-log?profileId=${encodeURIComponent(profileId)}`
       : `${FN}/cron-attempt-log`;
-    const { data, error } = await supabase.functions.invoke(path, { method: 'GET' });
+    const { data, error } = await edgeFetch(path, { method: 'GET' });
     if (!error && data?.ok && Array.isArray(data.data)) return data.data as CronAttemptLogEntry[];
   } catch {
     // ignore
@@ -225,19 +243,50 @@ export async function sendManualNudge(opts: {
   tag?: string;
   title?: string;
   body?: string;
-}): Promise<{ ok: boolean; reason?: string }> {
+  /** Comma/semicolon-separated or array — wins over server profile lookup */
+  recipient?: string;
+  recipients?: string[];
+}): Promise<{ ok: boolean; reason?: string; sentTo?: string[] }> {
   try {
-    const { data, error } = await supabase.functions.invoke(`${FN}/send-email`, {
+    const recipientList = Array.isArray(opts.recipients)
+      ? opts.recipients
+      : (opts.recipient ?? '')
+          .split(/[,;\s]+/)
+          .map(e => e.trim())
+          .filter(Boolean);
+
+    const { data, error } = await edgeFetch(`${FN}/send-email`, {
       method: 'POST',
       body: {
-        ...opts,
+        profileId: opts.profileId,
+        type: opts.type,
+        profileName: opts.profileName,
+        tag: opts.tag,
+        title: opts.title,
+        body: opts.body,
         force: true,
         date: getTodayKey(),
+        recipients: recipientList.length > 0 ? recipientList : undefined,
+        recipient: recipientList[0],
       },
     });
-    if (error) return { ok: false, reason: String(error) };
-    return data ?? { ok: false, reason: 'unknown' };
+    if (error) return { ok: false, reason: 'Could not reach email service. Try again.' };
+    if (!data?.ok) {
+      const reason = data?.reason === 'no_valid_recipient'
+        ? 'No valid email on this profile. Enter an address and try again.'
+        : data?.reason === 'global_disabled'
+          ? 'Email sending is turned off in settings.'
+          : 'Send failed. Check the address and try again.';
+      console.warn('[Email] Manual nudge failed:', data?.reason);
+      return { ok: false, reason };
+    }
+    return {
+      ok: true,
+      sentTo: Array.isArray(data.sentTo) ? data.sentTo : recipientList,
+      reason: data.reason,
+    };
   } catch (err) {
-    return { ok: false, reason: String(err) };
+    console.warn('[Email] Manual nudge error:', err);
+    return { ok: false, reason: 'Could not send. Check your connection and try again.' };
   }
 }

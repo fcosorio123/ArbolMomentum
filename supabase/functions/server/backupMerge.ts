@@ -124,5 +124,14 @@ export function unionMergeBackupPayload(
   const incomingAt = typeof incoming.savedAt === "number" ? incoming.savedAt : 0;
   merged.savedAt = Math.max(existingAt, incomingAt, Date.now());
 
+  // Never wipe a stored profile email with null/empty from a sparse client.
+  const existingEmail = typeof existing.profileEmail === "string" ? existing.profileEmail.trim() : "";
+  const incomingEmail = typeof incoming.profileEmail === "string" ? incoming.profileEmail.trim() : "";
+  if (incomingEmail) {
+    merged.profileEmail = incomingEmail;
+  } else if (existingEmail) {
+    merged.profileEmail = existingEmail;
+  }
+
   return merged;
 }
