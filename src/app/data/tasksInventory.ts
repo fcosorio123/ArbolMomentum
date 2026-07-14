@@ -37,7 +37,7 @@ export interface TasksInventory {
   unassigned: InventoryTask[];
 }
 
-/** Build full task inventory (all dates) for All Tasks management view. */
+/** Build full task inventory for All Tasks — one row per setup, with frequency. */
 export function buildAllTasksInventory(profileId: string): TasksInventory {
   const goals = getPersonalGoals(profileId);
   const goalTaskMap: Record<string, InventoryTask[]> = {};
@@ -59,28 +59,72 @@ export function buildAllTasksInventory(profileId: string): TasksInventory {
     }
   };
 
-  // All weekdays — not just "today" — so seeded tasks stay stable across days
-  const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const seenSeedIds = new Set<string>();
+  // Collect weekday seeds, then collapse same-label setups into one row + frequency.
+  // (Profiles like Favio store Mon/Tue/… copies with different IDs — users want frequency, not 7 rows.)
+  const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+  const todayName = DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+  type Acc = {
+    task: InventoryTask;
+    goalId?: string;
+    days: Set<string>;
+    ids: string[];
+  };
+  const bySetup = new Map<string, Acc>();
+
   for (const day of DAYS) {
     getTaskCategoriesForProfile(profileId, day).forEach(cat => {
       cat.tasks.forEach(t => {
-        if (seenSeedIds.has(t.id)) return;
-        seenSeedIds.add(t.id);
         if (hiddenSeedIds.has(t.id) || convertedSeedIds.has(t.id) || userTaskIds.has(t.id)) return;
         const merged = mergeSeedForProfile(profileId, t);
         const effectiveGoalId = getPrimaryGoalIdForTask(profileId, t.id, cat.goalId);
-        place(
-          {
+        const setupKey = [
+          (merged.label || '').trim().toLowerCase(),
+          merged.timeOfDay,
+          merged.type,
+          effectiveGoalId || '',
+        ].join('|');
+
+        const existing = bySetup.get(setupKey);
+        if (existing) {
+          existing.days.add(day);
+          existing.ids.push(t.id);
+          // Prefer today's instance as the editable representative id
+          if (day === todayName) {
+            existing.task = {
+              ...existing.task,
+              ...merged,
+              id: t.id,
+              potentialValue: getDisplayPotentialValue(merged.potentialValue),
+              goalId: effectiveGoalId,
+            };
+            existing.goalId = effectiveGoalId;
+          }
+          return;
+        }
+
+        bySetup.set(setupKey, {
+          days: new Set([day]),
+          ids: [t.id],
+          goalId: effectiveGoalId,
+          task: {
             ...merged,
             potentialValue: getDisplayPotentialValue(merged.potentialValue),
             goalId: effectiveGoalId,
-            scheduleLabel: merged.recurrence ? recurrenceLabel(merged.recurrence) : `${day} seed`,
+            scheduleLabel: 'Daily',
           },
-          effectiveGoalId,
-        );
+        });
       });
     });
+  }
+
+  for (const acc of bySetup.values()) {
+    const days = DAYS.filter(d => acc.days.has(d));
+    acc.task.scheduleLabel = frequencyLabelFromDays(days);
+    // If seed had explicit recurrence override, prefer that label
+    if (acc.task.recurrence) {
+      acc.task.scheduleLabel = recurrenceLabel(acc.task.recurrence);
+    }
+    place(acc.task, acc.goalId);
   }
 
   userTasks.forEach(ut => {
@@ -101,6 +145,15 @@ export function buildAllTasksInventory(profileId: string): TasksInventory {
   });
 
   return { goals, goalTaskMap, unassigned };
+}
+
+function frequencyLabelFromDays(days: string[]): string {
+  if (days.length === 0) return 'Scheduled';
+  if (days.length >= 7) return 'Daily';
+  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  if (days.length === 5 && weekdays.every(d => days.includes(d))) return 'Weekdays';
+  if (days.length === 1) return days[0];
+  return days.join(', ');
 }
 
 export function filterInventoryTasks(

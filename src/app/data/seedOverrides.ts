@@ -1,6 +1,7 @@
 /** Per-profile edits to seeded tasks (update-in-place; no convert-to-user-task). */
 
 import type { Task, TaskType, TimeOfDay } from './profiles';
+import { getAllTasksForProfile } from './profiles';
 import type { Recurrence, UserTask } from './userTasks';
 import type { PotentialValue } from './potentialValue';
 import { normalizePotentialValue } from './potentialValue';
