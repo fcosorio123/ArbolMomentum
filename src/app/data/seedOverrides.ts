@@ -58,6 +58,37 @@ export function setSeedOverride(
   persist(profileId, map);
 }
 
+/**
+ * Apply the same override to every weekday seed with the same original label.
+ * Keeps All Tasks "one setup + frequency" rows consistent when editing.
+ */
+export function setSeedOverrideForSameLabel(
+  profileId: string,
+  seedTaskId: string,
+  patch: SeedTaskOverride,
+): void {
+  const catalog = getAllTasksForProfile(profileId);
+  const source = catalog.find(t => t.id === seedTaskId);
+  const labelKey = (source?.label || '').trim().toLowerCase();
+  const targets = labelKey
+    ? catalog.filter(t => t.label.trim().toLowerCase() === labelKey).map(t => t.id)
+    : [seedTaskId];
+
+  const map = { ...getSeedOverrides(profileId) };
+  for (const id of targets) {
+    const prev = map[id] ?? {};
+    const next: SeedTaskOverride = { ...prev, ...patch };
+    if (patch.potentialValue) {
+      next.potentialValue = normalizePotentialValue(patch.potentialValue) ?? patch.potentialValue;
+    }
+    if (patch.description !== undefined && !patch.description.trim()) {
+      delete next.description;
+    }
+    map[id] = next;
+  }
+  persist(profileId, map);
+}
+
 export function clearSeedOverride(profileId: string, seedTaskId: string): void {
   const map = { ...getSeedOverrides(profileId) };
   if (!(seedTaskId in map)) return;

@@ -276,36 +276,57 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
                   : 'AI was enabled but the server used rule-based parsing. Results may be less tailored — you can go back and try again.'}
               </div>
             )}
-            <div style={{ maxHeight: 320, overflowY: 'auto', marginBottom: 12 }}>
+            <p style={{ margin: '0 0 10px', fontSize: 11, color: C.secondary, lineHeight: 1.4 }}>
+              <strong style={{ color: C.headline }}>Goal</strong> = the outcome you want ·{' '}
+              <strong style={{ color: C.headline }}>Tasks</strong> = the actions that get you there
+            </p>
+            <div style={{ maxHeight: 'min(52vh, 360px)', overflowY: 'auto', marginBottom: 12, WebkitOverflowScrolling: 'touch' }}>
               {groups.map(group => (
                 <div key={group.id} style={{ marginBottom: 14, padding: 12, background: C.bgAlt, borderRadius: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
                     <Checkbox
                       checked={group.selected}
                       onChange={e => toggleGoal(group.id, e.target.checked)}
                     />
                     <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 9, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase',
+                        color: C.primary, marginBottom: 4,
+                      }}>
+                        Goal (outcome)
+                      </div>
                       <Input
                         value={group.goal.title}
                         onChange={e => updateGoalTitle(group.id, e.target.value)}
+                        placeholder="Outcome you want…"
                         style={{ fontWeight: 700, fontSize: 14, marginBottom: 6, borderRadius: 8 }}
                       />
                       <Input
                         value={group.goal.deepWhy}
                         onChange={e => updateGoalWhy(group.id, e.target.value)}
+                        placeholder="Why this matters…"
                         style={{ fontSize: 12, borderRadius: 8 }}
                       />
                     </div>
                     <button
                       type="button"
                       onClick={() => removeGoal(group.id)}
-                      style={{ border: 'none', background: 'none', color: C.tertiary, fontSize: 11, cursor: 'pointer' }}
+                      style={{ border: 'none', background: 'none', color: C.tertiary, fontSize: 11, cursor: 'pointer', flexShrink: 0, padding: '4px 0' }}
                     >
                       Remove
                     </button>
                   </div>
+                  <div style={{
+                    fontSize: 9, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase',
+                    color: C.secondary, margin: '0 0 6px 28px',
+                  }}>
+                    Tasks (actions)
+                  </div>
                   {group.tasks.map(task => (
-                    <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 24, marginBottom: 6 }}>
+                    <div key={task.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 8, marginLeft: 12, marginBottom: 8,
+                      flexWrap: 'wrap',
+                    }}>
                       <Checkbox
                         checked={task.selected}
                         onChange={e => toggleTask(group.id, task.id, e.target.checked)}
@@ -313,13 +334,14 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
                       <Input
                         value={task.label}
                         onChange={e => updateTaskLabel(group.id, task.id, e.target.value)}
-                        style={{ flex: 1, fontSize: 13, borderRadius: 8 }}
+                        placeholder="Action to do…"
+                        style={{ flex: '1 1 140px', minWidth: 0, fontSize: 13, borderRadius: 8 }}
                       />
                       <span style={{ fontSize: 10, color: C.secondary, whiteSpace: 'nowrap' }}>{recurrenceSummary(task.recurrence)}</span>
                       <button
                         type="button"
                         onClick={() => removeTask(group.id, task.id)}
-                        style={{ border: 'none', background: 'none', color: C.secondary, fontSize: 11, cursor: 'pointer' }}
+                        style={{ border: 'none', background: 'none', color: C.secondary, fontSize: 11, cursor: 'pointer', minWidth: 28, minHeight: 28 }}
                       >
                         ✕
                       </button>
@@ -328,8 +350,8 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
                 </div>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
-              <Button block onClick={handleRegenerate} loading={parsing} style={{ borderRadius: 12, height: 44 }}>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+              <Button block onClick={handleRegenerate} loading={parsing} style={{ borderRadius: 12, height: 46, flex: '1 1 120px' }}>
                 Regenerate
               </Button>
               <Button
@@ -338,7 +360,7 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
                 size="large"
                 disabled={(selectedTaskCount === 0 && mode === 'tasks') || parsing}
                 onClick={handleConfirm}
-                style={{ borderRadius: 12, height: 44, background: C.primary, fontWeight: 700, border: 'none', flex: 1.4 }}
+                style={{ borderRadius: 12, height: 46, background: C.primary, fontWeight: 700, border: 'none', flex: '1.4 1 160px' }}
               >
                 {copy.confirm}
               </Button>

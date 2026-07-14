@@ -37,6 +37,11 @@ const GOAL_THEMES: Array<{
     deepWhy: 'Small daily money habits compound into real financial security over the semester.',
   },
   {
+    keywords: /hungry|hunger|eat|food|meal|nutrition|protein|diet|snack|hydrate|water|cook/i,
+    title: 'Eat well & feel nourished',
+    deepWhy: 'Steady meals and simple food habits keep energy up and cravings down.',
+  },
+  {
     keywords: /exercise|workout|gym|run|walk|fitness|mwf|health/i,
     title: 'Health & Fitness',
     deepWhy: 'Moving your body regularly improves focus, energy, and long-term wellness.',
@@ -50,6 +55,45 @@ const GOAL_THEMES: Array<{
     keywords: /job|career|intern|apply|interview|resume|linkedin/i,
     title: 'Career & Work',
     deepWhy: 'Steady career actions build momentum toward opportunities you actually want.',
+  },
+];
+
+/** Vague feelings/needs → outcome goals + concrete action tasks (never echo the dump as the goal title). */
+const OUTCOME_STARTERS: Array<{
+  match: RegExp;
+  title: string;
+  deepWhy: string;
+  tasks: string[];
+}> = [
+  {
+    match: /\b(i'?m\s+hungry|feeling\s+hungry|so\s+hungry|starving|need\s+(to\s+)?eat|want\s+(some\s+)?food)\b/i,
+    title: 'Eat well & feel nourished',
+    deepWhy: 'Getting real food on a predictable rhythm so you feel fed, not frantic.',
+    tasks: [
+      'Eat a balanced meal with protein and a vegetable',
+      'Prep one grab-and-go snack you will actually eat',
+      'Drink a full glass of water before your next meal',
+    ],
+  },
+  {
+    match: /\b(i'?m\s+tired|exhausted|no\s+energy|burnt?\s*out|need\s+(to\s+)?rest|want\s+to\s+sleep)\b/i,
+    title: 'Restore energy & rest well',
+    deepWhy: 'Protecting sleep and recovery so you can show up with steady energy.',
+    tasks: [
+      'Set a phone-down time 30 minutes before bed',
+      'Take a 10-minute outdoor walk for fresh air',
+      'Drink water and eat a light protein snack if you skipped a meal',
+    ],
+  },
+  {
+    match: /\b(i'?m\s+stressed|overwhelm|anxious|too\s+much\s+to\s+do)\b/i,
+    title: 'Feel calmer and in control',
+    deepWhy: 'Clearing mental load with small concrete resets instead of spinning.',
+    tasks: [
+      'Write the top 3 things on your mind in 5 minutes',
+      'Pick one item and do only the first tiny step',
+      'Take 5 slow breaths, then put your phone face-down for 10 minutes',
+    ],
   },
 ];
 
@@ -152,6 +196,17 @@ function findOrCreateThemeGroup(
   return group;
 }
 
+function looksLikeAction(label: string): boolean {
+  return /^(eat|drink|walk|run|call|email|write|read|submit|review|buy|prep|cook|clean|study|apply|send|finish|start|open|set|check|add|swap|do|make|plan|track|hit|complete|practice)\b/i
+    .test(label.trim());
+}
+
+function pushUniqueTask(group: SeedSuggestionGroup, line: string, label: string, recurrence: Recurrence) {
+  if (group.tasks.some(t => t.label.toLowerCase() === label.toLowerCase())) return;
+  if (label.toLowerCase() === group.goal.title.toLowerCase()) return;
+  group.tasks.push(makeTask(line, label, recurrence));
+}
+
 /** Parse free-text goals into editable suggestion groups (user input only, no bundled defaults). */
 export function parseGoalInput(text: string): SeedSuggestionGroup[] {
   _id = 0;
@@ -161,30 +216,83 @@ export function parseGoalInput(text: string): SeedSuggestionGroup[] {
   const groups: SeedSuggestionGroup[] = [];
 
   for (const line of lines) {
-    const theme = matchTheme(line);
     const recurrence = detectRecurrence(line);
     const label = cleanTaskLabel(line);
-    if (label.length < 4) continue;
+    if (label.length < 3) continue;
 
-    if (theme) {
-      const group = findOrCreateThemeGroup(groups, theme);
-      const duplicate = group.tasks.some(t => t.label.toLowerCase() === label.toLowerCase());
-      if (!duplicate) {
-        group.tasks.push(makeTask(line, label, recurrence));
+    const outcome = OUTCOME_STARTERS.find(o => o.match.test(line));
+    if (outcome) {
+      let group = groups.find(g => g.goal.title === outcome.title);
+      if (!group) {
+        group = {
+          id: nextId('goal'),
+          goal: { title: outcome.title, deepWhy: outcome.deepWhy },
+          selected: true,
+          tasks: [],
+        };
+        groups.push(group);
+      }
+      for (const taskLabel of outcome.tasks) {
+        pushUniqueTask(group, line, taskLabel, recurrence);
       }
       continue;
     }
 
-    // Unmatched lines become a goal with distinct starter tasks (never echo title as task)
-    const starters = [
-      makeTask(line, `Define the next small step for "${label.slice(0, 40)}"`, recurrence),
-      makeTask(line, `Spend 15 minutes progressing on "${label.slice(0, 40)}"`, recurrence),
-    ].filter(t => t.label.toLowerCase() !== label.toLowerCase());
+    const theme = matchTheme(line);
+    if (theme) {
+      const group = findOrCreateThemeGroup(groups, theme);
+      // Feeling/keyword dumps become starter actions under the outcome theme — not the goal title itself
+      if (looksLikeAction(label) && label.length >= 8) {
+        pushUniqueTask(group, line, label, recurrence);
+      } else if (group.tasks.length === 0) {
+        const defaults =
+          /eat|food|meal|hung|protein|nutrition/i.test(theme.title + line)
+            ? [
+              'Eat a balanced meal with protein and a vegetable',
+              'Prep one healthy snack you will actually eat',
+              'Drink a full glass of water with your next meal',
+            ]
+            : [
+              `Take one concrete action toward ${theme.title.toLowerCase()} today`,
+              `Spend 15 focused minutes on ${theme.title.toLowerCase()}`,
+            ];
+        for (const taskLabel of defaults) {
+          pushUniqueTask(group, line, taskLabel, recurrence);
+        }
+      }
+      continue;
+    }
+
+    // Unmatched action lines → task under a short outcome goal derived from the action
+    if (looksLikeAction(label)) {
+      const outcomeTitle = label.length > 48 ? `${label.slice(0, 45)}…` : label;
+      groups.push({
+        id: nextId('goal'),
+        goal: {
+          title: `Follow through: ${outcomeTitle}`,
+          deepWhy: 'Turning this action into a clear outcome you can keep returning to.',
+        },
+        selected: true,
+        tasks: [makeTask(line, label, recurrence)],
+      });
+      continue;
+    }
+
+    // Last resort: outcome-framed goal + concrete starters (never meta coaching prompts)
     groups.push({
       id: nextId('goal'),
-      goal: { title: label, deepWhy: 'A goal you set when creating this profile.' },
+      goal: {
+        title: `Make progress on: ${label.slice(0, 50)}`,
+        deepWhy: 'An outcome-oriented goal from what you wrote — edit the title if needed.',
+      },
       selected: true,
-      tasks: starters,
+      tasks: [
+        makeTask(line, `Do the smallest useful version of this for 10 minutes`, recurrence),
+        makeTask(line, `Gather what you need, then finish one visible next step`, {
+          ...recurrence,
+          type: recurrence.type === 'one-time' ? 'one-time' : 'daily',
+        }),
+      ],
     });
   }
 

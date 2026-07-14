@@ -213,10 +213,17 @@ function TaskItem({
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
+          fontSize: 9, fontWeight: 800, letterSpacing: 0.45, textTransform: 'uppercase',
+          color: catColor, marginBottom: 2,
+        }}>
+          Task
+        </div>
+        <div style={{
           fontSize: 14, fontWeight: 600,
           color: isSkipped ? C.secondary : status === 'done' ? C.secondary : C.headline,
           textDecoration: status === 'done' ? 'line-through' : 'none',
           lineHeight: 1.3,
+          overflowWrap: 'anywhere',
         }}>
           {task.label}
         </div>
@@ -499,6 +506,14 @@ function GoalGroup({
           borderRadius: 16, border: `1.5px solid ${accentColor}30`,
         }}>
           <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+              <span style={{
+                fontSize: 9, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase',
+                padding: '2px 6px', borderRadius: 5, background: `${accentColor}22`, color: accentColor,
+              }}>
+                Goal
+              </span>
+            </div>
             <div style={{ fontWeight: 700, fontSize: 15, color: C.headline }}>{goal.title}</div>
             <div style={{ fontSize: 12, color: C.body, marginTop: 4 }}>{emptyMessage}</div>
           </div>
@@ -547,19 +562,25 @@ function GoalGroup({
           format={pct => <span style={{ fontSize: 10, fontWeight: 800, color: accent }}>{pct}%</span>}
         />
         <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
+            <span style={{
+              fontSize: 9, fontWeight: 800, letterSpacing: 0.6, textTransform: 'uppercase',
+              padding: '2px 7px', borderRadius: 5, background: `${accent}22`, color: accent,
+            }}>
+              Goal
+            </span>
+            <span style={{ fontSize: 10, color: C.secondary }}>
+              {allDone ? '✓ All tasks done' : `${doneTasks} of ${totalTasks} tasks`}
+            </span>
+          </div>
           <div style={{
-            fontSize: 13, fontWeight: 700, color: C.headline,
+            fontSize: 16, fontWeight: 700, color: C.headline,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             {goal.title}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
-            <span style={{
-              fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 5,
-              background: `${accent}20`, color: accent,
-            }}>
-              {allDone ? '✓ All done' : `${doneTasks}/${totalTasks} tasks`}
-            </span>
+          <div style={{ fontSize: 11, color: C.body, marginTop: 2 }}>
+            Outcome you&apos;re working toward
           </div>
         </div>
         <span style={{ fontSize: 16, color: C.secondary, transition: 'transform 0.2s', transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)', flexShrink: 0 }}>
@@ -584,16 +605,22 @@ function GoalGroup({
         </div>
       )}
 
-      {/* Tasks directly under goal */}
+      {/* Tasks under this goal */}
       {!collapsed && (
         <div style={{
-          paddingLeft: 10, paddingTop: 10,
+          paddingLeft: 10, paddingTop: 8,
           borderLeft: `3px solid ${accent}25`, marginLeft: 6,
           borderBottom: 'none',
           borderRight: `1.5px solid ${accent}30`,
           paddingRight: 6, paddingBottom: 4,
           background: C.bgCard,
         }}>
+          <div style={{
+            fontSize: 10, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase',
+            color: C.secondary, margin: '0 0 8px 4px',
+          }}>
+            Tasks · do these actions
+          </div>
           {allVisibleTasks.map(task => (
             <TaskItem
               key={task.id} task={task} catColor={accent}
@@ -1413,8 +1440,8 @@ export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDa
         <PageTourButton onClick={() => setShowTour(true)} />
       </div>
       <p style={{ margin: '0 0 12px', color: C.secondary, fontSize: 13, lineHeight: 1.5 }}>
-        {taskView === 'all' && 'Manage every task — find it without hunting the calendar.'}
-        {taskView === 'today' && 'What needs attention right now.'}
+        {taskView === 'all' && 'Every task, grouped under its Goal (outcome) — tasks are the actions.'}
+        {taskView === 'today' && 'Today’s tasks by Goal. Tap a task to update — Goal is the outcome, Tasks are the actions.'}
         {taskView === 'month' && 'See timing and workload across the month.'}
       </p>
 
@@ -1503,31 +1530,6 @@ export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDa
         />
       ) : (
         <>
-          {taskView === 'all' && (
-            <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
-              {statusChips.map(({ key, label }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setStatusFilter(key)}
-                  style={{
-                    minHeight: MIN_TOUCH,
-                    padding: '8px 14px',
-                    borderRadius: 20,
-                    cursor: 'pointer',
-                    background: statusFilter === key ? C.primary : C.bgCard,
-                    color: statusFilter === key ? '#fff' : C.secondary,
-                    fontWeight: statusFilter === key ? 700 : 600,
-                    fontSize: 12,
-                    border: `1.5px solid ${statusFilter === key ? C.primary : C.border}`,
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-
           {taskView === 'today' && overdueUserTasks.length > 0 && (
             <div style={{
               marginBottom: 14, padding: '12px 14px', borderRadius: 14,
@@ -1571,49 +1573,81 @@ export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDa
             </div>
           )}
 
-          {/* Select + time filters */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Filters: status · select · time — one compact wrap row */}
+          <div style={{
+            display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center',
+          }}>
+            {taskView === 'all' && (
+              <div style={{
+                display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center',
+                padding: 4, borderRadius: 14, background: C.bgAlt, border: `1px solid ${C.border}`,
+              }}>
+                {statusChips.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setStatusFilter(key)}
+                    style={{
+                      minHeight: MIN_TOUCH,
+                      padding: '8px 11px',
+                      borderRadius: 12,
+                      cursor: 'pointer',
+                      background: statusFilter === key ? C.primary : 'transparent',
+                      color: statusFilter === key ? '#fff' : C.secondary,
+                      fontWeight: statusFilter === key ? 700 : 600,
+                      fontSize: 12,
+                      border: 'none',
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
             <button
               type="button"
               onClick={() => { setSelectMode(m => !m); setSelectedTaskIds(new Set()); }}
               style={{
                 minHeight: MIN_TOUCH,
-                padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${C.border}`,
+                padding: '8px 12px', borderRadius: 12, border: `1.5px solid ${selectMode ? C.primary : C.border}`,
                 background: selectMode ? `${C.primary}15` : C.bgCard,
                 color: selectMode ? C.primary : C.secondary, fontSize: 12, fontWeight: 600, cursor: 'pointer',
               }}
             >
-              {selectMode ? 'Cancel select' : 'Select tasks'}
+              {selectMode ? 'Cancel' : 'Select'}
             </button>
             {selectMode && selectedTaskIds.size > 0 && (
               <>
-                <button type="button" onClick={() => runBulkDelete('today')} style={{ minHeight: MIN_TOUCH, padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${C.border}`, background: C.bgCard, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                <button type="button" onClick={() => runBulkDelete('today')} style={{ minHeight: MIN_TOUCH, padding: '8px 12px', borderRadius: 12, border: `1.5px solid ${C.border}`, background: C.bgCard, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                   Skip today ({selectedTaskIds.size})
                 </button>
-                <button type="button" onClick={() => runBulkDelete('forever')} style={{ minHeight: MIN_TOUCH, padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${C.tertiary}40`, background: `${C.tertiary}10`, color: C.tertiary, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                <button type="button" onClick={() => runBulkDelete('forever')} style={{ minHeight: MIN_TOUCH, padding: '8px 12px', borderRadius: 12, border: `1.5px solid ${C.tertiary}40`, background: `${C.tertiary}10`, color: C.tertiary, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                   Remove ({selectedTaskIds.size})
                 </button>
               </>
             )}
-          </div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
-            {([
-              { key: 'all',     label: 'All times' },
-              { key: 'morning', label: '☀️ Morning' },
-              { key: 'evening', label: '🌙 Evening' },
-            ] as const).map(({ key, label }) => (
-              <button key={key} onClick={() => setTimeFilter(key)} style={{
-                minHeight: MIN_TOUCH,
-                padding: '8px 14px', borderRadius: 20, cursor: 'pointer',
-                background: timeFilter === key ? C.primary : C.bgAlt,
-                color: timeFilter === key ? '#fff' : C.secondary,
-                fontWeight: timeFilter === key ? 700 : 400, fontSize: 12,
-                border: `1px solid ${timeFilter === key ? C.primary : C.border}`,
-                transition: 'all 0.18s',
-              }}>
-                {label}
-              </button>
-            ))}
+            <div style={{
+              display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center',
+              padding: 4, borderRadius: 14, background: C.bgAlt, border: `1px solid ${C.border}`,
+            }}>
+              {([
+                { key: 'all',     label: 'All' },
+                { key: 'morning', label: '☀️ AM' },
+                { key: 'evening', label: '🌙 PM' },
+              ] as const).map(({ key, label }) => (
+                <button key={key} type="button" onClick={() => setTimeFilter(key)} style={{
+                  minHeight: MIN_TOUCH,
+                  padding: '8px 11px', borderRadius: 12, cursor: 'pointer',
+                  background: timeFilter === key ? C.primary : 'transparent',
+                  color: timeFilter === key ? '#fff' : C.secondary,
+                  fontWeight: timeFilter === key ? 700 : 600, fontSize: 12,
+                  border: 'none',
+                  transition: 'all 0.18s',
+                }}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {isEmpty ? (
@@ -1625,14 +1659,14 @@ export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDa
           ) : taskView === 'all' ? (
             renderGoalLists(allGoalTaskMap, allUnassigned, {
               showExplore: false,
-              unassignedLabel: 'Unassigned',
+              unassignedLabel: 'Tasks · no goal yet',
               emptyMessage: 'No tasks for this goal yet.',
               getStatusHint: statusHintForAll,
             })
           ) : (
             renderGoalLists(goalTaskMap, ungroupedTasks, {
               showExplore: true,
-              unassignedLabel: 'Unassigned',
+              unassignedLabel: 'Tasks · no goal yet',
               emptyMessage: 'No tasks yet for this goal today.',
             })
           )}

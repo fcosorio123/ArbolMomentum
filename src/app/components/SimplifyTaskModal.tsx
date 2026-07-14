@@ -178,6 +178,20 @@ export function SimplifyTaskModal({
 
         {reviewing && result && (
           <>
+            <div style={{
+              marginBottom: 12, padding: '10px 12px', borderRadius: 10,
+              background: C.bgAlt, border: `1px solid ${C.border}`,
+            }}>
+              <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 0.45, textTransform: 'uppercase', color: C.secondary, marginBottom: 4 }}>
+                Simplifying this task
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.headline, overflowWrap: 'anywhere' }}>{taskLabel}</div>
+              {goalTitle && (
+                <div style={{ fontSize: 11, color: C.body, marginTop: 4 }}>
+                  Goal · {goalTitle}
+                </div>
+              )}
+            </div>
             <p style={{ margin: '0 0 14px', fontSize: 12, color: C.body }}>
               Choose 2–5 tiny actions that replace the original. Uncheck any you don&apos;t want.
             </p>

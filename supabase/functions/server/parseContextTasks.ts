@@ -97,23 +97,26 @@ function ensureStarterTasks<T extends { label: string; timeOfDay: "morning" | "e
   tasks: T[],
 ): T[] {
   if (tasks.length >= 2) return tasks.slice(0, MAX_TASKS_PER_GOAL);
-  const short = goalTitle.slice(0, 40);
+  const t = goalTitle.toLowerCase();
+  const food = /eat|food|meal|hung|nourish|protein|nutrition|diet/.test(t);
   const extras: T[] = [];
-  // Concrete starter tasks only — never meta/"think about" coaching prompts
-  if (tasks.length === 0) {
+  const candidates = food
+    ? [
+      "Eat a balanced meal with protein and a vegetable",
+      "Prep one healthy snack you will actually eat",
+      "Drink a full glass of water before your next meal",
+    ]
+    : [
+      `Take one concrete action toward "${goalTitle.slice(0, 36)}" today`,
+      `Spend 15 focused minutes on "${goalTitle.slice(0, 36)}"`,
+    ];
+  for (const label of candidates) {
+    if (tasks.length + extras.length >= 2) break;
+    if ([...tasks, ...extras].some((x) => x.label.toLowerCase() === label.toLowerCase())) continue;
     extras.push({
-      label: `Take one concrete action toward "${short}" today`,
-      timeOfDay: "morning",
-      type: "goal",
-      recurrence: { type: "daily" },
-      selected: true,
-    } as T);
-  }
-  if (tasks.length + extras.length < 2) {
-    extras.push({
-      label: `Spend 15 minutes on "${short}"`,
-      timeOfDay: "evening",
-      type: "routine",
+      label,
+      timeOfDay: extras.length === 0 ? "morning" : "evening",
+      type: extras.length === 0 ? "goal" : "routine",
       recurrence: { type: "daily" },
       selected: true,
     } as T);
@@ -165,7 +168,8 @@ function systemPromptForMode(mode: string): string {
   const base =
     'You turn unstructured student text into READY-TO-USE goals and tasks. Return JSON only: {"groups":[{"goal":{"title","deepWhy"},"tasks":[{"label","timeOfDay":"morning|evening","type":"priority|goal|routine","recurrence":{"type":"daily|weekly|monthly|one-time","weekdays":[0-6]}}]}]}. ' +
     "CRITICAL: Do the planning yourself. Do NOT return coaching/meta tasks like \"identify your goal\", \"think about next steps\", \"break this down\", or \"define the next step\". " +
-    "Goals must be outcome-driven (what they will achieve). Tasks must be execution-driven checklist items that start with an action verb (Submit, Review, Call, Walk, Write…). " +
+    "Goals must be OUTCOME-driven titles (what success looks like), NEVER a raw feeling dump like \"I'm hungry\" — rewrite those into outcomes like \"Eat well & feel nourished\". " +
+    "Tasks must be ACTION-driven checklist items that start with a verb (Eat, Prep, Walk, Submit…). " +
     "For each goal invent 2–4 concrete, checkable tasks — not paragraphs, not duplicates of the goal title. Prefer useful structure over refusing. Max 8 goals, 12 tasks per goal.";
   if (mode === "tasks") {
     return base + " Mode=tasks: prioritize actionable next steps; if a larger outcome is clear, still include a short goal title to group them.";

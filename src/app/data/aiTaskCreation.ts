@@ -151,20 +151,42 @@ export function ruleBasedSimplifyClient(input: SimplifyTaskInput): SimplifiedTas
 
   const steps: string[] = [];
   if (domain === 'eating') {
-    if (/fruit|apple|banana|berry|orange/.test(t)) {
+    if (/protein|chicken|egg|eggs|tofu|turkey|meat|whey|fish|salmon|tuna|beans?|lentil|greek\s*yogurt|cottage\s*cheese/.test(t)) {
+      steps.push('Add a clear protein source to your next meal');
+      steps.push('Eat eggs, yogurt, chicken, fish, beans, or tofu once today');
+      steps.push(tightTime
+        ? 'Grab one high-protein snack you already have'
+        : 'Prep one high-protein snack for later today');
+      steps.push(likesTaste
+        ? 'Choose a protein food you actually enjoy and eat a portion of it'
+        : 'Include protein at breakfast or the meal you usually skip');
+      steps.push('Drink water with that protein meal');
+    } else if (/fruit|apple|banana|berry|orange/.test(t)) {
       steps.push('Buy or grab one piece of fruit today');
       steps.push('Eat that fruit with one meal');
+      steps.push(likesTaste
+        ? 'Choose one healthy food that also tastes good to you'
+        : 'Add one vegetable to lunch or dinner');
+      steps.push(tightTime
+        ? 'Drink a full glass of water with your next meal'
+        : 'Prep one simple healthy snack for tomorrow');
+      steps.push('Swap one processed snack for a whole-food option once');
+    } else if (/veg|vegetable|salad|greens?/.test(t)) {
+      steps.push('Add one vegetable to lunch or dinner today');
+      steps.push('Prep a ready-to-eat veggie portion for tomorrow');
+      steps.push('Eat a simple salad or steamed veg once');
+      steps.push('Drink a full glass of water with your next meal');
     } else {
       steps.push('Add one fruit to one meal today');
       steps.push('Find one apple or banana you will actually eat');
+      steps.push(likesTaste
+        ? 'Choose one healthy food that also tastes good to you'
+        : 'Add one vegetable to lunch or dinner');
+      steps.push(tightTime
+        ? 'Drink a full glass of water with your next meal'
+        : 'Prep one simple healthy snack for tomorrow');
+      steps.push('Swap one processed snack for a whole-food option once');
     }
-    steps.push(likesTaste
-      ? 'Choose one healthy food that also tastes good to you'
-      : 'Add one vegetable to lunch or dinner');
-    steps.push(tightTime
-      ? 'Drink a full glass of water with your next meal'
-      : 'Prep one simple healthy snack for tomorrow');
-    steps.push('Swap one processed snack for a whole-food option once');
   } else if (domain === 'exercise') {
     steps.push(tightTime ? 'Walk for 10 minutes today' : 'Walk for 20 minutes today');
     steps.push('Do 5 minutes of stretching after you wake up or before bed');
