@@ -13,6 +13,7 @@ import { TasksMonthView } from './TasksMonthView';
 import { useDashboardRefresh } from '../hooks/useDashboardRefresh';
 import { pickDoNowTask } from '../data/dashboardSnapshot';
 import { C } from '../data/colors';
+import { MIN_TOUCH, touchPrimaryButton } from '../styles/touchTargets';
 
 interface Props {
   profile: Profile;
@@ -146,6 +147,10 @@ export function Dashboard({
   const [isPwaInstalled, setIsPwaInstalled] = useState(false);
   const [showTour, setShowTour] = useState(false);
   const [showCheckInTour, setShowCheckInTour] = useState(false);
+  const [streakCursor, setStreakCursor] = useState(() => {
+    const n = new Date();
+    return { year: n.getFullYear(), month0: n.getMonth() };
+  });
 
   const {
     doneCount: todayDone,
@@ -197,19 +202,52 @@ export function Dashboard({
     [profile.id, snapshot.dateKey, snapshot.doneCount, snapshot.totalCount],
   );
 
-  // Month overview (tasks) + streak heatmap grids
-  const now = useMemo(() => new Date(), []);
-  const currentGrid = useMemo(
-    () => buildMonthGrid(profile.id, now.getFullYear(), now.getMonth()),
-    [profile.id, now, snapshot.doneCount, snapshot.dateKey],
+  // Streak heatmap: navigate a two-month window (left = cursor-1, right = cursor)
+  const todayMonth = useMemo(() => {
+    const n = new Date();
+    return { year: n.getFullYear(), month0: n.getMonth() };
+  }, [snapshot.dateKey]);
+
+  const leftMonth = useMemo(() => {
+    const d = new Date(streakCursor.year, streakCursor.month0 - 1, 1);
+    return { year: d.getFullYear(), month0: d.getMonth() };
+  }, [streakCursor]);
+
+  const leftGrid = useMemo(
+    () => buildMonthGrid(profile.id, leftMonth.year, leftMonth.month0),
+    [profile.id, leftMonth, snapshot.doneCount, snapshot.dateKey],
   );
-  const prevDate = useMemo(() => new Date(now.getFullYear(), now.getMonth() - 1, 1), [now]);
-  const prevGrid = useMemo(
-    () => buildMonthGrid(profile.id, prevDate.getFullYear(), prevDate.getMonth()),
-    [profile.id, prevDate, snapshot.doneCount, snapshot.dateKey],
+  const rightGrid = useMemo(
+    () => buildMonthGrid(profile.id, streakCursor.year, streakCursor.month0),
+    [profile.id, streakCursor, snapshot.doneCount, snapshot.dateKey],
   );
-  const currentMonthLabel = now.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-  const prevMonthLabel = prevDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  const leftMonthLabel = useMemo(
+    () => new Date(leftMonth.year, leftMonth.month0, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+    [leftMonth],
+  );
+  const rightMonthLabel = useMemo(
+    () => new Date(streakCursor.year, streakCursor.month0, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+    [streakCursor],
+  );
+
+  const canStreakForward =
+    streakCursor.year < todayMonth.year
+    || (streakCursor.year === todayMonth.year && streakCursor.month0 < todayMonth.month0);
+
+  const shiftStreakMonth = (delta: number) => {
+    setStreakCursor(prev => {
+      const d = new Date(prev.year, prev.month0 + delta, 1);
+      const next = { year: d.getFullYear(), month0: d.getMonth() };
+      // Don't navigate past the current calendar month
+      if (
+        next.year > todayMonth.year
+        || (next.year === todayMonth.year && next.month0 > todayMonth.month0)
+      ) {
+        return { ...todayMonth };
+      }
+      return next;
+    });
+  };
 
   const card: React.CSSProperties = {
     background: C.bgCard, border: `1.5px solid ${C.border}`,
@@ -543,17 +581,58 @@ export function Dashboard({
 
       {/* ── Streak History (completion heatmap) */}
       <div style={{ ...card, padding: '16px 18px' }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: C.headline, marginBottom: 14 }}>
-          Streak History
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginBottom: 12, gap: 8,
+        }}>
+          <button
+            type="button"
+            onClick={() => shiftStreakMonth(-1)}
+            aria-label="Previous months"
+            style={{
+              ...touchPrimaryButton,
+              minWidth: MIN_TOUCH,
+              border: `1.5px solid ${C.border}`,
+              background: C.bgCard,
+              color: C.headline,
+              fontWeight: 700,
+            }}
+          >
+            ←
+          </button>
+          <div style={{ textAlign: 'center', minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.headline }}>Streak History</div>
+            <div style={{ fontSize: 11, color: C.secondary, marginTop: 2 }}>
+              {leftMonthLabel} – {rightMonthLabel}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => shiftStreakMonth(1)}
+            disabled={!canStreakForward}
+            aria-label="Next months"
+            style={{
+              ...touchPrimaryButton,
+              minWidth: MIN_TOUCH,
+              border: `1.5px solid ${C.border}`,
+              background: C.bgCard,
+              color: canStreakForward ? C.headline : C.secondary,
+              fontWeight: 700,
+              opacity: canStreakForward ? 1 : 0.45,
+              cursor: canStreakForward ? 'pointer' : 'default',
+            }}
+          >
+            →
+          </button>
         </div>
 
         <div style={{ display: 'flex', gap: 10 }}>
-          <MonthHeatmap grid={prevGrid} label={prevMonthLabel} />
+          <MonthHeatmap grid={leftGrid} label={leftMonthLabel} />
           <div style={{ width: 1, background: C.border, flexShrink: 0 }} />
-          <MonthHeatmap grid={currentGrid} label={currentMonthLabel} />
+          <MonthHeatmap grid={rightGrid} label={rightMonthLabel} />
         </div>
 
-        <div style={{ display: 'flex', gap: 12, marginTop: 14, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 12, marginTop: 14, alignItems: 'center', flexWrap: 'wrap' }}>
           {[
             { color: '#4ade80aa', label: '1 task' },
             { color: '#22c55e',   label: '2 tasks' },
@@ -564,6 +643,18 @@ export function Dashboard({
               <span style={{ fontSize: 9, color: C.secondary }}>{label}</span>
             </div>
           ))}
+          {(streakCursor.year !== todayMonth.year || streakCursor.month0 !== todayMonth.month0) && (
+            <button
+              type="button"
+              onClick={() => setStreakCursor({ ...todayMonth })}
+              style={{
+                marginLeft: 'auto', border: 'none', background: 'none',
+                color: C.primary, fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: 0,
+              }}
+            >
+              Jump to current
+            </button>
+          )}
         </div>
       </div>
 
