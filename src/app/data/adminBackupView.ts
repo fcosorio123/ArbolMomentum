@@ -6,6 +6,7 @@
 import {
   getTaskCategoriesForProfile,
   getDateKeyForTzOffset,
+  normalizeTzOffsetMinutes,
   type TaskStatus,
   type TaskType,
 } from './profiles';
@@ -114,13 +115,18 @@ function hasActivityOnDateFromBackup(
   return false;
 }
 
+function tzOffsetFromBackup(backup: Record<string, unknown>): number {
+  if (typeof backup.tzOffset === 'number') {
+    return normalizeTzOffsetMinutes(backup.tzOffset);
+  }
+  return new Date().getTimezoneOffset();
+}
+
 export function computeLiveStreakFromBackup(
   backup: Record<string, unknown>,
   profileId: string,
 ): number {
-  const offset = typeof backup.tzOffset === 'number'
-    ? backup.tzOffset
-    : new Date().getTimezoneOffset();
+  const offset = tzOffsetFromBackup(backup);
   const todayKey = getDateKeyForTzOffset(new Date(), offset);
   const todayDone = hasActivityOnDateFromBackup(backup, profileId, todayKey);
 
@@ -247,12 +253,7 @@ export function computeAdminViewFromBackup(
   rows = applyOverlay(rows, overlay);
   rows = rows.filter(r => r.disposition !== 'removed');
 
-  // Prefer profile timezone today for check-in display when dateKey is "today" locally —
-  // callers pass an explicit dateKey for week cells.
-  const offset = typeof backup.tzOffset === 'number'
-    ? backup.tzOffset
-    : new Date().getTimezoneOffset();
-  const profileToday = getDateKeyForTzOffset(new Date(), offset);
+  const profileToday = getBackupTodayKey(backup);
   const checkDate = dateKey;
 
   return {
@@ -263,4 +264,9 @@ export function computeAdminViewFromBackup(
     hasBackup: true,
     savedAt: typeof backup.savedAt === 'number' ? backup.savedAt : null,
   };
+}
+
+/** Profile's calendar "today" from backup tz (normalized). */
+export function getBackupTodayKey(backup: Record<string, unknown>): string {
+  return getDateKeyForTzOffset(new Date(), tzOffsetFromBackup(backup));
 }

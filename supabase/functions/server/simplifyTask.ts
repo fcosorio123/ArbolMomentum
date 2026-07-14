@@ -1,4 +1,4 @@
-// AI-assisted task simplification — breaks one task into 2–5 smaller steps
+// AI-assisted task simplification — replaces one task with 2–5 simpler checklist tasks
 
 import * as kv from "./kv_store.tsx";
 
@@ -51,22 +51,56 @@ export function normalizeSimplifyAnswers(input: SimplifyTaskInput): Required<Sim
   };
 }
 
+/**
+ * Produce concrete simpler replacements for the original task —
+ * not coaching prompts, not "clarify blocker", not motivational notes.
+ */
 export function ruleBasedSimplify(input: SimplifyTaskInput): SimplifiedTask[] {
-  const label = input.taskLabel.trim();
+  const label = input.taskLabel.trim().replace(/\s+/g, " ");
+  const short = label.slice(0, 70);
   const { blocker, motivation, constraint } = normalizeSimplifyAnswers(input);
 
   const steps: string[] = [];
-  if (blocker) steps.push(`Clarify blocker: ${blocker.slice(0, 60)}`);
-  if (motivation) {
-    steps.push(`Use this motivation: ${motivation.slice(0, 80)}`);
-  }
-  steps.push(`Spend 10 minutes on: ${label.slice(0, 72)}`);
-  if (constraint) steps.push(`Work within constraint: ${constraint.slice(0, 60)}`);
-  steps.push(`Define the very next action for "${label.slice(0, 40)}"`);
 
-  return steps.slice(0, 5).map((s, i) => ({
+  // Always: a micro version of the actual task
+  steps.push(`5-min start: ${short}`);
+
+  // Prep / easier slice tied to the same work (use blocker only to shrink the action)
+  if (blocker) {
+    const hint = blocker.slice(0, 36);
+    steps.push(`Easiest piece of "${short}" (skip: ${hint})`);
+  } else {
+    steps.push(`Prep what you need for: ${short}`);
+  }
+
+  // Finish a short complete win
+  if (constraint) {
+    steps.push(`Finish ${short} within ${constraint.slice(0, 36)}`);
+  } else {
+    steps.push(`Complete a short version of: ${short}`);
+  }
+
+  // Optional fourth: accountability framed as a doable task, not a note
+  if (motivation) {
+    steps.push(`${short} — then note win: ${motivation.slice(0, 40)}`);
+  }
+
+  // Dedupe near-identical labels
+  const seen = new Set<string>();
+  const unique = steps.filter((s) => {
+    const key = s.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  while (unique.length < 2) {
+    unique.push(`Do the first step of: ${short}`);
+  }
+
+  return unique.slice(0, 5).map((s, i) => ({
     label: s.slice(0, MAX_LABEL_CHARS),
-    timeOfDay: i % 2 === 0 ? "morning" : "evening",
+    timeOfDay: (i % 2 === 0 ? "morning" : "evening") as "morning" | "evening",
   }));
 }
 
@@ -91,10 +125,10 @@ async function callOpenAi(input: SimplifyTaskInput): Promise<SimplifiedTask[] | 
   const context = [
     input.goalTitle ? `Goal: ${input.goalTitle}` : "",
     input.goalWhy ? `Why: ${input.goalWhy}` : "",
-    `Task: ${input.taskLabel}`,
-    `Q1 — What makes this hard/vague/overwhelming? Answer: ${answers.blocker || "(no answer)"}`,
-    `Q2 — What would make you feel motivated to take the next step today? Answer: ${answers.motivation || "(no answer)"}`,
-    `Q3 — Any constraints (time, energy, tools, dependencies)? Answer: ${answers.constraint || "(no answer)"}`,
+    `Original task to replace: ${input.taskLabel}`,
+    `What makes it hard: ${answers.blocker || "(no answer)"}`,
+    `Motivation: ${answers.motivation || "(no answer)"}`,
+    `Constraints: ${answers.constraint || "(no answer)"}`,
   ].filter(Boolean).join("\n");
 
   try {
@@ -106,13 +140,13 @@ async function callOpenAi(input: SimplifyTaskInput): Promise<SimplifiedTask[] | 
       },
       body: JSON.stringify({
         model,
-        temperature: 0.3,
+        temperature: 0.35,
         response_format: { type: "json_object" },
         messages: [
           {
             role: "system",
             content:
-              'Break an overwhelming task into 2–5 concrete, smaller tasks. Return JSON only: {"tasks":[{"label":"...","timeOfDay":"morning|evening"}]}. Labels max 120 chars. Each step should be doable in under 30 minutes. Personalize using the answers: use the blocker to shrink or clarify the first step; use motivation to frame steps toward accountability or outcome; respect constraints and do not invent specific facts the user did not provide. Prefer a useful guess over rejecting when answers are thin. Always return at least 2 steps.',
+              'Replace ONE overwhelming task with 2–5 SIMPLER checklist tasks that are shorter versions or micro-steps OF that same work. Return JSON only: {"tasks":[{"label":"...","timeOfDay":"morning|evening"}]}. Rules: (1) Each label must read like a doable to-do the user can mark done (e.g. "Put protein on breakfast plate", not "Clarify why protein is hard"). (2) Do NOT invent coaching, reflections, "define next action", or echo the user\'s answers as the task. (3) Use the blocker only to shrink scope; respect constraints; prefer under-15-minute actions. (4) Labels max 120 chars. Always return at least 2 tasks that clearly relate to the original task.',
           },
           { role: "user", content: context },
         ],

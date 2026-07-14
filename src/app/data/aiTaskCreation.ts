@@ -2,10 +2,11 @@
 // AI-assisted task creation (edge parse-context-tasks)
 // ──────────────────────────────────────────────
 
-import { supabase } from '/utils/supabase/client';
+import { projectId, publicAnonKey } from '/utils/supabase/info';
 import { parseGoalInput, type SeedSuggestionGroup } from './profileSeedParser';
 
 const FN = 'make-server-5d90ddf5';
+const FN_BASE = `https://${projectId}.supabase.co/functions/v1`;
 
 export type ParseContextSource = 'llm' | 'rules';
 
@@ -16,18 +17,37 @@ export interface ParseContextTasksResult {
   reason?: string;
 }
 
+/** Authorization-only fetch — avoid apikey header (CORS preflight breaks POSTs). */
+async function edgePost(path: string, body: Record<string, unknown>): Promise<{ data: any; error: string | null }> {
+  try {
+    const res = await fetch(`${FN_BASE}/${path.replace(/^\//, '')}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${publicAnonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    let data: any = null;
+    try { data = await res.json(); } catch { data = null; }
+    if (!res.ok) {
+      return { data, error: data?.error || data?.message || `HTTP ${res.status}` };
+    }
+    return { data, error: null };
+  } catch (err) {
+    return { data: null, error: String(err) };
+  }
+}
+
 export async function parseContextTasksFromEdge(
   text: string,
   opts?: { preferRules?: boolean; mode?: 'profile' | 'goals' | 'tasks' },
 ): Promise<ParseContextTasksResult> {
   try {
-    const { data, error } = await supabase.functions.invoke(`${FN}/parse-context-tasks`, {
-      method: 'POST',
-      body: {
-        text,
-        preferRules: opts?.preferRules ?? false,
-        mode: opts?.mode ?? 'goals',
-      },
+    const { data, error } = await edgePost(`${FN}/parse-context-tasks`, {
+      text,
+      preferRules: opts?.preferRules ?? false,
+      mode: opts?.mode ?? 'goals',
     });
     if (error) {
       const fallback = parseGoalInput(text);
@@ -40,19 +60,15 @@ export async function parseContextTasksFromEdge(
     if (!payload?.ok || !Array.isArray(payload?.groups) || payload.groups.length === 0) {
       const fallback = parseGoalInput(text);
       if (fallback.length > 0) {
-        return {
-          ok: true,
-          groups: fallback,
-          source: 'rules',
-          reason: payload?.reason === 'llm_unavailable' ? 'llm_unavailable' : (payload?.reason ?? 'client_fallback'),
-        };
+        return { ok: true, groups: fallback, source: 'rules', reason: 'client_fallback' };
       }
+      return { ok: false, groups: [], source: 'rules', reason: payload?.reason || 'empty' };
     }
     return {
-      ok: Boolean(payload?.ok),
-      groups: Array.isArray(payload?.groups) ? payload.groups : [],
-      source: payload?.source === 'llm' ? 'llm' : 'rules',
-      reason: payload?.reason,
+      ok: true,
+      groups: payload.groups,
+      source: payload.source === 'llm' ? 'llm' : 'rules',
+      reason: payload.reason,
     };
   } catch {
     const fallback = parseGoalInput(text);
@@ -115,15 +131,38 @@ function normalizeClientAnswers(input: SimplifyTaskInput): {
 
 /** Client-side mirror of edge ruleBasedSimplify (used when the invoke fails). */
 export function ruleBasedSimplifyClient(input: SimplifyTaskInput): SimplifiedTaskSuggestion[] {
-  const label = input.taskLabel.trim();
+  const label = input.taskLabel.trim().replace(/\s+/g, ' ');
+  const short = label.slice(0, 70);
   const { blocker, motivation, constraint } = normalizeClientAnswers(input);
+
   const steps: string[] = [];
-  if (blocker) steps.push(`Clarify blocker: ${blocker.slice(0, 60)}`);
-  if (motivation) steps.push(`Use this motivation: ${motivation.slice(0, 80)}`);
-  steps.push(`Spend 10 minutes on: ${label.slice(0, 72)}`);
-  if (constraint) steps.push(`Work within constraint: ${constraint.slice(0, 60)}`);
-  steps.push(`Define the very next action for "${label.slice(0, 40)}"`);
-  return steps.slice(0, 5).map((s, i) => ({
+  steps.push(`5-min start: ${short}`);
+  if (blocker) {
+    steps.push(`Easiest piece of "${short}" (skip: ${blocker.slice(0, 36)})`);
+  } else {
+    steps.push(`Prep what you need for: ${short}`);
+  }
+  if (constraint) {
+    steps.push(`Finish ${short} within ${constraint.slice(0, 36)}`);
+  } else {
+    steps.push(`Complete a short version of: ${short}`);
+  }
+  if (motivation) {
+    steps.push(`${short} — then note win: ${motivation.slice(0, 40)}`);
+  }
+
+  const seen = new Set<string>();
+  const unique = steps.filter(s => {
+    const key = s.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  while (unique.length < 2) {
+    unique.push(`Do the first step of: ${short}`);
+  }
+
+  return unique.slice(0, 5).map((s, i) => ({
     label: s.slice(0, MAX_SIMPLIFY_LABEL),
     timeOfDay: (i % 2 === 0 ? 'morning' : 'evening') as 'morning' | 'evening',
   }));
@@ -149,10 +188,7 @@ export async function simplifyTaskFromEdge(input: SimplifyTaskInput): Promise<Si
   };
 
   try {
-    const { data, error } = await supabase.functions.invoke(`${FN}/simplify-task`, {
-      method: 'POST',
-      body: payload,
-    });
+    const { data, error } = await edgePost(`${FN}/simplify-task`, payload);
     if (error) {
       return clientFallback();
     }

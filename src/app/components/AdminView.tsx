@@ -12,7 +12,7 @@ import {
   computeDayStatsFromPersisted,
   buildRemoteDayOverlay,
 } from '../data/dashboardSnapshot';
-import { computeAdminViewFromBackup, goalsFromBackup } from '../data/adminBackupView';
+import { computeAdminViewFromBackup, goalsFromBackup, getBackupTodayKey } from '../data/adminBackupView';
 import { fetchProfileBackupForAdmin } from '../data/cloudBackup';
 import {
   getAllFeedbackAll, getActivityChartData, getWeeklyEngagement,
@@ -112,7 +112,7 @@ function OverviewTab() {
 
   const load = async () => {
     setLoading(true);
-    const today = getTodayKey();
+    const adminToday = getTodayKey();
     const profiles = getActiveProfiles(true);
 
     // KV backup is the student SoT (same as mobile/desktop sync).
@@ -136,8 +136,10 @@ function OverviewTab() {
     }
 
     const profileStats = await Promise.all(profiles.map(async p => {
-      const todayVisits = await fetchVisitCountForAdmin(p.id, today);
+      const todayVisits = await fetchVisitCountForAdmin(p.id, adminToday);
       const backup = backupById[p.id] ?? null;
+      // Use each profile's calendar today (tz-normalized) — not the admin browser's date.
+      const today = backup ? getBackupTodayKey(backup) : adminToday;
 
       const calculateDayStats = (date: string) => {
         if (backup) {
@@ -442,13 +444,14 @@ function AnalyticsTab() {
   const [backup, setBackup] = useState<Record<string, unknown> | null>(null);
 
   const profile = getOperativeProfiles().find(p => p.id === selectedId)!;
-  const today = getTodayKey();
+  const adminToday = getTodayKey();
 
   useEffect(() => {
-    fetchVisitCountForAdmin(selectedId, today).then(setTodayVisits);
+    fetchVisitCountForAdmin(selectedId, adminToday).then(setTodayVisits);
     fetchProfileBackupForAdmin(selectedId).then(setBackup).catch(() => setBackup(null));
-  }, [selectedId, today]);
+  }, [selectedId, adminToday]);
 
+  const today = backup ? getBackupTodayKey(backup) : adminToday;
   const hourlyData = getActivityChartData(selectedId, today);
   const todayView = computeAdminViewFromBackup(selectedId, backup, today);
   const todayDetail = todayView.hasBackup

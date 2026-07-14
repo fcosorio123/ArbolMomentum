@@ -126,11 +126,11 @@ export function SimplifyTaskModal({
           Simplify for me
         </div>
         <h3 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 800, color: C.headline }}>
-          {reviewing ? 'Pick simpler steps' : QUESTIONS[step]}
+          {reviewing ? 'Pick simpler tasks' : QUESTIONS[step]}
         </h3>
         {!reviewing && (
           <p style={{ margin: '0 0 14px', fontSize: 12, color: C.body, lineHeight: 1.45 }}>
-            Breaking down: <strong>{taskLabel}</strong>
+            Creating easier versions of: <strong>{taskLabel}</strong>
             {goalTitle && <> · goal: {goalTitle}</>}
           </p>
         )}
@@ -170,7 +170,7 @@ export function SimplifyTaskModal({
                 onClick={handleNext}
                 style={{ borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none', background: '#7c3aed' }}
               >
-                {isLastQuestion ? (error ? 'Retry' : 'Generate steps') : 'Next'}
+                {isLastQuestion ? (error ? 'Retry' : 'Suggest simpler tasks') : 'Next'}
               </Button>
             </div>
           </>
@@ -179,7 +179,7 @@ export function SimplifyTaskModal({
         {reviewing && result && (
           <>
             <p style={{ margin: '0 0 14px', fontSize: 12, color: C.body }}>
-              Choose 2–5 smaller tasks to replace the original. You can uncheck any you don&apos;t want.
+              Choose 2–5 simpler tasks to replace the original. Uncheck any you don&apos;t want.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
               {result.tasks.map((t, i) => (

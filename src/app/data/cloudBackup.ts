@@ -6,7 +6,12 @@
 
 import { projectId, publicAnonKey } from '/utils/supabase/info';
 import { getStorageKey } from './environment';
-import { getActiveProfiles, isProfileArchived, applyProfileArchivedFromSync } from './profiles';
+import {
+  getActiveProfiles,
+  isProfileArchived,
+  applyProfileArchivedFromSync,
+  normalizeTzOffsetMinutes,
+} from './profiles';
 import { CALENDAR_PREFS_KEY, CALENDAR_PROVIDER_KEY } from './calendarExport';
 import { buildNudgeSnapshot } from './dashboardSnapshot';
 
@@ -19,28 +24,17 @@ const DELETED_DEFAULT_GOALS_KEY = (profileId: string) => `arbol-deleted-default-
 const LOCAL_CLOUD_AT_KEY = (profileId: string) => `arbol-local-cloud-at-${profileId}`;
 const TZ_OFFSET_KEY = (profileId: string) => `arbol-tz-offset-${profileId}`;
 
-/**
- * Normalize to Date.getTimezoneOffset() minutes (positive west of UTC).
- * Older backups accidentally stored ISO-style negatives (e.g. -480 for Pacific).
- */
-function normalizeTzOffset(offset: number): number {
-  const browser = new Date().getTimezoneOffset();
-  // US/Western devices report positive offsets; flip legacy ISO-style negatives.
-  if (offset < 0 && browser > 0) return -offset;
-  return offset;
-}
-
 export function getStoredTzOffset(profileId: string): number {
   const raw = localStorage.getItem(TZ_OFFSET_KEY(profileId));
   if (raw != null && raw !== '' && !Number.isNaN(Number(raw))) {
-    return normalizeTzOffset(Number(raw));
+    return normalizeTzOffsetMinutes(Number(raw));
   }
   return new Date().getTimezoneOffset();
 }
 
 function persistTzOffset(profileId: string, offset: unknown): void {
   if (typeof offset === 'number' && Number.isFinite(offset)) {
-    localStorage.setItem(TZ_OFFSET_KEY(profileId), String(normalizeTzOffset(offset)));
+    localStorage.setItem(TZ_OFFSET_KEY(profileId), String(normalizeTzOffsetMinutes(offset)));
   }
 }
 

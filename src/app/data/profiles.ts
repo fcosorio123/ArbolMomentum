@@ -1840,11 +1840,22 @@ export function getTodayKey() {
  * (e.g. EST = 300). Used so mobile/desktop streak walks share the profile's home zone.
  */
 export function getDateKeyForTzOffset(date: Date, tzOffsetMinutes: number): string {
-  const shifted = new Date(date.getTime() - tzOffsetMinutes * 60_000);
+  const shifted = new Date(date.getTime() - normalizeTzOffsetMinutes(tzOffsetMinutes) * 60_000);
   const y = shifted.getUTCFullYear();
   const m = String(shifted.getUTCMonth() + 1).padStart(2, '0');
   const d = String(shifted.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+}
+
+/**
+ * Normalize to Date.getTimezoneOffset() minutes (positive west of UTC).
+ * Older backups accidentally stored ISO-style negatives (e.g. -480 for Pacific).
+ */
+export function normalizeTzOffsetMinutes(offset: number): number {
+  if (!Number.isFinite(offset)) return new Date().getTimezoneOffset();
+  // US/Western devices report positive offsets; flip legacy ISO-style negatives.
+  if (offset < 0 && new Date().getTimezoneOffset() > 0) return -offset;
+  return offset;
 }
 
 export function getProfileTodayKey(profileId: string): string {
@@ -1852,9 +1863,7 @@ export function getProfileTodayKey(profileId: string): string {
   try {
     const raw = localStorage.getItem(`arbol-tz-offset-${profileId}`);
     if (raw != null && raw !== '' && !Number.isNaN(Number(raw))) {
-      offset = Number(raw);
-      // Legacy backups used ISO-style negatives (e.g. -480 for Pacific).
-      if (offset < 0 && new Date().getTimezoneOffset() > 0) offset = -offset;
+      offset = normalizeTzOffsetMinutes(Number(raw));
     }
   } catch { /* ignore */ }
   return getDateKeyForTzOffset(new Date(), offset);
@@ -1882,8 +1891,7 @@ export function computeLiveStreak(profileId: string, todayHasActivity = false): 
   try {
     const raw = localStorage.getItem(`arbol-tz-offset-${profileId}`);
     if (raw != null && raw !== '' && !Number.isNaN(Number(raw))) {
-      offset = Number(raw);
-      if (offset < 0 && new Date().getTimezoneOffset() > 0) offset = -offset;
+      offset = normalizeTzOffsetMinutes(Number(raw));
     }
   } catch { /* ignore */ }
 
