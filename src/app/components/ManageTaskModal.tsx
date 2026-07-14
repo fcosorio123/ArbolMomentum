@@ -8,6 +8,7 @@ import {
   PV_LABELS, defaultPotentialValue, normalizePotentialValue,
   type PotentialValue, type PotentialValueScore,
 } from '../data/potentialValue';
+import { ACCENT_MODAL_STYLES, ModalAccentBar } from '../styles/modalChrome';
 
 type ApplyTo = 'this' | 'all';
 
@@ -201,13 +202,10 @@ export function ManageTaskModal({
       centered
       title={null}
       width="min(420px, calc(100vw - 24px))"
-      styles={{
-        content: { borderRadius: 20, padding: 0, overflow: 'hidden' },
-        mask: { backdropFilter: 'blur(4px)' },
-      }}
+      styles={ACCENT_MODAL_STYLES}
     >
-      <div style={{ height: 5, background: `linear-gradient(90deg, #ef4565, #f5a623)` }} />
-      <div style={{ padding: '22px 24px 24px', maxHeight: '85vh', overflowY: 'auto' }}>
+      <ModalAccentBar gradient="linear-gradient(90deg, #ef4565, #f5a623)" />
+      <div style={{ padding: '16px 24px 24px', maxHeight: '85vh', overflowY: 'auto' }}>
         <h3 style={{ margin: '0 0 18px', fontSize: 17, fontWeight: 800, color: C.headline }}>
           {isEdit ? 'Edit Task' : 'Add Task'}
         </h3>

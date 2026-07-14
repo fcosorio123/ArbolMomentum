@@ -134,10 +134,21 @@ export function ruleBasedSimplifyClient(input: SimplifyTaskInput): SimplifiedTas
   const label = input.taskLabel.trim().replace(/\s+/g, ' ');
   const answers = normalizeClientAnswers(input);
   const blob = `${label} ${answers.blocker} ${answers.motivation} ${answers.constraint} ${input.goalTitle ?? ''}`;
+  const labelL = label.toLowerCase();
   const t = blob.toLowerCase();
 
-  const domain =
-    /eat|food|meal|healthy|diet|nutrition|protein|fruit|veg|hydrate|water|cook|snack/.test(t) ? 'eating'
+  const domain: string =
+    /hydrat|drink(?:ing)?\s+(?:enough\s+)?water|water\s+intake|fluids?|\b\d+\s*[–-]?\s*\d*\s*l\b|liter|litre|oz\b.*water|water\b.*(?:day|target|goal)/i.test(labelL)
+      ? 'hydration'
+    : /hydrat|drink(?:ing)?\s+(?:enough\s+)?water|water\s+intake/i.test(t) && !/protein|fruit|meal|snack|breakfast|lunch|dinner|eat\b/i.test(labelL)
+      ? 'hydration'
+    : /eat|food|meal|healthy|diet|nutrition|protein|fruit|veg|cook|snack/.test(labelL) ? 'eating'
+    : /exercise|workout|gym|run|walk|fit|lift|cardio|stretch/.test(labelL) ? 'exercise'
+    : /sleep|bed|wind.?down|rest|insomnia/.test(labelL) ? 'sleep'
+    : /study|homework|read|class|exam|assignment|learn/.test(labelL) ? 'study'
+    : /budget|money|save|spend|bill|expense/.test(labelL) ? 'money'
+    : /clean|laundry|dishes|chore|organize|tid(y|ying)/.test(labelL) ? 'chores'
+    : /eat|food|meal|healthy|diet|nutrition|protein|fruit|veg|cook|snack/.test(t) ? 'eating'
     : /exercise|workout|gym|run|walk|fit|lift|cardio|stretch/.test(t) ? 'exercise'
     : /sleep|bed|wind.?down|rest|insomnia/.test(t) ? 'sleep'
     : /study|homework|read|class|exam|assignment|learn/.test(t) ? 'study'
@@ -150,8 +161,17 @@ export function ruleBasedSimplifyClient(input: SimplifyTaskInput): SimplifiedTas
   const likesTaste = /taste|tasty|enjoy|good|like|delicious/i.test(answers.motivation);
 
   const steps: string[] = [];
-  if (domain === 'eating') {
-    if (/protein|chicken|egg|eggs|tofu|turkey|meat|whey|fish|salmon|tuna|beans?|lentil|greek\s*yogurt|cottage\s*cheese/.test(t)) {
+  if (domain === 'hydration') {
+    steps.push('Drink a full glass of water right now');
+    steps.push('Fill your bottle and keep it where you can see it');
+    steps.push(tightTime
+      ? 'Take 5 sips of water before your next focused block'
+      : 'Drink a glass of water with (or instead of) your next snack craving');
+    steps.push('Set a phone reminder in 90 minutes: drink water');
+    steps.push('Log glasses today — add one more before evening');
+  } else if (domain === 'eating') {
+    if (/protein|chicken|egg|eggs|tofu|turkey|meat|whey|fish|salmon|tuna|beans?|lentil|greek\s*yogurt|cottage\s*cheese/.test(labelL)
+      || /protein|chicken|egg|eggs|tofu|turkey|meat|whey|fish|salmon|tuna/.test(t)) {
       steps.push('Add a clear protein source to your next meal');
       steps.push('Eat eggs, yogurt, chicken, fish, beans, or tofu once today');
       steps.push(tightTime
@@ -161,7 +181,7 @@ export function ruleBasedSimplifyClient(input: SimplifyTaskInput): SimplifiedTas
         ? 'Choose a protein food you actually enjoy and eat a portion of it'
         : 'Include protein at breakfast or the meal you usually skip');
       steps.push('Drink water with that protein meal');
-    } else if (/fruit|apple|banana|berry|orange/.test(t)) {
+    } else if (/fruit|apple|banana|berry|orange/.test(labelL) || /fruit|apple|banana|berry|orange/.test(t)) {
       steps.push('Buy or grab one piece of fruit today');
       steps.push('Eat that fruit with one meal');
       steps.push(likesTaste
@@ -171,7 +191,7 @@ export function ruleBasedSimplifyClient(input: SimplifyTaskInput): SimplifiedTas
         ? 'Drink a full glass of water with your next meal'
         : 'Prep one simple healthy snack for tomorrow');
       steps.push('Swap one processed snack for a whole-food option once');
-    } else if (/veg|vegetable|salad|greens?/.test(t)) {
+    } else if (/veg|vegetable|salad|greens?/.test(labelL) || /veg|vegetable|salad|greens?/.test(t)) {
       steps.push('Add one vegetable to lunch or dinner today');
       steps.push('Prep a ready-to-eat veggie portion for tomorrow');
       steps.push('Eat a simple salad or steamed veg once');

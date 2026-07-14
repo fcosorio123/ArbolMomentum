@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Modal, Input, Button } from 'antd';
 import { C } from '../data/colors';
 import { simplifyTaskFromEdge, type SimplifyTaskResult } from '../data/aiTaskCreation';
+import { ACCENT_MODAL_STYLES, ModalAccentBar } from '../styles/modalChrome';
 
 const { TextArea } = Input;
 
@@ -115,13 +116,10 @@ export function SimplifyTaskModal({
       centered
       width="min(400px, calc(100vw - 24px))"
       destroyOnClose
-      styles={{
-        content: { borderRadius: 20, padding: 0, overflow: 'hidden' },
-        mask: { backdropFilter: 'blur(4px)' },
-      }}
+      styles={ACCENT_MODAL_STYLES}
     >
-      <div style={{ height: 5, background: `linear-gradient(90deg, #7c3aed, #3da9fc)` }} />
-      <div style={{ padding: '22px 24px 24px' }}>
+      <ModalAccentBar gradient="linear-gradient(90deg, #7c3aed, #3da9fc)" />
+      <div style={{ padding: '16px 24px 24px' }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
           Simplify for me
         </div>

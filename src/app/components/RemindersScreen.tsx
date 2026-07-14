@@ -45,6 +45,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
   const [newTime, setNewTime] = useState('09:00');
   const [newDays, setNewDays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
   const [sending, setSending] = useState(false);
+  const [testFeedback, setTestFeedback] = useState<string | null>(null);
   const [enabling, setEnabling] = useState(false);
   const [notifGloballyEnabled, setNotifGloballyEnabled] = useState(() => areNotificationsEnabled());
   const [alertPrefs, setAlertPrefs] = useState<ProfileAlertPrefs>(() => getProfileAlertPrefs(profile.id));
@@ -121,18 +122,51 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
   };
 
   const showTest = async () => {
-    if (!notifGloballyEnabled) { message.warning('Notifications are currently disabled by admin'); return; }
-    if (Notification.permission !== 'granted') { message.warning('Enable notifications first'); return; }
+    setTestFeedback(null);
+    if (!notifGloballyEnabled) {
+      const msg = 'Notifications are currently disabled by admin.';
+      setTestFeedback(msg);
+      message.warning(msg);
+      return;
+    }
+    if (!('Notification' in window)) {
+      const msg = 'This browser does not support notifications.';
+      setTestFeedback(msg);
+      message.error(msg);
+      return;
+    }
+    if (Notification.permission !== 'granted') {
+      const msg = 'Enable notifications first, then tap Test again.';
+      setTestFeedback(msg);
+      message.warning(msg);
+      return;
+    }
     setSending(true);
     const firstName = profile.name.split(' ')[0];
     const title = 'Arbol Momentum 🌿';
-    const body = `Hey ${firstName}! You'll receive morning, midday, and evening funding check-ins — never more than 3 per day.`;
+    const body = `Hey ${firstName}! Test alert from Alerts & Reminders.`;
     try {
-      await showNotification(swRegistration, title, body, 'test');
-      message.success('Test notification sent!');
+      const result = await showNotification(
+        swRegistration,
+        title,
+        body,
+        `test-${Date.now()}`,
+        { skipDedupe: true },
+      );
+      if (result.ok) {
+        const msg = 'Test notification sent — check your system notification tray.';
+        setTestFeedback(msg);
+        message.success(msg);
+      } else {
+        const msg = result.reason ?? 'Could not send test notification.';
+        setTestFeedback(msg);
+        message.error(msg);
+      }
     } catch (err) {
       console.warn('Notification test failed:', err);
-      message.error('Could not send notification — check device settings');
+      const msg = 'Could not send notification — check device settings.';
+      setTestFeedback(msg);
+      message.error(msg);
     }
     setSending(false);
   };
@@ -217,7 +251,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
             </Button>
           )}
           {notifGloballyEnabled && permission === 'granted' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0, alignItems: 'flex-end' }}>
               <Button size="small" icon={<SendOutlined />} onClick={showTest} loading={sending}
                 style={{ background: `${C.primary}15`, border: `1px solid ${C.primary}40`, color: C.primary, borderRadius: 8, fontSize: 12 }}>
                 Test
@@ -237,6 +271,14 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
             </Button>
           )}
         </div>
+        {testFeedback && (
+          <div style={{
+            marginTop: 10, fontSize: 12, lineHeight: 1.4, fontWeight: 600,
+            color: testFeedback.toLowerCase().includes('sent') ? C.primary : C.tertiary,
+          }}>
+            {testFeedback}
+          </div>
+        )}
         {platform.troubleshootingHint && permission !== 'granted' && (
           <div style={{
             marginTop: 12, padding: '10px 12px', borderRadius: 10,

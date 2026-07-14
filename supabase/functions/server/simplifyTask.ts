@@ -51,6 +51,7 @@ export function normalizeSimplifyAnswers(input: SimplifyTaskInput): Required<Sim
 }
 
 type Domain =
+  | "hydration"
   | "eating"
   | "exercise"
   | "sleep"
@@ -59,16 +60,33 @@ type Domain =
   | "chores"
   | "generic";
 
-function detectDomain(text: string): Domain {
-  const t = text.toLowerCase();
-  if (/eat|food|meal|healthy|diet|nutrition|protein|fruit|veg|hydrate|water|cook|snack/.test(t)) {
-    return "eating";
+/** Prefer the task label for topic — goals (e.g. "lose weight") must not override "hydration". */
+function detectDomain(taskLabel: string, contextBlob: string): Domain {
+  const label = taskLabel.toLowerCase();
+  const blob = contextBlob.toLowerCase();
+
+  if (/hydrat|drink(?:ing)?\s+(?:enough\s+)?water|water\s+intake|fluids?|\b\d+\s*[–-]?\s*\d*\s*l\b|liter|litre|oz\b.*water|water\b.*(?:day|target|goal)/i
+    .test(label)) {
+    return "hydration";
   }
-  if (/exercise|workout|gym|run|walk|fit|lift|cardio|stretch/.test(t)) return "exercise";
-  if (/sleep|bed|wind.?down|rest|insomnia/.test(t)) return "sleep";
-  if (/study|homework|read|class|exam|assignment|learn/.test(t)) return "study";
-  if (/budget|money|save|spend|bill|expense/.test(t)) return "money";
-  if (/clean|laundry|dishes|chore|organize|tid(y|ying)/.test(t)) return "chores";
+  if (/hydrat|drink(?:ing)?\s+(?:enough\s+)?water|water\s+intake/i.test(blob)
+    && !/protein|fruit|meal|snack|breakfast|lunch|dinner|eat\b/i.test(label)) {
+    return "hydration";
+  }
+
+  if (/eat|food|meal|healthy|diet|nutrition|protein|fruit|veg|cook|snack/.test(label)) return "eating";
+  if (/exercise|workout|gym|run|walk|fit|lift|cardio|stretch/.test(label)) return "exercise";
+  if (/sleep|bed|wind.?down|rest|insomnia/.test(label)) return "sleep";
+  if (/study|homework|read|class|exam|assignment|learn/.test(label)) return "study";
+  if (/budget|money|save|spend|bill|expense/.test(label)) return "money";
+  if (/clean|laundry|dishes|chore|organize|tid(y|ying)/.test(label)) return "chores";
+
+  if (/eat|food|meal|healthy|diet|nutrition|protein|fruit|veg|cook|snack/.test(blob)) return "eating";
+  if (/exercise|workout|gym|run|walk|fit|lift|cardio|stretch/.test(blob)) return "exercise";
+  if (/sleep|bed|wind.?down|rest|insomnia/.test(blob)) return "sleep";
+  if (/study|homework|read|class|exam|assignment|learn/.test(blob)) return "study";
+  if (/budget|money|save|spend|bill|expense/.test(blob)) return "money";
+  if (/clean|laundry|dishes|chore|organize|tid(y|ying)/.test(blob)) return "chores";
   return "generic";
 }
 
@@ -83,17 +101,27 @@ function mention(haystack: string, re: RegExp): boolean {
 export function ruleBasedSimplify(input: SimplifyTaskInput): SimplifiedTask[] {
   const label = input.taskLabel.trim().replace(/\s+/g, " ");
   const answers = normalizeSimplifyAnswers(input);
+  // Answers + goal are context only — domain is driven primarily by the task label
   const blob = `${label} ${answers.blocker} ${answers.motivation} ${answers.constraint} ${input.goalTitle ?? ""}`;
-  const domain = detectDomain(blob);
+  const domain = detectDomain(label, blob);
   const tightTime = /time|min|busy|rushed|quick|short|structure|overwhelm|vague|big|hard|complicated/i
     .test(`${answers.blocker} ${answers.constraint}`);
   const likesTaste = /taste|tasty|enjoy|good|like|delicious/i.test(answers.motivation);
 
   const steps: string[] = [];
 
-  if (domain === "eating") {
+  if (domain === "hydration") {
+    steps.push("Drink a full glass of water right now");
+    steps.push("Fill your bottle and keep it where you can see it");
+    steps.push(tightTime
+      ? "Take 5 sips of water before your next focused block"
+      : "Drink a glass of water with (or instead of) your next snack craving");
+    steps.push("Set a phone reminder in 90 minutes: drink water");
+    steps.push("Log glasses today — add one more before evening");
+  } else if (domain === "eating") {
     // Anchor to original task keywords first (protein > fruit > veg > generic)
-    if (mention(blob, /protein|chicken|egg|eggs|tofu|turkey|meat|whey|fish|salmon|tuna|beans?|lentil|greek\s*yogurt|cottage\s*cheese/)) {
+    if (mention(label, /protein|chicken|egg|eggs|tofu|turkey|meat|whey|fish|salmon|tuna|beans?|lentil|greek\s*yogurt|cottage\s*cheese/)
+      || mention(blob, /protein|chicken|egg|eggs|tofu|turkey|meat|whey|fish|salmon|tuna/)) {
       steps.push("Add a clear protein source to your next meal");
       steps.push("Eat eggs, yogurt, chicken, fish, beans, or tofu once today");
       steps.push(tightTime
@@ -103,7 +131,7 @@ export function ruleBasedSimplify(input: SimplifyTaskInput): SimplifiedTask[] {
         ? "Choose a protein food you actually enjoy and eat a portion of it"
         : "Include protein at breakfast or the meal you usually skip");
       steps.push("Drink water with that protein meal");
-    } else if (mention(blob, /fruit|apple|banana|berry|orange/)) {
+    } else if (mention(label, /fruit|apple|banana|berry|orange/) || mention(blob, /fruit|apple|banana|berry|orange/)) {
       steps.push("Buy or grab one piece of fruit today");
       steps.push("Eat that fruit with one meal");
       steps.push(likesTaste
@@ -113,7 +141,7 @@ export function ruleBasedSimplify(input: SimplifyTaskInput): SimplifiedTask[] {
         ? "Drink a full glass of water with your next meal"
         : "Prep one simple healthy snack for tomorrow");
       steps.push("Swap one processed snack for a whole-food option once");
-    } else if (mention(blob, /veg|vegetable|salad|greens?/)) {
+    } else if (mention(label, /veg|vegetable|salad|greens?/) || mention(blob, /veg|vegetable|salad|greens?/)) {
       steps.push("Add one vegetable to lunch or dinner today");
       steps.push("Prep a ready-to-eat veggie portion for tomorrow");
       steps.push("Eat a simple salad or steamed veg once");
@@ -240,7 +268,7 @@ async function callOpenAi(input: SimplifyTaskInput): Promise<SimplifiedTask[] | 
               'Simplify an overwhelming task into 2–5 TINY, concrete checklist actions the user can do today. Return JSON only: {"tasks":[{"label":"...","timeOfDay":"morning|evening"}]}. '
               + "Rules: (1) Labels must be real doable actions (Buy one apple, Walk 10 minutes, Drink a glass of water) — never meta wording. "
               + "(2) NEVER output templates like \"5-min start:\", \"Easiest piece of…\", \"note win:\", \"skip:\", or paste the user's answers into the task. "
-              + "(3) Stay anchored to the ORIGINAL task keywords — if they said protein / workout / study, every suggestion must clearly involve that topic (do not invent unrelated food like fruit when the task was about protein). "
+              + "(3) Stay anchored to the ORIGINAL task keywords only — if the task is hydration/water, every suggestion must be about drinking water (never switch to food/fruit). If protein, stay on protein. Do not invent a different topic because the goal title mentions weight loss or health. "
               + "(4) Prefer under-10-minute actions. Labels max 120 chars. Always return at least 2 tasks.",
           },
           { role: "user", content: context },

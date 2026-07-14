@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Modal, Input, Button } from 'antd';
 import { C } from '../data/colors';
 import type { PersonalGoal } from '../data/personalGoals';
+import { ACCENT_MODAL_STYLES, ModalAccentBar } from '../styles/modalChrome';
 
 interface Props {
   open: boolean;
@@ -40,13 +41,10 @@ export function ManageGoalModal({ open, goal, onSave, onCancel, onOpenAiAssist }
       title={null}
       width="min(400px, calc(100vw - 24px))"
       destroyOnClose
-      styles={{
-        content: { borderRadius: 20, padding: 0, overflow: 'hidden' },
-        mask: { backdropFilter: 'blur(4px)' },
-      }}
+      styles={ACCENT_MODAL_STYLES}
     >
-      <div style={{ height: 5, background: `linear-gradient(90deg, ${C.primary}, #3da9fc)` }} />
-      <div style={{ padding: '22px 24px 24px' }}>
+      <ModalAccentBar gradient={`linear-gradient(90deg, ${C.primary}, #3da9fc)`} />
+      <div style={{ padding: '16px 24px 24px' }}>
         {!isEdit && step === 'choose' && onOpenAiAssist ? (
           <>
             <h3 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 800, color: C.headline }}>

@@ -18,16 +18,30 @@ function shouldSuppress(tag: string): boolean {
   return false;
 }
 
+export type ShowNotificationResult = {
+  ok: boolean;
+  reason?: string;
+};
+
 export async function showNotification(
   swReg: ServiceWorkerRegistration | null,
   title: string,
   body: string,
   tag: string,
-  options?: { badgeCount?: number; url?: string },
-) {
-  if (!areNotificationsEnabled()) return;
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  if (shouldSuppress(tag)) return;
+  options?: { badgeCount?: number; url?: string; skipDedupe?: boolean },
+): Promise<ShowNotificationResult> {
+  if (!areNotificationsEnabled()) {
+    return { ok: false, reason: 'Notifications are turned off in admin settings.' };
+  }
+  if (!('Notification' in window)) {
+    return { ok: false, reason: 'This browser does not support notifications.' };
+  }
+  if (Notification.permission !== 'granted') {
+    return { ok: false, reason: 'Notification permission is not granted.' };
+  }
+  if (!options?.skipDedupe && shouldSuppress(tag)) {
+    return { ok: false, reason: 'A similar notification was just sent — wait a moment and try again.' };
+  }
 
   const payload = {
     type: 'SHOW' as const,
@@ -39,13 +53,24 @@ export async function showNotification(
   };
 
   try {
+    // Prefer the native Notification API for Test / explicit user actions —
+    // SW postMessage alone is easy to miss and silent when the worker is idle.
+    if (options?.skipDedupe || tag.startsWith('test')) {
+      new Notification(title, { body, tag, icon: NOTIF_ICON });
+      return { ok: true };
+    }
+
     if ('serviceWorker' in navigator) {
       const reg = swReg ?? (await navigator.serviceWorker.ready);
       if (reg?.active) {
         reg.active.postMessage(payload);
-        return;
+        return { ok: true };
       }
     }
     new Notification(title, { body, tag, icon: NOTIF_ICON });
-  } catch { /* ignore */ }
+    return { ok: true };
+  } catch (err) {
+    console.warn('[Notification] show failed:', err);
+    return { ok: false, reason: 'Could not display the notification — check system notification settings.' };
+  }
 }

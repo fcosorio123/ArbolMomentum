@@ -4,6 +4,7 @@ import type { TaskStatus } from '../data/profiles';
 import { TaskStatusSelector, type TaskUpdateStatus } from './TaskStatusSelector';
 import { getTaskNote } from '../data/liveCheckInFeedback';
 import { C } from '../data/colors';
+import { ACCENT_MODAL_STYLES, ModalAccentBar } from '../styles/modalChrome';
 
 const REFLECTION_CHIPS = [
   'Felt energized',
@@ -69,12 +70,12 @@ export function TaskUpdateModal({
       destroyOnClose
       width="min(420px, calc(100vw - 24px))"
       styles={{
-        content: { borderRadius: 16, padding: 0, overflow: 'hidden' },
+        ...ACCENT_MODAL_STYLES,
         mask: { backdropFilter: 'blur(4px)', background: 'rgba(9,64,103,0.4)' },
       }}
     >
-      <div style={{ height: 4, background: `linear-gradient(90deg, ${C.primary}, #1a6da8)` }} />
-      <div style={{ padding: '18px 20px 20px', maxHeight: 'min(85vh, 640px)', overflowY: 'auto' }}>
+      <ModalAccentBar gradient={`linear-gradient(90deg, ${C.primary}, #1a6da8)`} />
+      <div style={{ padding: '14px 20px 20px', maxHeight: 'min(85vh, 640px)', overflowY: 'auto' }}>
         {context.goalTitle && (
           <div style={{
             background: `${C.primary}08`, border: `1px solid ${C.primary}22`,

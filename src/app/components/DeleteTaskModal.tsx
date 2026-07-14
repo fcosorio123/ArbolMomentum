@@ -1,5 +1,6 @@
-import { Button, Modal } from 'antd';
+import { Modal, Button } from 'antd';
 import { C } from '../data/colors';
+import { ACCENT_MODAL_STYLES } from '../styles/modalChrome';
 
 export type DeleteTaskChoice = 'today' | 'forever';
 
@@ -36,12 +37,10 @@ export function DeleteTaskModal({
       closable
       centered
       width="min(360px, calc(100vw - 24px))"
-      styles={{
-        content: { borderRadius: 16, padding: 0, overflow: 'hidden' },
-        mask: { backdropFilter: 'blur(4px)' },
-      }}
+      styles={ACCENT_MODAL_STYLES}
     >
-      <div style={{ padding: '20px 20px 18px' }}>
+      <div aria-hidden style={{ height: 32 }} />
+      <div style={{ padding: '0 20px 18px' }}>
         <h3 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 800, color: C.headline }}>
           Delete task?
         </h3>

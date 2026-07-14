@@ -4,6 +4,7 @@ import { ArrowLeftOutlined } from '@ant-design/icons';
 import { C } from '../data/colors';
 import { parseContextTasksFromEdge, type ParseContextSource } from '../data/aiTaskCreation';
 import { recurrenceSummary, type SeedSuggestionGroup } from '../data/profileSeedParser';
+import { ACCENT_MODAL_STYLES, ModalAccentBar } from '../styles/modalChrome';
 
 const { TextArea } = Input;
 
@@ -291,13 +292,10 @@ export function ContextAssistModal({ open, onClose, mode, existingGoals = [], on
       centered
       width="min(420px, calc(100vw - 24px))"
       destroyOnClose
-      styles={{
-        content: { borderRadius: 20, padding: 0, overflow: 'hidden' },
-        mask: { backdropFilter: 'blur(4px)' },
-      }}
+      styles={ACCENT_MODAL_STYLES}
     >
-      <div style={{ height: 5, background: `linear-gradient(90deg, ${C.primary}, #1a6da8)` }} />
-      <div style={{ padding: '20px 22px 18px' }}>
+      <ModalAccentBar gradient={`linear-gradient(90deg, ${C.primary}, #1a6da8)`} />
+      <div style={{ padding: '16px 22px 18px' }}>
         {step === 'kind' && (
           <>
             <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, color: C.headline }}>
