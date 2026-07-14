@@ -6,12 +6,14 @@ import {
   BarChart, Bar, LineChart, Line,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
-import { getActiveProfiles, getTodayKey, getDateKey, computeLiveStreak, computeBestStreak, hasActivityOnDate, isProfileArchived, setProfileArchived } from '../data/profiles';
+import { getActiveProfiles, getTodayKey, getDateKey, computeBestStreak, isProfileArchived, setProfileArchived } from '../data/profiles';
 import { OpsTab } from './admin/OpsTab';
 import {
   computeDayStatsFromPersisted,
   buildRemoteDayOverlay,
 } from '../data/dashboardSnapshot';
+import { computeAdminViewFromBackup, goalsFromBackup } from '../data/adminBackupView';
+import { fetchProfileBackupForAdmin } from '../data/cloudBackup';
 import {
   getAllFeedbackAll, getActivityChartData, getWeeklyEngagement,
   generateInsight, RATING_EMOJIS, type FeedbackEntry,
@@ -111,88 +113,92 @@ function OverviewTab() {
   const load = async () => {
     setLoading(true);
     const today = getTodayKey();
+    const profiles = getActiveProfiles(true);
 
-    // If published, fetch from Supabase for accurate cross-user data
+    // KV backup is the student SoT (same as mobile/desktop sync).
+    const backups = await Promise.all(
+      profiles.map(async p => ({
+        id: p.id,
+        backup: await fetchProfileBackupForAdmin(p.id).catch(() => null),
+      })),
+    );
+    const backupById = Object.fromEntries(backups.map(b => [b.id, b.backup]));
+
+    let completions: Awaited<ReturnType<typeof fetchAllTaskCompletions>> = [];
+    let deletions: Awaited<ReturnType<typeof fetchAllTaskDeletions>> = [];
     if (isPublishedVersion()) {
       try {
-        const completions = await fetchAllTaskCompletions();
-        const deletions = await fetchAllTaskDeletions();
-
-        const profileStats = await Promise.all(getActiveProfiles(true).map(async p => {
-          const todayVisits = await fetchVisitCountForAdmin(p.id, today);
-
-          const calculateDayStats = (date: string) => {
-            const overlay = buildRemoteDayOverlay(p.id, date, completions, deletions);
-            return computeDayStatsFromPersisted(p.id, date, overlay);
-          };
-
-          const todayDetail = calculateDayStats(today);
-
-          // Calculate week stats
-          const weekDays = DAYS_SHORT.map(day => {
-            const date = getDateForWeekday(day);
-            const stats = calculateDayStats(date);
-            return { day, date, ...stats };
-          });
-
-          const weekAvg = weekDays.length > 0
-            ? Math.round(weekDays.reduce((s, d) => s + d.pct, 0) / weekDays.length)
-            : 0;
-
-          // Calculate previous week for comparison
-          const prevWeekDays = DAYS_SHORT.map((day, idx) => {
-            const d = new Date();
-            d.setDate(d.getDate() - (6 - idx) - 7); // Go back 7 more days
-            const date = getDateKey(d);
-            const stats = calculateDayStats(date);
-            return { day, date, done: stats.done, total: stats.total, pct: stats.pct };
-          });
-
-          const prevWeekAvg = prevWeekDays.length > 0
-            ? Math.round(prevWeekDays.reduce((s, d) => s + d.pct, 0) / prevWeekDays.length)
-            : 0;
-
-          return { ...p, todayVisits, todayDetail, weekDays, weekAvg, prevWeekDays, prevWeekAvg, liveStreak: computeLiveStreak(p.id, hasActivityOnDate(p.id, today)) };
-        }));
-
-        setStats(profileStats);
+        completions = await fetchAllTaskCompletions();
+        deletions = await fetchAllTaskDeletions();
       } catch (error) {
-        console.error('Failed to fetch Supabase data:', error);
-        // Fallback to localStorage
-        await loadFromLocalStorage();
+        console.error('Failed to fetch Supabase completions (using backup only):', error);
       }
-    } else {
-      await loadFromLocalStorage();
     }
 
-    setLoading(false);
-  };
-
-  const loadFromLocalStorage = async () => {
-    const today = getTodayKey();
-    const profileStats = await Promise.all(getActiveProfiles(true).map(async p => {
+    const profileStats = await Promise.all(profiles.map(async p => {
       const todayVisits = await fetchVisitCountForAdmin(p.id, today);
-      const todayDetail = computeDayStatsFromPersisted(p.id, today);
+      const backup = backupById[p.id] ?? null;
+
+      const calculateDayStats = (date: string) => {
+        if (backup) {
+          const overlay = isPublishedVersion()
+            ? buildRemoteDayOverlay(p.id, date, completions, deletions)
+            : undefined;
+          return computeAdminViewFromBackup(p.id, backup, date, overlay).dayStats;
+        }
+        // Dev / no backup yet: local fallback for this admin browser only
+        return computeDayStatsFromPersisted(p.id, date);
+      };
+
+      const todayView = backup
+        ? computeAdminViewFromBackup(
+          p.id,
+          backup,
+          today,
+          isPublishedVersion() ? buildRemoteDayOverlay(p.id, today, completions, deletions) : undefined,
+        )
+        : null;
+
+      const todayDetail = todayView?.dayStats ?? calculateDayStats(today);
 
       const weekDays = DAYS_SHORT.map(day => {
         const date = getDateForWeekday(day);
-        const detail = computeDayStatsFromPersisted(p.id, date);
-        return { day, date, ...detail };
+        const stats = calculateDayStats(date);
+        return { day, date, ...stats };
       });
-      const weekAvg = Math.round(weekDays.reduce((s, d) => s + d.pct, 0) / weekDays.length);
+
+      const weekAvg = weekDays.length > 0
+        ? Math.round(weekDays.reduce((s, d) => s + d.pct, 0) / weekDays.length)
+        : 0;
 
       const prevWeekDays = DAYS_SHORT.map((day, idx) => {
         const d = new Date();
         d.setDate(d.getDate() - (6 - idx) - 7);
         const date = getDateKey(d);
-        const detail = computeDayStatsFromPersisted(p.id, date);
-        return { day, date, ...detail };
+        const stats = calculateDayStats(date);
+        return { day, date, done: stats.done, total: stats.total, pct: stats.pct };
       });
-      const prevWeekAvg = Math.round(prevWeekDays.reduce((s, d) => s + d.pct, 0) / prevWeekDays.length);
 
-      return { ...p, todayVisits, todayDetail, weekDays, weekAvg, prevWeekDays, prevWeekAvg, liveStreak: computeLiveStreak(p.id, hasActivityOnDate(p.id, today)) };
+      const prevWeekAvg = prevWeekDays.length > 0
+        ? Math.round(prevWeekDays.reduce((s, d) => s + d.pct, 0) / prevWeekDays.length)
+        : 0;
+
+      return {
+        ...p,
+        todayVisits,
+        todayDetail,
+        weekDays,
+        weekAvg,
+        prevWeekDays,
+        prevWeekAvg,
+        liveStreak: todayView?.liveStreak ?? 0,
+        checkedIn: todayView?.checkedIn ?? false,
+        hasBackup: !!backup,
+      };
     }));
+
     setStats(profileStats);
+    setLoading(false);
   };
 
   useEffect(() => { load(); const iv = setInterval(load, 30000); return () => clearInterval(iv); }, []);
@@ -275,7 +281,13 @@ function OverviewTab() {
                 {isProfileArchived(p.id) ? 'Restore' : 'Archive'}
               </button>
               <FireOutlined style={{ color: C.streak, fontSize: 13 }} />
-              <span style={{ color: C.streak, fontWeight: 800, fontSize: 16 }}>{p.liveStreak ?? computeLiveStreak(p.id)}</span>
+              <span style={{ color: C.streak, fontWeight: 800, fontSize: 16 }}>{p.liveStreak ?? 0}</span>
+              {p.checkedIn && (
+                <span style={{ fontSize: 10, fontWeight: 700, color: C.primary, marginLeft: 4 }}>Checked in</span>
+              )}
+              {!p.hasBackup && (
+                <span style={{ fontSize: 9, color: C.secondary, marginLeft: 4 }} title="No cloud backup yet">No sync</span>
+              )}
             </div>
           </div>
 
@@ -427,18 +439,28 @@ function AnalyticsTab() {
   const [engagementData, setEngagementData] = useState<EngagementData[]>([]);
   const [loading, setLoading] = useState(false);
   const [todayVisits, setTodayVisits] = useState(0);
+  const [backup, setBackup] = useState<Record<string, unknown> | null>(null);
 
   const profile = getOperativeProfiles().find(p => p.id === selectedId)!;
   const today = getTodayKey();
 
   useEffect(() => {
     fetchVisitCountForAdmin(selectedId, today).then(setTodayVisits);
+    fetchProfileBackupForAdmin(selectedId).then(setBackup).catch(() => setBackup(null));
   }, [selectedId, today]);
 
   const hourlyData = getActivityChartData(selectedId, today);
-  const todayDetail = computeDayStatsFromPersisted(selectedId, today);
-  const liveStreak = computeLiveStreak(selectedId, hasActivityOnDate(selectedId, today));
-  const bestStreak = Math.max(computeBestStreak(selectedId), liveStreak, profile.bestStreak);
+  const todayView = computeAdminViewFromBackup(selectedId, backup, today);
+  const todayDetail = todayView.hasBackup
+    ? todayView.dayStats
+    : computeDayStatsFromPersisted(selectedId, today);
+  const liveStreak = todayView.hasBackup ? todayView.liveStreak : 0;
+  const bestStreak = Math.max(
+    Number((backup?.streakBest as { daily?: number } | undefined)?.daily) || 0,
+    computeBestStreak(selectedId),
+    liveStreak,
+    profile.bestStreak,
+  );
 
   // Peak hour
   const allHours: number[] = JSON.parse(localStorage.getItem(`arbol-activity-${selectedId}-${today}`) || '[]') || [];
@@ -547,7 +569,7 @@ function AnalyticsTab() {
     setLoading(false);
   };
 
-  // Helper: Get daily engagement data from Supabase
+  // Helper: Get daily engagement data from backup (+ optional SQL overlay)
   const getDailyEngagementData = (startDate: string, endDate: string, completions: any[], deletions: any[]): EngagementData[] => {
     const data: EngagementData[] = [];
     const start = new Date(startDate);
@@ -556,7 +578,9 @@ function AnalyticsTab() {
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dateStr = getDateKey(d);
       const overlay = buildRemoteDayOverlay(selectedId, dateStr, completions, deletions);
-      const detail = computeDayStatsFromPersisted(selectedId, dateStr, overlay);
+      const detail = backup
+        ? computeAdminViewFromBackup(selectedId, backup, dateStr, overlay).dayStats
+        : computeDayStatsFromPersisted(selectedId, dateStr, overlay);
 
       data.push({
         date: dateStr,
@@ -594,7 +618,9 @@ function AnalyticsTab() {
       for (let d = new Date(weekStart); d <= new Date(weekEndStr); d.setDate(d.getDate() + 1)) {
         const dateStr = getDateKey(d);
         const overlay = buildRemoteDayOverlay(selectedId, dateStr, completions, deletions);
-        const detail = computeDayStatsFromPersisted(selectedId, dateStr, overlay);
+        const detail = backup
+          ? computeAdminViewFromBackup(selectedId, backup, dateStr, overlay).dayStats
+          : computeDayStatsFromPersisted(selectedId, dateStr, overlay);
 
         totalPct += detail.pct;
         weekDone += detail.done;
@@ -690,7 +716,7 @@ function AnalyticsTab() {
 
     const avgCompletion = Math.round(engagementData.reduce((sum, d) => sum + d.pct, 0) / engagementData.length);
     const totalCompletions = engagementData.reduce((sum, d) => sum + d.done, 0);
-    const activeDays = engagementData.filter(d => hasActivityOnDate(selectedId, d.date)).length;
+    const activeDays = engagementData.filter(d => d.done > 0 || d.pct > 0).length;
     const peakDay = engagementData.reduce((max, d) => d.pct > max.pct ? d : max, engagementData[0]);
 
     // Calculate trend (comparing first half vs second half)
@@ -1527,14 +1553,17 @@ function PersonalGoalsTab() {
       setLogs(localLogs);
     }
 
-    // Load all goals from all profiles
+    // Load goal titles from each student's KV backup (not admin-local storage)
     const goalMap: Record<string, PersonalGoal> = {};
-    getOperativeProfiles().forEach(profile => {
-      const goals = getPersonalGoals(profile.id);
-      goals.forEach(goal => {
-        goalMap[goal.id] = goal;
-      });
-    });
+    await Promise.all(getOperativeProfiles().map(async profile => {
+      const backup = await fetchProfileBackupForAdmin(profile.id).catch(() => null);
+      const goals = goalsFromBackup(backup);
+      if (goals.length === 0) {
+        getPersonalGoals(profile.id).forEach(goal => { goalMap[goal.id] = goal; });
+      } else {
+        goals.forEach(goal => { goalMap[goal.id] = goal; });
+      }
+    }));
     setAllGoals(goalMap);
     setLoading(false);
   };

@@ -4,7 +4,7 @@ import { DeleteOutlined, CheckCircleFilled, PlayCircleOutlined, EditOutlined, Pl
 import {
   type Profile, type Task, type TaskStatus,
   getTaskCategoriesForProfile, getTaskStatus,
-  skipTaskForToday, permanentlyHideSeedTask, getTodayKey, getPermanentlyHiddenSeedTaskIds,
+  skipTaskForToday, permanentlyHideSeedTask, permanentlyHideSeedTasksByLabel, getTodayKey, getPermanentlyHiddenSeedTaskIds,
   getEarnedBadges, type Badge, isFreshProfile,
 } from '../data/profiles';
 import { isUserDefinedProfile } from '../data/customProfiles';
@@ -32,7 +32,16 @@ import { SimplifyTaskModal } from './SimplifyTaskModal';
 import { DeleteTaskModal, type DeleteTaskChoice } from './DeleteTaskModal';
 import { TasksMonthView } from './TasksMonthView';
 import { C } from '../data/colors';
-import { PV_LABELS } from '../data/potentialValue';
+import { getDisplayPotentialValue } from '../data/potentialValue';
+import {
+  mergeSeedForProfile,
+  seedAsEditableUserTask,
+  setSeedOverride,
+  getSeedOverride,
+  applySeedOverride,
+  clearSeedOverride,
+  type SeedTaskOverride,
+} from '../data/seedOverrides';
 import { touchIconButton, touchPrimaryButton, MIN_TOUCH } from '../styles/touchTargets';
 import type { SeedSuggestionGroup } from '../data/profileSeedParser';
 import { trackActivity } from '../data/feedback';
@@ -68,6 +77,7 @@ type UserTask_ = Task & {
   isUserCreated?: boolean;
   recurrence?: Recurrence;
   potentialValue?: UserTask['potentialValue'];
+  description?: string;
   archivedAt?: number;
   scheduleLabel?: string;
   goalId?: string;
@@ -87,6 +97,25 @@ function loadTaskView(profileId: string): TaskViewMode {
 
 function isRecurringUT(task: UserTask): boolean {
   return !!task.recurrence && task.recurrence.type !== 'daily' && task.recurrence.type !== 'one-time';
+}
+
+function pvEqual(
+  a?: UserTask['potentialValue'] | null,
+  b?: UserTask['potentialValue'] | null,
+): boolean {
+  const da = a ? getDisplayPotentialValue(a) : null;
+  const db = b ? getDisplayPotentialValue(b) : null;
+  if (!da && !db) return true;
+  if (!da || !db) return false;
+  return da.score === db.score;
+}
+
+function recurrenceEqual(a?: Recurrence, b?: Recurrence): boolean {
+  const na = !a || a.type === 'daily' ? undefined : a;
+  const nb = !b || b.type === 'daily' ? undefined : b;
+  if (!na && !nb) return true;
+  if (!na || !nb) return false;
+  return JSON.stringify(na) === JSON.stringify(nb);
 }
 
 const STATUS_META: Record<TaskStatus, { label: string; dot: string; color: string }> = {
@@ -195,14 +224,21 @@ function TaskItem({
           {scheduleText && (
             <span style={{ marginLeft: 8 }}>· {scheduleText}</span>
           )}
-          {task.potentialValue && (
-            <span style={{
-              marginLeft: 8, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 5,
-              background: `${C.primary}15`, color: C.primary,
-            }}>
-              {PV_LABELS[task.potentialValue.score]}
-            </span>
-          )}
+          {(() => {
+            const pv = getDisplayPotentialValue(task.potentialValue);
+            return (
+              <span
+                style={{
+                  marginLeft: 8, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 5,
+                  background: `${C.primary}15`, color: C.primary,
+                }}
+                title={`Potential Value: ${pv.label}`}
+                aria-label={`Potential Value: ${pv.label}`}
+              >
+                PV: {pv.label}
+              </span>
+            );
+          })()}
         </div>
         {statusLocked && (
           <div style={{ fontSize: 10, color: C.tertiary, marginTop: 4, fontWeight: 600 }}>
@@ -572,7 +608,13 @@ function GoalGroup({
               onOpenUpdate={() => onOpenUpdate(task, goal, doneTasks, totalTasks)}
               onDelete={() => onDelete(task)}
               onEdit={() => onEditTask(task)}
-              onSimplify={task.isUserCreated && onSimplifyTask ? () => onSimplifyTask(task, goal) : undefined}
+              onSimplify={
+                onSimplifyTask
+                && (statuses[task.id] ?? null) !== 'done'
+                && (statuses[task.id] ?? null) !== 'skipped'
+                  ? () => onSimplifyTask(task, goal)
+                  : undefined
+              }
               onArchive={task.isUserCreated && onArchiveTask && !task.archivedAt ? () => onArchiveTask(task) : undefined}
               onRestore={task.isUserCreated && onRestoreTask && task.archivedAt ? () => onRestoreTask(task) : undefined}
             />
@@ -860,13 +902,12 @@ export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDa
       setEditingTask(existingUserTask);
       setEditingSeedTaskId(null);
     } else {
-      // Seed task - build a fake UserTask to pre-populate modal
-      setEditingTask({
-        id: task.id, profileId: profile.id,
-        label: task.label, timeOfDay: task.timeOfDay, type: task.type,
-        goalId: currentGoalId ?? getPrimaryGoalIdForTask(profile.id, task.id),
-        createdAt: 0,
-      } as UserTask);
+      const merged = mergeSeedForProfile(profile.id, task);
+      setEditingTask(seedAsEditableUserTask(
+        profile.id,
+        merged,
+        currentGoalId ?? getPrimaryGoalIdForTask(profile.id, task.id),
+      ));
       setEditingSeedTaskId(task.id);
     }
     setManageTaskOpen(true);
@@ -890,28 +931,45 @@ export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDa
 
     const seedId = resolveSeedId();
     const isNewTask = !editingTask && !seedId;
-    let didSeedConversion = false;
 
     if (seedId) {
       const seedTask = categories.flatMap(c => c.tasks).find(t => t.id === seedId);
-      const onlyGoalAssignment = seedTask
-        && taskData.label.trim() === seedTask.label
-        && taskData.timeOfDay === seedTask.timeOfDay
-        && taskData.type === seedTask.type
-        && !taskData.recurrence;
+      if (!seedTask) {
+        setManageTaskOpen(false);
+        setEditingTask(null);
+        setEditingSeedTaskId(null);
+        return;
+      }
+      const merged = applySeedOverride(seedTask, getSeedOverride(profile.id, seedId));
+      const onlyGoalAssignment =
+        taskData.label.trim() === merged.label
+        && taskData.timeOfDay === merged.timeOfDay
+        && (taskData.description?.trim() || '') === (merged.description?.trim() || '')
+        && pvEqual(taskData.potentialValue, merged.potentialValue)
+        && recurrenceEqual(taskData.recurrence, merged.recurrence)
+        && taskData.type === merged.type;
 
       if (onlyGoalAssignment && taskData.goalId) {
         setPrimaryGoalLinkForTask(profile.id, seedId, taskData.goalId);
-        setEditingSeedTaskId(null);
       } else if (onlyGoalAssignment && !taskData.goalId) {
         clearUserGoalLinksForTask(profile.id, seedId);
-        setEditingSeedTaskId(null);
       } else {
-        createUserTask(profile.id, { ...taskData, sourceSeedTaskId: seedId });
-        permanentlyHideSeedTask(profile.id, seedId);
-        setEditingSeedTaskId(null);
-        didSeedConversion = true;
+        const override: SeedTaskOverride = {
+          label: taskData.label.trim(),
+          timeOfDay: taskData.timeOfDay,
+          type: seedTask.type,
+          description: taskData.description,
+          potentialValue: taskData.potentialValue,
+          recurrence: taskData.recurrence,
+        };
+        setSeedOverride(profile.id, seedId, override);
+        if (taskData.goalId) {
+          setPrimaryGoalLinkForTask(profile.id, seedId, taskData.goalId);
+        } else {
+          clearUserGoalLinksForTask(profile.id, seedId);
+        }
       }
+      setEditingSeedTaskId(null);
     } else if (editingTask) {
       const existing = userTasks.find(u => u.id === editingTask.id);
       if (!existing) {
@@ -936,7 +994,7 @@ export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDa
     loadState();
 
     // Show congrat modal for new task creation (not edits)
-    if (isNewTask || didSeedConversion) {
+    if (isNewTask) {
       const linkedGoal = goals.find(g => g.id === taskData.goalId);
       setCongratTask({
         label: taskData.label,
@@ -987,6 +1045,7 @@ export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDa
       }
       if (!goal) return;
       group.tasks.forEach(task => {
+        if (task.label.trim().toLowerCase() === goal!.title.trim().toLowerCase()) return;
         createUserTask(profile.id, {
           label: task.label,
           timeOfDay: task.timeOfDay,
@@ -1005,15 +1064,37 @@ export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDa
   const handleSimplifyConfirm = (replacements: Array<{ label: string; timeOfDay: 'morning' | 'evening' }>) => {
     if (!simplifyTarget) return;
     const { task, goal } = simplifyTarget;
-    const existing = userTasks.find(u => u.id === task.id);
-    if (!existing) return;
+    let existing = userTasks.find(u => u.id === task.id);
+
+    if (!existing) {
+      // Promote seed → user task once, hide all same-label day siblings
+      const seed = categories.flatMap(c => c.tasks).find(t => t.id === task.id);
+      const merged = seed
+        ? applySeedOverride(seed, getSeedOverride(profile.id, task.id))
+        : null;
+      const sourceLabel = merged?.label ?? task.label;
+      existing = createUserTask(profile.id, {
+        label: sourceLabel,
+        timeOfDay: merged?.timeOfDay ?? task.timeOfDay,
+        type: (goal ? 'goal' : (merged?.type ?? task.type)) as UserTask['type'],
+        goalId: goal?.id ?? task.goalId ?? getPrimaryGoalIdForTask(profile.id, task.id),
+        description: merged?.description,
+        potentialValue: getDisplayPotentialValue(merged?.potentialValue ?? task.potentialValue),
+        recurrence: merged?.recurrence,
+        sourceSeedTaskId: task.id,
+      });
+      permanentlyHideSeedTasksByLabel(profile.id, sourceLabel);
+      clearSeedOverride(profile.id, task.id);
+    }
+
     replacements.forEach(rep => {
       createUserTask(profile.id, {
         label: rep.label,
         timeOfDay: rep.timeOfDay,
-        type: goal ? 'goal' : existing.type,
-        goalId: goal?.id ?? existing.goalId,
-        sourceSimplifiedFrom: existing.id,
+        type: goal ? 'goal' : existing!.type,
+        goalId: goal?.id ?? existing!.goalId,
+        potentialValue: getDisplayPotentialValue(existing!.potentialValue),
+        sourceSimplifiedFrom: existing!.id,
       });
     });
     deleteUserTask(profile.id, existing.id);
@@ -1042,7 +1123,12 @@ export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDa
     cat.tasks.forEach(t => {
       if (shouldSkipSeedTask(t.id)) return;
       if (userTaskIds.has(t.id)) return;
-      const taskObj: UserTask_ = { ...t, scheduleLabel: 'Daily' };
+      const merged = mergeSeedForProfile(profile.id, t);
+      const taskObj: UserTask_ = {
+        ...merged,
+        potentialValue: getDisplayPotentialValue(merged.potentialValue),
+        scheduleLabel: merged.recurrence ? recurrenceLabel(merged.recurrence) : 'Daily',
+      };
       const effectiveGoalId = getPrimaryGoalIdForTask(profile.id, t.id, cat.goalId);
       if (effectiveGoalId && goalTaskMap[effectiveGoalId] !== undefined) {
         goalTaskMap[effectiveGoalId].push(taskObj);
@@ -1057,7 +1143,7 @@ export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDa
     const taskObj: UserTask_ = {
       id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, type: ut.type,
       category: 'user', isUserCreated: true, recurrence: ut.recurrence,
-      potentialValue: ut.potentialValue,
+      potentialValue: getDisplayPotentialValue(ut.potentialValue),
       scheduleLabel: recurrenceLabel(ut.recurrence),
       goalId: ut.goalId,
     };
@@ -1299,7 +1385,11 @@ export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDa
                 onOpenUpdate={() => openTaskUpdate(task)}
                 onDelete={() => openDeleteTask(task)}
                 onEdit={() => handleEditAnyTask(task, undefined)}
-                onSimplify={task.isUserCreated ? () => setSimplifyTarget({ task }) : undefined}
+                onSimplify={
+                  (statuses[task.id] ?? null) !== 'done' && (statuses[task.id] ?? null) !== 'skipped'
+                    ? () => setSimplifyTarget({ task })
+                    : undefined
+                }
                 onArchive={task.isUserCreated && !task.archivedAt ? () => handleArchiveTask(task) : undefined}
                 onRestore={task.isUserCreated && task.archivedAt ? () => handleRestoreTask(task) : undefined}
               />
@@ -1326,6 +1416,19 @@ export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDa
         {taskView === 'today' && 'What needs attention right now.'}
         {taskView === 'month' && 'See timing and workload across the month.'}
       </p>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => setContextAssistOpen(true)}
+          style={{
+            padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.primary}40`,
+            background: `${C.primary}10`, color: C.primary, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+          }}
+        >
+          ✨ Add with AI
+        </button>
+      </div>
 
       {/* View segmented control */}
       <div
@@ -1436,17 +1539,18 @@ export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDa
                 const taskObj: UserTask_ = {
                   id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, type: ut.type,
                   category: 'user', isUserCreated: true, recurrence: ut.recurrence,
-                  potentialValue: ut.potentialValue,
+                  potentialValue: getDisplayPotentialValue(ut.potentialValue),
                   scheduleLabel: recurrenceLabel(ut.recurrence),
                   goalId: ut.goalId,
                 };
                 const statusDate = ut.recurrence?.specificDate ?? today;
+                const overdueStatus = getTaskStatus(profile.id, ut.id, statusDate);
                 return (
                   <TaskItem
                     key={ut.id}
                     task={taskObj}
                     catColor={C.tertiary}
-                    status={getTaskStatus(profile.id, ut.id, statusDate)}
+                    status={overdueStatus}
                     statusHint="Overdue"
                     profileId={profile.id}
                     profileName={profile.name}
@@ -1454,6 +1558,11 @@ export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDa
                     onOpenUpdate={() => openTaskUpdate(taskObj, goals.find(g => g.id === ut.goalId))}
                     onDelete={() => openDeleteTask(taskObj)}
                     onEdit={() => handleEditAnyTask(taskObj, ut.goalId)}
+                    onSimplify={
+                      overdueStatus !== 'done' && overdueStatus !== 'skipped'
+                        ? () => setSimplifyTarget({ task: taskObj, goal: goals.find(g => g.id === ut.goalId) })
+                        : undefined
+                    }
                     onArchive={() => handleArchiveTask(taskObj)}
                   />
                 );
@@ -1592,6 +1701,7 @@ export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDa
         defaultGoalId={defaultTaskGoalId}
         goals={goals}
         currentDate={today}
+        preserveTaskType={!!editingSeedTaskId}
         onSave={handleSaveUserTask}
         onCancel={() => { setManageTaskOpen(false); setEditingTask(null); setDefaultTaskGoalId(undefined); setEditingSeedTaskId(null); }}
       />

@@ -50,6 +50,15 @@ export function normalizePotentialValue(raw?: Partial<PotentialValue> | null): P
   };
 }
 
+/** Always returns a displayable PV (Moderate default). */
+export function getDisplayPotentialValue(raw?: Partial<PotentialValue> | null): PotentialValue {
+  return normalizePotentialValue(raw) ?? defaultPotentialValue('default');
+}
+
+export function isValidPotentialValueScore(score: unknown): score is PotentialValueScore {
+  return ([1, 2, 3, 4] as const).includes(score as PotentialValueScore);
+}
+
 export function potentialValuePriorityBonus(pv?: PotentialValue): number {
   if (!pv) return 0;
   return pv.score * 10;

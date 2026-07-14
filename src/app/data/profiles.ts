@@ -1835,6 +1835,27 @@ export function getTodayKey() {
   return getDateKey(new Date());
 }
 
+/**
+ * Calendar YYYY-MM-DD in a timezone expressed as Date.getTimezoneOffset()-style minutes
+ * (e.g. EST = 300). Used so mobile/desktop streak walks share the profile's home zone.
+ */
+export function getDateKeyForTzOffset(date: Date, tzOffsetMinutes: number): string {
+  const shifted = new Date(date.getTime() - tzOffsetMinutes * 60_000);
+  const y = shifted.getUTCFullYear();
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(shifted.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export function getProfileTodayKey(profileId: string): string {
+  let offset = new Date().getTimezoneOffset();
+  try {
+    const raw = localStorage.getItem(`arbol-tz-offset-${profileId}`);
+    if (raw != null && raw !== '' && !Number.isNaN(Number(raw))) offset = Number(raw);
+  } catch { /* ignore */ }
+  return getDateKeyForTzOffset(new Date(), offset);
+}
+
 export function hasActivityOnDate(profileId: string, dateKey: string): boolean {
   if (localStorage.getItem(`streak-${profileId}-${dateKey}`) === 'true') return true;
   for (let i = 0; i < localStorage.length; i++) {
@@ -1851,16 +1872,22 @@ export function hasActivityOnDate(profileId: string, dateKey: string): boolean {
 
 // Computes the live streak from localStorage for any profile.
 // Pass todayHasActivity=true if the caller already knows the user touched a task today.
+// Uses profile tz offset (from cloud backup) so devices in different zones align.
 export function computeLiveStreak(profileId: string, todayHasActivity = false): number {
-  const todayKey = getTodayKey();
+  let offset = new Date().getTimezoneOffset();
+  try {
+    const raw = localStorage.getItem(`arbol-tz-offset-${profileId}`);
+    if (raw != null && raw !== '' && !Number.isNaN(Number(raw))) offset = Number(raw);
+  } catch { /* ignore */ }
+
+  const todayKey = getDateKeyForTzOffset(new Date(), offset);
   const todayDone = todayHasActivity || hasActivityOnDate(profileId, todayKey);
 
   if (todayDone) {
     let count = 1;
     for (let i = 1; i <= 365; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      if (hasActivityOnDate(profileId, getDateKey(d))) {
+      const key = getDateKeyForTzOffset(new Date(Date.now() - i * 86_400_000), offset);
+      if (hasActivityOnDate(profileId, key)) {
         count++;
       } else {
         break;
@@ -1871,9 +1898,8 @@ export function computeLiveStreak(profileId: string, todayHasActivity = false): 
 
   let count = 0;
   for (let i = 1; i <= 365; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    if (hasActivityOnDate(profileId, getDateKey(d))) {
+    const key = getDateKeyForTzOffset(new Date(Date.now() - i * 86_400_000), offset);
+    if (hasActivityOnDate(profileId, key)) {
       count++;
     } else {
       break;
@@ -2044,6 +2070,19 @@ export function permanentlyHideSeedTask(profileId: string, taskId: string) {
   try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch { /* ignore */ }
   try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch { /* ignore */ }
   import('./dashboardSnapshot').then(({ dispatchDashboardRefresh }) => dispatchDashboardRefresh());
+}
+
+/** Hide all seed tasks that share the same label (day-sibling family). */
+export function permanentlyHideSeedTasksByLabel(profileId: string, label: string) {
+  const normalized = label.trim().toLowerCase();
+  if (!normalized) return;
+  getTaskCategoriesForProfile(profileId).forEach(cat => {
+    cat.tasks.forEach(t => {
+      if (t.label.trim().toLowerCase() === normalized) {
+        permanentlyHideSeedTask(profileId, t.id);
+      }
+    });
+  });
 }
 
 export function markTaskDeleted(profileId: string, taskId: string, date: string) {

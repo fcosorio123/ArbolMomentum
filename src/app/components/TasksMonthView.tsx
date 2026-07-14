@@ -10,6 +10,7 @@ import {
 import { getPersonalGoals } from '../data/personalGoals';
 import { MIN_TOUCH, touchPrimaryButton } from '../styles/touchTargets';
 import { TASK_STATUS_DISPLAY } from './TaskStatusSelector';
+import { getDisplayPotentialValue } from '../data/potentialValue';
 
 interface Props {
   profileId: string;
@@ -236,6 +237,13 @@ export function TasksMonthView({ profileId, onManageTask, onGoAllTasks }: Props)
                   {task.scheduleLabel ? ` · ${task.scheduleLabel}` : ''}
                   {' · '}
                   <span style={{ color: display.color, fontWeight: 700 }}>{display.label}</span>
+                  {' · '}
+                  <span
+                    style={{ color: C.primary, fontWeight: 700 }}
+                    title={`Potential Value: ${getDisplayPotentialValue(task.potentialValue).label}`}
+                  >
+                    PV: {getDisplayPotentialValue(task.potentialValue).label}
+                  </span>
                 </div>
               </button>
             );

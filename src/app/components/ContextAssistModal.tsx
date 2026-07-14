@@ -47,6 +47,7 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
   const [useAiAssist, setUseAiAssist] = useState(true);
   const [parsing, setParsing] = useState(false);
   const [parseSource, setParseSource] = useState<ParseContextSource | null>(null);
+  const [parseReason, setParseReason] = useState<string | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
 
   const reset = () => {
@@ -56,6 +57,7 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
     setUseAiAssist(true);
     setParsing(false);
     setParseSource(null);
+    setParseReason(null);
     setParseError(null);
   };
 
@@ -72,7 +74,10 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
     setParsing(true);
     setParseError(null);
     try {
-      const result = await parseContextTasksFromEdge(text, { preferRules: !useAiAssist });
+      const result = await parseContextTasksFromEdge(text, {
+        preferRules: !useAiAssist,
+        mode,
+      });
       if (!result.ok || result.groups.length === 0) {
         const reason = result.reason === 'network_error'
           ? 'Could not reach the server. Check your connection and try again.'
@@ -84,6 +89,7 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
       }
       setGroups(result.groups);
       setParseSource(result.source);
+      setParseReason(result.reason ?? null);
       setStep('review');
     } finally {
       setParsing(false);
@@ -219,7 +225,9 @@ export function ContextAssistModal({ open, onClose, mode, onConfirm }: Props) {
                 marginBottom: 12, padding: '10px 12px', borderRadius: 10,
                 background: '#fff8e6', border: '1px solid #f5a62350', fontSize: 12, color: '#8a6d00', lineHeight: 1.45,
               }}>
-                AI was enabled but the server used rule-based parsing. Results may be less tailored — you can go back and try again.
+                {parseReason === 'llm_unavailable' || parseReason === 'rate_limited'
+                  ? 'AI assist is temporarily unavailable (missing key, rate limit, or model error). Showing rule-based suggestions — review carefully, then confirm.'
+                  : 'AI was enabled but the server used rule-based parsing. Results may be less tailored — you can go back and try again.'}
               </div>
             )}
             <div style={{ maxHeight: 300, overflowY: 'auto', marginBottom: 16 }}>

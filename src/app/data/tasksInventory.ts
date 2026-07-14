@@ -16,11 +16,14 @@ import {
 } from './userTasks';
 import { getPrimaryGoalIdForTask } from './taskGoalLinks';
 import { getPersonalGoals, type PersonalGoal } from './personalGoals';
+import { mergeSeedForProfile } from './seedOverrides';
+import { getDisplayPotentialValue } from './potentialValue';
 
 export type InventoryTask = Task & {
   isUserCreated?: boolean;
   recurrence?: Recurrence;
   potentialValue?: UserTask['potentialValue'];
+  description?: string;
   archivedAt?: number;
   goalId?: string;
   scheduleLabel?: string;
@@ -59,12 +62,14 @@ export function buildAllTasksInventory(profileId: string): TasksInventory {
   getTaskCategoriesForProfile(profileId).forEach(cat => {
     cat.tasks.forEach(t => {
       if (hiddenSeedIds.has(t.id) || convertedSeedIds.has(t.id) || userTaskIds.has(t.id)) return;
+      const merged = mergeSeedForProfile(profileId, t);
       const effectiveGoalId = getPrimaryGoalIdForTask(profileId, t.id, cat.goalId);
       place(
         {
-          ...t,
+          ...merged,
+          potentialValue: getDisplayPotentialValue(merged.potentialValue),
           goalId: effectiveGoalId,
-          scheduleLabel: 'Daily',
+          scheduleLabel: merged.recurrence ? recurrenceLabel(merged.recurrence) : 'Daily',
         },
         effectiveGoalId,
       );
@@ -80,7 +85,7 @@ export function buildAllTasksInventory(profileId: string): TasksInventory {
       category: 'user',
       isUserCreated: true,
       recurrence: ut.recurrence,
-      potentialValue: ut.potentialValue,
+      potentialValue: getDisplayPotentialValue(ut.potentialValue),
       archivedAt: ut.archivedAt,
       goalId: ut.goalId,
       scheduleLabel: recurrenceLabel(ut.recurrence),
@@ -155,7 +160,7 @@ export function getInventoryTasksForDate(profileId: string, dateKey: string): In
       category: 'user',
       isUserCreated: true,
       recurrence: ut.recurrence,
-      potentialValue: ut.potentialValue,
+      potentialValue: getDisplayPotentialValue(ut.potentialValue),
       goalId: ut.goalId,
       scheduleLabel: recurrenceLabel(ut.recurrence),
     });

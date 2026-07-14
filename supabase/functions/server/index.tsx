@@ -1,4 +1,4 @@
-﻿import { Hono } from "npm:hono";
+import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
 import * as kv from "./kv_store.tsx";
@@ -30,19 +30,22 @@ app.get("/health", (c) => {
   return c.json({ status: "ok" });
 });
 
-// Save a full profile backup (reject stale overwrites)
+// Save profile backup — server-side union merge so peer-device activity is never wiped
 app.post("/backup/:profileId", async (c) => {
   const profileId = c.req.param("profileId");
   try {
     const payload = await c.req.json();
-    const existing = await kv.get(`arbol-backup-${profileId}`);
-    const incomingAt = typeof payload?.savedAt === "number" ? payload.savedAt : 0;
-    const existingAt = typeof existing?.savedAt === "number" ? existing.savedAt : 0;
-    if (existing && incomingAt > 0 && existingAt > incomingAt) {
-      return c.json({ ok: false, reason: "stale_backup", cloudSavedAt: existingAt });
+    if (!payload || typeof payload !== "object") {
+      return c.json({ ok: false, reason: "invalid_payload" }, 400);
     }
-    await kv.set(`arbol-backup-${profileId}`, payload);
-    return c.json({ ok: true });
+    const existing = await kv.get(`arbol-backup-${profileId}`);
+    const { unionMergeBackupPayload } = await import("./backupMerge.ts");
+    const merged = unionMergeBackupPayload(
+      existing && typeof existing === "object" ? existing as Record<string, unknown> : null,
+      payload as Record<string, unknown>,
+    );
+    await kv.set(`arbol-backup-${profileId}`, merged);
+    return c.json({ ok: true, savedAt: merged.savedAt });
   } catch (err) {
     console.log(`[Backup] Error saving backup for ${profileId}:`, err);
     return c.json({ error: String(err) }, 500);
@@ -189,19 +192,22 @@ app.post("/simplify-task", async (c) => {
     const taskLabel = typeof body?.taskLabel === "string" ? body.taskLabel : "";
     const goalTitle = typeof body?.goalTitle === "string" ? body.goalTitle : undefined;
     const goalWhy = typeof body?.goalWhy === "string" ? body.goalWhy : undefined;
+    const blocker = typeof body?.blocker === "string" ? body.blocker : undefined;
+    const motivation = typeof body?.motivation === "string" ? body.motivation : undefined;
+    const constraint = typeof body?.constraint === "string" ? body.constraint : undefined;
     const answers = Array.isArray(body?.answers)
       ? body.answers.filter((a: unknown) => typeof a === "string")
-      : [];
+      : undefined;
     const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "anon";
     const { simplifyTask } = await import("./simplifyTask.ts");
     const result = await simplifyTask(
-      { taskLabel, goalTitle, goalWhy, answers },
+      { taskLabel, goalTitle, goalWhy, blocker, motivation, constraint, answers },
       { rateLimitKey: ip },
     );
     return c.json(result);
   } catch (err) {
     console.log("[SimplifyTask] Error:", err);
-    return c.json({ ok: false, tasks: [], source: "rules", reason: String(err) }, 500);
+    return c.json({ ok: false, tasks: [], source: "rules", reason: "server_error" }, 500);
   }
 });
 
@@ -211,9 +217,10 @@ app.post("/parse-context-tasks", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const text = typeof body?.text === "string" ? body.text : "";
     const preferRules = Boolean(body?.preferRules);
+    const mode = typeof body?.mode === "string" ? body.mode : "goals";
     const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "anon";
     const { parseContextTasks } = await import("./parseContextTasks.ts");
-    const result = await parseContextTasks(text, { rateLimitKey: ip, preferRules });
+    const result = await parseContextTasks(text, { rateLimitKey: ip, preferRules, mode });
     return c.json(result);
   } catch (err) {
     console.log("[ParseContextTasks] Error:", err);

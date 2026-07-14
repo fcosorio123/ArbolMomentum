@@ -92,12 +92,40 @@ function dedupeTaskLabels(tasks: { label: string }[], goalTitle: string): typeof
   });
 }
 
+function ensureStarterTasks<T extends { label: string; timeOfDay: "morning" | "evening"; type: TaskType; recurrence: Recurrence; selected: boolean }>(
+  goalTitle: string,
+  tasks: T[],
+): T[] {
+  if (tasks.length >= 2) return tasks.slice(0, MAX_TASKS_PER_GOAL);
+  const short = goalTitle.slice(0, 40);
+  const extras: T[] = [];
+  if (!tasks.some((t) => /next (small )?step/i.test(t.label))) {
+    extras.push({
+      label: `Define the next small step for "${short}"`,
+      timeOfDay: "morning",
+      type: "goal",
+      recurrence: { type: "daily" },
+      selected: true,
+    } as T);
+  }
+  if (tasks.length + extras.length < 2) {
+    extras.push({
+      label: `Spend 15 minutes making progress on "${short}"`,
+      timeOfDay: "evening",
+      type: "routine",
+      recurrence: { type: "daily" },
+      selected: true,
+    } as T);
+  }
+  return dedupeTaskLabels([...tasks, ...extras], goalTitle).slice(0, MAX_TASKS_PER_GOAL) as T[];
+}
+
 function normalizeLlmGroups(raw: RawLlmGroup[]): SeedSuggestionGroup[] {
   const globalSeen = new Set<string>();
   const trimmed = raw.slice(0, MAX_GOALS).map((g) => {
     const title = (g.goal?.title ?? "Goal").trim();
     const deepWhy = (g.goal?.deepWhy ?? "A goal from your description.").trim();
-    const tasks = dedupeTaskLabels(
+    let tasks = dedupeTaskLabels(
       (g.tasks ?? []).slice(0, MAX_TASKS_PER_GOAL).map((t) => ({
         label: (t.label ?? "").trim(),
         timeOfDay: normalizeTimeOfDay(t.timeOfDay),
@@ -113,14 +141,31 @@ function normalizeLlmGroups(raw: RawLlmGroup[]): SeedSuggestionGroup[] {
       return true;
     });
 
+    tasks = ensureStarterTasks(title || "Goal", tasks);
+
     return {
       goal: { title: title || "Goal", deepWhy: deepWhy || "A goal from your description." },
       tasks,
       selected: true,
     };
-  }).filter((g) => g.goal.title.length > 0);
+  }).filter((g) => g.goal.title.length > 0 && g.tasks.length > 0);
 
   return assignIds(trimmed);
+}
+
+function systemPromptForMode(mode: string): string {
+  const base =
+    'You organize unstructured student life-planning text into goals and tasks. Return JSON only: {"groups":[{"goal":{"title","deepWhy"},"tasks":[{"label","timeOfDay":"morning|evening","type":"priority|goal|routine","recurrence":{"type":"daily|weekly|monthly|one-time","weekdays":[0-6]}}]}]}. ' +
+    "Goals are outcome-driven (desired result, target, timeframe). Tasks are execution-driven and start with a clear action verb. " +
+    "For each goal invent 2–4 concrete, checkable tasks that advance it — do not paste whole paragraphs as labels; do not duplicate the goal title as a task. " +
+    "When input is vague, make the best reasonable inference. Prefer useful structure over refusing. Max 8 goals, 12 tasks per goal.";
+  if (mode === "tasks") {
+    return base + " Mode=tasks: prioritize actionable next steps; if a larger outcome is clear, still include a short goal title to group them.";
+  }
+  if (mode === "goals") {
+    return base + " Mode=goals: prioritize clear outcome goals, then optional starter tasks under each.";
+  }
+  return base + " Mode=profile: extract a starter pack of goals with supporting tasks for a new profile.";
 }
 
 async function checkRateLimit(key: string): Promise<boolean> {
@@ -133,9 +178,12 @@ async function checkRateLimit(key: string): Promise<boolean> {
   return true;
 }
 
-async function callOpenAi(prompt: string): Promise<RawLlmGroup[] | null> {
+async function callOpenAi(prompt: string, mode: string): Promise<RawLlmGroup[] | null> {
   const apiKey = Deno.env.get("LLM_API_KEY")?.trim();
-  if (!apiKey) return null;
+  if (!apiKey) {
+    console.log("[ParseContext] LLM_API_KEY not set — skipping LLM");
+    return null;
+  }
 
   const model = Deno.env.get("LLM_MODEL")?.trim() || "gpt-4o-mini";
   const controller = new AbortController();
@@ -150,14 +198,10 @@ async function callOpenAi(prompt: string): Promise<RawLlmGroup[] | null> {
       },
       body: JSON.stringify({
         model,
-        temperature: 0.2,
+        temperature: 0.35,
         response_format: { type: "json_object" },
         messages: [
-          {
-            role: "system",
-            content:
-              "You extract goals and tasks from student life planning text. Return JSON only: {\"groups\":[{\"goal\":{\"title\",\"deepWhy\"},\"tasks\":[{\"label\",\"timeOfDay\":\"morning|evening\",\"type\":\"priority|goal|routine\",\"recurrence\":{\"type\":\"daily|weekly|monthly|one-time\",\"weekdays\":[0-6]}}]}]}. Use only user-mentioned items. Max 8 goals, 12 tasks per goal.",
-          },
+          { role: "system", content: systemPromptForMode(mode) },
           { role: "user", content: prompt },
         ],
       }),
@@ -184,25 +228,28 @@ async function callOpenAi(prompt: string): Promise<RawLlmGroup[] | null> {
   }
 }
 
-async function callLlmProvider(text: string): Promise<RawLlmGroup[] | null> {
+async function callLlmProvider(text: string, mode: string): Promise<RawLlmGroup[] | null> {
   const provider = (Deno.env.get("LLM_PROVIDER")?.trim() || "openai").toLowerCase();
-  if (provider === "openai" || provider === "none") {
-    if (provider === "none") return null;
-    return callOpenAi(text);
+  if (provider === "none") return null;
+  if (provider === "openai") {
+    return callOpenAi(text, mode);
   }
-  // Future providers hook here; unknown provider falls through to rules
   console.log("[ParseContext] Unknown LLM_PROVIDER:", provider);
   return null;
 }
 
 export async function parseContextTasks(
   text: string,
-  opts?: { rateLimitKey?: string; preferRules?: boolean },
+  opts?: { rateLimitKey?: string; preferRules?: boolean; mode?: string },
 ): Promise<ParseContextResult> {
   const trimmed = text.trim().slice(0, MAX_INPUT_CHARS);
   if (trimmed.length < 8) {
     return { ok: false, groups: [], source: "rules", reason: "input_too_short" };
   }
+
+  const mode = opts?.mode === "tasks" || opts?.mode === "goals" || opts?.mode === "profile"
+    ? opts.mode
+    : "goals";
 
   const rateKey = opts?.rateLimitKey || "global";
   if (!(await checkRateLimit(rateKey))) {
@@ -211,20 +258,22 @@ export async function parseContextTasks(
   }
 
   if (!opts?.preferRules) {
-    const llmRaw = await callLlmProvider(trimmed);
+    const llmRaw = await callLlmProvider(trimmed, mode);
     if (llmRaw?.length) {
       const groups = normalizeLlmGroups(llmRaw);
       if (groups.length > 0) {
         return { ok: true, groups, source: "llm" };
       }
     }
+    const fallback = parseGoalInputRuleBased(trimmed);
+    return {
+      ok: fallback.length > 0,
+      groups: fallback,
+      source: "rules",
+      reason: Deno.env.get("LLM_API_KEY")?.trim() ? "llm_unavailable" : "llm_unavailable",
+    };
   }
 
   const groups = parseGoalInputRuleBased(trimmed);
-  return {
-    ok: groups.length > 0,
-    groups,
-    source: "rules",
-    reason: groups.length > 0 ? undefined : "no_suggestions",
-  };
+  return { ok: groups.length > 0, groups, source: "rules", reason: "prefer_rules" };
 }

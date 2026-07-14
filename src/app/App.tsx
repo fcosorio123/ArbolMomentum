@@ -401,7 +401,7 @@ export default function App() {
 
             if (result === 'merged' || hydrated) {
               notifyUi();
-              // Immediately persist the union so the other device can pull it.
+              // Serialized saveToCloud unions with cloud; avoids racing dual POSTs from scheduleSave.
               await saveToCloud(profileId);
               notifyUi();
             } else {

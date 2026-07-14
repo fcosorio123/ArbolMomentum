@@ -160,7 +160,13 @@ export function parseGoalInputRuleBased(text: string): SeedSuggestionGroup[] {
       id: nextId("goal"),
       goal: { title: label, deepWhy: "A goal you set when creating this profile." },
       selected: true,
-      tasks: [makeTask(line, label, recurrence)],
+      tasks: [
+        makeTask(line, `Define the next small step for "${label.slice(0, 40)}"`, recurrence),
+        makeTask(line, `Spend 15 minutes progressing on "${label.slice(0, 40)}"`, {
+          ...recurrence,
+          type: recurrence.type === "one-time" ? "one-time" : "daily",
+        }),
+      ].filter((t) => t.label.toLowerCase() !== label.toLowerCase()),
     });
   }
 

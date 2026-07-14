@@ -1,6 +1,11 @@
 import type { TimeOfDay, TaskType } from './profiles';
 import { purgeTaskLocalState } from './profiles';
 import { scheduleSave } from './cloudBackup';
+import {
+  defaultPotentialValue,
+  isValidPotentialValueScore,
+  normalizePotentialValue,
+} from './potentialValue';
 
 // ── Recurrence ────────────────────────────────────────────────────────
 export interface Recurrence {
@@ -95,7 +100,26 @@ function storageKey(profileId: string) {
 
 export function getUserTasks(profileId: string): UserTask[] {
   try {
-    return JSON.parse(localStorage.getItem(storageKey(profileId)) || '[]');
+    const tasks = JSON.parse(localStorage.getItem(storageKey(profileId)) || '[]') as UserTask[];
+    if (!Array.isArray(tasks)) return [];
+    let changed = false;
+    const normalized = tasks.map(t => {
+      if (t.potentialValue && isValidPotentialValueScore(t.potentialValue.score)) {
+        const n = normalizePotentialValue(t.potentialValue);
+        if (n && (!t.potentialValue.label || t.potentialValue.label !== n.label)) {
+          changed = true;
+          return { ...t, potentialValue: n };
+        }
+        return t;
+      }
+      changed = true;
+      return { ...t, potentialValue: defaultPotentialValue('default') };
+    });
+    if (changed) {
+      localStorage.setItem(storageKey(profileId), JSON.stringify(normalized));
+      scheduleSave(profileId);
+    }
+    return normalized;
   } catch {
     return [];
   }
@@ -156,6 +180,7 @@ export function createUserTask(profileId: string, data: Omit<UserTask, 'id' | 'p
     createdAt: Date.now(),
     ...data,
     label: data.label.trim(),
+    potentialValue: normalizePotentialValue(data.potentialValue) ?? defaultPotentialValue('default'),
   };
   saveUserTasks(profileId, [...tasks, task]);
   try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}

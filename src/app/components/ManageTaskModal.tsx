@@ -23,6 +23,8 @@ interface Props {
   goals: PersonalGoal[];
   /** currentDate is the YYYY-MM-DD occurrence date; needed for "This task only" edits */
   currentDate?: string;
+  /** When editing a seed, keep its type (e.g. priority) instead of remapping to goal/routine. */
+  preserveTaskType?: boolean;
   onSave: (data: SaveData) => void;
   onCancel: () => void;
 }
@@ -91,7 +93,9 @@ function isRecurring(rec?: Recurrence): boolean {
 }
 
 // ── Main modal ────────────────────────────────────────────────────────
-export function ManageTaskModal({ open, profileId, task, defaultGoalId, goals, currentDate, onSave, onCancel }: Props) {
+export function ManageTaskModal({
+  open, profileId, task, defaultGoalId, goals, currentDate, preserveTaskType, onSave, onCancel,
+}: Props) {
   const isEdit = !!task;
 
   const [label, setLabel] = useState('');
@@ -164,11 +168,14 @@ export function ManageTaskModal({ open, profileId, task, defaultGoalId, goals, c
 
   const handleSave = () => {
     const recurrence = buildRecurrence();
+    const resolvedType = preserveTaskType && task?.type
+      ? task.type
+      : (goalId ? 'goal' : 'routine');
     onSave({
       label: label.trim(),
       description: description.trim() || undefined,
       timeOfDay,
-      type: goalId ? 'goal' : 'routine',
+      type: resolvedType,
       goalId: goalId || undefined,
       recurrence,
       potentialValue,

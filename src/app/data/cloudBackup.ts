@@ -16,6 +16,19 @@ const LEGACY_GOALS_KEY = (profileId: string) => `arbol-goals-${profileId}`;
 const TASK_GOAL_LINKS_KEY = (profileId: string) => `arbol-task-goal-links-${profileId}`;
 const DELETED_DEFAULT_GOALS_KEY = (profileId: string) => `arbol-deleted-default-goals-${profileId}`;
 const LOCAL_CLOUD_AT_KEY = (profileId: string) => `arbol-local-cloud-at-${profileId}`;
+const TZ_OFFSET_KEY = (profileId: string) => `arbol-tz-offset-${profileId}`;
+
+export function getStoredTzOffset(profileId: string): number {
+  const raw = localStorage.getItem(TZ_OFFSET_KEY(profileId));
+  if (raw != null && raw !== '' && !Number.isNaN(Number(raw))) return Number(raw);
+  return new Date().getTimezoneOffset();
+}
+
+function persistTzOffset(profileId: string, offset: unknown): void {
+  if (typeof offset === 'number' && Number.isFinite(offset)) {
+    localStorage.setItem(TZ_OFFSET_KEY(profileId), String(offset));
+  }
+}
 
 function isUserCreatedGoal(profileId: string, goalId: string): boolean {
   return goalId.startsWith(`user-${profileId}-`);
@@ -165,11 +178,12 @@ function collectLocalData(profileId: string): Record<string, unknown> {
     streakBest:     raw(`streak-best-${profileId}`),
     profileEmail:   localStorage.getItem(getStorageKey(`arbol-email-${profileId}`)) || null,
     alertPrefs:     raw(getStorageKey(`arbol-alert-prefs-${profileId}`)),
-    tzOffset:       new Date().getTimezoneOffset(),
+    tzOffset:       getStoredTzOffset(profileId),
     nudgeSnapshot:  profile ? buildNudgeSnapshot(profileId, profile.name) : null,
     liveReports:    raw(`arbol-live-reports-${profileId}`),
     liveSnapshots:  raw(`arbol-live-snapshots-${profileId}`),
     permanentlyHiddenSeedTasks: raw(`arbol-hidden-seed-${profileId}`),
+    seedOverrides: raw(`arbol-seed-overrides-${profileId}`),
     taskGoalLinks:    raw(TASK_GOAL_LINKS_KEY(profileId)),
     deletedDefaultGoals: raw(DELETED_DEFAULT_GOALS_KEY(profileId)),
     taskStatuses,
@@ -279,6 +293,7 @@ function hasLocalProfileData(profileId: string): boolean {
   if (localStorage.getItem(`arbol-user-tasks-${profileId}`)) return true;
   if (localStorage.getItem(`arbol-user-cats-${profileId}`)) return true;
   if (localStorage.getItem(`arbol-hidden-seed-${profileId}`)) return true;
+  if (localStorage.getItem(`arbol-seed-overrides-${profileId}`)) return true;
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     if (!k) continue;
@@ -340,6 +355,7 @@ function mergeCloudActivityUnion(profileId: string, cloud: Record<string, unknow
     write(`arbol-live-reports-${profileId}`, cloud.liveReports);
     write(`arbol-live-snapshots-${profileId}`, cloud.liveSnapshots);
     write(`arbol-hidden-seed-${profileId}`, cloud.permanentlyHiddenSeedTasks);
+    write(`arbol-seed-overrides-${profileId}`, cloud.seedOverrides);
     write(DELETED_DEFAULT_GOALS_KEY(profileId), cloud.deletedDefaultGoals);
   }
 
@@ -365,6 +381,7 @@ function applyLocalData(profileId: string, data: Record<string, unknown>): void 
   write(`arbol-live-reports-${profileId}`, data.liveReports);
   write(`arbol-live-snapshots-${profileId}`, data.liveSnapshots);
   write(`arbol-hidden-seed-${profileId}`, data.permanentlyHiddenSeedTasks);
+  write(`arbol-seed-overrides-${profileId}`, data.seedOverrides);
   write(TASK_GOAL_LINKS_KEY(profileId), data.taskGoalLinks);
   write(DELETED_DEFAULT_GOALS_KEY(profileId), data.deletedDefaultGoals);
 
@@ -404,6 +421,7 @@ function applyLocalData(profileId: string, data: Record<string, unknown>): void 
   if (typeof data.calendarProvider === 'string' && data.calendarProvider.trim()) {
     localStorage.setItem(CALENDAR_PROVIDER_KEY(profileId), data.calendarProvider.trim());
   }
+  persistTzOffset(profileId, data.tzOffset);
 }
 
 // ── API calls ────────────────────────────────────────────────────────
@@ -500,10 +518,25 @@ function mergeArchiveFromCloud(profileId: string, cloud: Record<string, unknown>
   return true;
 }
 
-async function fetchCloudBackup(profileId: string): Promise<Record<string, unknown> | null> {
+type CloudBackupFetch =
+  | { status: 'ok'; data: Record<string, unknown> }
+  | { status: 'empty' }
+  | { status: 'error'; error: unknown };
+
+async function fetchCloudBackupResult(profileId: string): Promise<CloudBackupFetch> {
   const { data, error } = await invokeWithRetry(`${FN}/backup/${profileId}`, { method: 'GET' });
-  if (error || !data?.ok || !data?.data) return null;
-  return data.data as Record<string, unknown>;
+  if (error) return { status: 'error', error };
+  // Transport/API failure without SDK error object
+  if (data && typeof data === 'object' && 'error' in data && data.ok !== true && !('data' in data)) {
+    return { status: 'error', error: (data as { error: unknown }).error };
+  }
+  if (!data?.ok || !data?.data) return { status: 'empty' };
+  return { status: 'ok', data: data.data as Record<string, unknown> };
+}
+
+async function fetchCloudBackup(profileId: string): Promise<Record<string, unknown> | null> {
+  const result = await fetchCloudBackupResult(profileId);
+  return result.status === 'ok' ? result.data : null;
 }
 
 export async function fetchProfileBackupForAdmin(profileId: string): Promise<Record<string, unknown> | null> {
@@ -520,7 +553,8 @@ export interface ProfileSyncStatus {
 
 export async function getProfileSyncStatus(profileId: string): Promise<ProfileSyncStatus> {
   const localSavedAt = Number(localStorage.getItem(LOCAL_CLOUD_AT_KEY(profileId)) || 0);
-  const cloud = await fetchCloudBackup(profileId);
+  const result = await fetchCloudBackupResult(profileId);
+  const cloud = result.status === 'ok' ? result.data : null;
   const cloudSavedAt = typeof cloud?.savedAt === 'number' ? cloud.savedAt : null;
   let lastSyncDirection: ProfileSyncStatus['lastSyncDirection'] = 'unknown';
   if (cloudSavedAt != null && localSavedAt > 0) {
@@ -542,7 +576,6 @@ export async function getProfileSyncStatus(profileId: string): Promise<ProfileSy
 }
 
 function rebuildStreakDaysFromDoneTasks(profileId: string): void {
-  // Derive streak-* flags from any done task-* keys (covers devices that only synced statuses).
   const dateRe = /(\d{4}-\d{2}-\d{2})$/;
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
@@ -569,16 +602,35 @@ function mergeStringMaps(
   return out;
 }
 
+function mergeStreakBest(a: unknown, b: unknown): Record<string, number> {
+  const left = (a && typeof a === 'object' ? a : {}) as Record<string, number>;
+  const right = (b && typeof b === 'object' ? b : {}) as Record<string, number>;
+  return {
+    daily: Math.max(Number(left.daily) || 0, Number(right.daily) || 0),
+    weekly: Math.max(Number(left.weekly) || 0, Number(right.weekly) || 0),
+    monthly: Math.max(Number(left.monthly) || 0, Number(right.monthly) || 0),
+  };
+}
+
 /**
  * Guarantee a save never drops the other device's activity.
  * Pull cloud → union into local → collect payload as the union of both.
+ * Throws CLOUD_FETCH_FAILED when GET errors (fail-closed — do not POST sparse local).
  */
 async function buildUnionPayload(profileId: string): Promise<Record<string, unknown>> {
-  const cloud = await fetchCloudBackup(profileId);
+  const fetch = await fetchCloudBackupResult(profileId);
+  if (fetch.status === 'error') {
+    throw new Error('CLOUD_FETCH_FAILED');
+  }
+
+  const cloud = fetch.status === 'ok' ? fetch.data : null;
   if (cloud) {
     mergeCloudActivityUnion(profileId, cloud);
+    persistTzOffset(profileId, cloud.tzOffset);
     rebuildStreakDaysFromDoneTasks(profileId);
   } else {
+    // First backup for this profile — stamp current device offset.
+    persistTzOffset(profileId, new Date().getTimezoneOffset());
     rebuildStreakDaysFromDoneTasks(profileId);
   }
 
@@ -597,6 +649,8 @@ async function buildUnionPayload(profileId: string): Promise<Record<string, unkn
   local.visitCounts = mergeStringMaps(local.visitCounts, cloud.visitCounts, preferVisitCount);
   local.tourDismissals = mergeStringMaps(local.tourDismissals, cloud.tourDismissals, preferBooleanish);
 
+  local.streakBest = mergeStreakBest(local.streakBest, cloud.streakBest);
+
   // Keep richer array blobs when cloud has more items (goals/tasks).
   const cloudTasks = Array.isArray(cloud.userTasks) ? cloud.userTasks : null;
   const localTasks = Array.isArray(local.userTasks) ? local.userTasks : null;
@@ -606,16 +660,39 @@ async function buildUnionPayload(profileId: string): Promise<Record<string, unkn
   const cloudGoals = Array.isArray(cloud.personalGoals) ? cloud.personalGoals : null;
   const localGoals = Array.isArray(local.personalGoals) ? local.personalGoals : null;
   if (cloudGoals && (!localGoals || cloudGoals.length > localGoals.length)) {
-    // Prefer keep-local merge already done; only fill empty
     if (!localGoals || localGoals.length === 0) local.personalGoals = cloud.personalGoals;
+  }
+
+  // Prefer stored profile timezone (often from the first/primary device).
+  if (typeof cloud.tzOffset === 'number') {
+    local.tzOffset = cloud.tzOffset;
   }
 
   local.savedAt = Date.now();
   return local;
 }
 
-export async function saveToCloud(profileId: string, opts?: { retryOnStale?: boolean }): Promise<boolean> {
-  const payload = await buildUnionPayload(profileId);
+const saveChains: Record<string, Promise<boolean>> = {};
+const pendingRetryTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+
+async function saveToCloudUnlocked(profileId: string, opts?: { retryOnStale?: boolean }): Promise<boolean> {
+  let payload: Record<string, unknown>;
+  try {
+    payload = await buildUnionPayload(profileId);
+  } catch (err) {
+    if (String(err).includes('CLOUD_FETCH_FAILED')) {
+      console.warn('[CloudBackup] Save skipped — cloud fetch failed (fail-closed)');
+      // Retry later; do not upload incomplete local over unknown cloud state.
+      if (pendingRetryTimers[profileId]) clearTimeout(pendingRetryTimers[profileId]);
+      pendingRetryTimers[profileId] = setTimeout(() => {
+        delete pendingRetryTimers[profileId];
+        void saveToCloud(profileId);
+      }, 8000);
+      return false;
+    }
+    throw err;
+  }
+
   // Apply unioned maps back into localStorage so the open tab matches what we saved.
   restoreStringMap(payload.taskStatuses);
   restoreStringMap(payload.taskDeletions);
@@ -623,6 +700,10 @@ export async function saveToCloud(profileId: string, opts?: { retryOnStale?: boo
   restoreStringMap(payload.checkInDays);
   restoreStringMap(payload.goalTaskChecks);
   restoreStringMap(payload.visitCounts);
+  if (payload.streakBest != null) {
+    localStorage.setItem(`streak-best-${profileId}`, JSON.stringify(payload.streakBest));
+  }
+  persistTzOffset(profileId, payload.tzOffset);
 
   const { data, error } = await invokeWithRetry(`${FN}/backup/${profileId}`, {
     method: 'POST',
@@ -630,20 +711,29 @@ export async function saveToCloud(profileId: string, opts?: { retryOnStale?: boo
   });
 
   if (!error && data?.ok === true) {
-    localStorage.setItem(LOCAL_CLOUD_AT_KEY(profileId), String(payload.savedAt));
+    const at = typeof data.savedAt === 'number' ? data.savedAt : Number(payload.savedAt) || Date.now();
+    localStorage.setItem(LOCAL_CLOUD_AT_KEY(profileId), String(at));
     return true;
   }
 
+  // Server now union-merges; stale_backup is rare / legacy — still retry once.
   if (data?.reason === 'stale_backup' && opts?.retryOnStale !== false) {
     await syncProfileFromCloud(profileId);
-    const retryPayload = await buildUnionPayload(profileId);
-    const retry = await invokeWithRetry(`${FN}/backup/${profileId}`, {
-      method: 'POST',
-      body: retryPayload,
-    });
-    if (!retry.error && retry.data?.ok === true) {
-      localStorage.setItem(LOCAL_CLOUD_AT_KEY(profileId), String(retryPayload.savedAt));
-      return true;
+    try {
+      const retryPayload = await buildUnionPayload(profileId);
+      const retry = await invokeWithRetry(`${FN}/backup/${profileId}`, {
+        method: 'POST',
+        body: retryPayload,
+      });
+      if (!retry.error && retry.data?.ok === true) {
+        const at = typeof retry.data.savedAt === 'number'
+          ? retry.data.savedAt
+          : Number(retryPayload.savedAt) || Date.now();
+        localStorage.setItem(LOCAL_CLOUD_AT_KEY(profileId), String(at));
+        return true;
+      }
+    } catch {
+      return false;
     }
   }
 
@@ -653,23 +743,38 @@ export async function saveToCloud(profileId: string, opts?: { retryOnStale?: boo
   return false;
 }
 
+/** Serialized per-profile save — prevents overlapping buildUnionPayload races. */
+export async function saveToCloud(profileId: string, opts?: { retryOnStale?: boolean }): Promise<boolean> {
+  const prev = saveChains[profileId] ?? Promise.resolve(true);
+  const next = prev
+    .catch(() => false)
+    .then(() => saveToCloudUnlocked(profileId, opts));
+  saveChains[profileId] = next.finally(() => {
+    if (saveChains[profileId] === next) delete saveChains[profileId];
+  });
+  return next;
+}
+
 /** After cloud pull, push email/qualification if local has fields cloud is missing. */
 export async function pushQualificationAfterSync(profileId: string): Promise<void> {
-  const cloud = await fetchCloudBackup(profileId);
-  if (!cloud) {
+  const result = await fetchCloudBackupResult(profileId);
+  if (result.status === 'error') {
+    // Fail-closed: don't invent a first backup while cloud status is unknown.
+    scheduleSave(profileId);
+    return;
+  }
+  if (result.status === 'empty') {
     await saveToCloud(profileId);
     return;
   }
+  const cloud = result.data;
   const emailKey = getStorageKey(`arbol-email-${profileId}`);
   const localEmail = localStorage.getItem(emailKey)?.trim() ?? '';
   const cloudEmail = typeof cloud.profileEmail === 'string' ? cloud.profileEmail.trim() : '';
   const needsEmailPush = !!localEmail && !cloudEmail;
-  // Always union-save after sync so the cloud snapshot includes both devices —
-  // buildUnionPayload prevents wipe; never use Date.now() alone to claim "local newer".
   if (needsEmailPush) {
     await saveToCloud(profileId);
   } else {
-    // Light: scheduleSave already queued on merge; ensure one union push settles the other device.
     scheduleSave(profileId);
   }
 }

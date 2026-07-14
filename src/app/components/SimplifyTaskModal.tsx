@@ -7,9 +7,9 @@ const { TextArea } = Input;
 
 const QUESTIONS = [
   'What makes this task feel hard, vague, or overwhelming?',
-  'What would "good enough" progress look like today?',
+  'What would make you feel motivated to take the next step today?',
   'Any constraints? (time, energy, tools, dependencies)',
-];
+] as const;
 
 interface Props {
   open: boolean;
@@ -18,6 +18,12 @@ interface Props {
   goalTitle?: string;
   goalWhy?: string;
   onConfirm: (replacements: Array<{ label: string; timeOfDay: 'morning' | 'evening' }>) => void;
+}
+
+function friendlySimplifyError(reason?: string): string {
+  if (reason === 'network_error') return 'Could not reach the server. Check your connection and try again.';
+  if (reason === 'input_too_short') return 'Add a bit more about what makes this hard — then try again.';
+  return 'Couldn’t simplify — try again.';
 }
 
 export function SimplifyTaskModal({
@@ -59,17 +65,16 @@ export function SimplifyTaskModal({
     setLoading(true);
     setError(null);
     try {
-      const filled = answers.map(a => a.trim()).filter(Boolean);
       const res = await simplifyTaskFromEdge({
         taskLabel,
         goalTitle,
         goalWhy,
-        answers: filled,
+        blocker: answers[0] ?? '',
+        motivation: answers[1] ?? '',
+        constraint: answers[2] ?? '',
       });
       if (!res.ok || res.tasks.length === 0) {
-        setError(res.reason === 'network_error'
-          ? 'Could not reach the server. Try again.'
-          : 'No simpler steps could be generated. Try adding more detail to your answers.');
+        setError(friendlySimplifyError(res.reason));
         return;
       }
       setResult(res);
@@ -165,7 +170,7 @@ export function SimplifyTaskModal({
                 onClick={handleNext}
                 style={{ borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none', background: '#7c3aed' }}
               >
-                {isLastQuestion ? 'Generate steps' : 'Next'}
+                {isLastQuestion ? (error ? 'Retry' : 'Generate steps') : 'Next'}
               </Button>
             </div>
           </>

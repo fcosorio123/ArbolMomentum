@@ -226,6 +226,7 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
         deepWhy: group.goal.deepWhy,
       });
       group.tasks.forEach(task => {
+        if (task.label.trim().toLowerCase() === goal.title.trim().toLowerCase()) return;
         createUserTask(profile.id, {
           label: task.label,
           timeOfDay: task.timeOfDay,
@@ -293,20 +294,32 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
           <div style={{ fontSize: 48, marginBottom: 14 }}>🎯</div>
           <div style={{ fontWeight: 700, fontSize: 16, color: C.headline, marginBottom: 8 }}>No goals yet</div>
           <div style={{ color: C.body, fontSize: 13, lineHeight: 1.6, marginBottom: 20 }}>
-            Set your first goal and build daily tasks around it. Start with something meaningful.
+            Set your first goal and build daily tasks around it. Start with something meaningful — or paste a brain dump for AI to organize.
           </div>
-          <button
-            data-tour-id="goals-add-btn"
-            onClick={() => { setEditingGoal(null); setManageGoalOpen(true); }}
-            style={{
-              background: `linear-gradient(135deg, #ef4565, #f5a623)`,
-              border: 'none', borderRadius: 12, padding: '12px 24px',
-              color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-            }}
-          >
-            <PlusOutlined /> Set my first goal
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+            <button
+              data-tour-id="goals-add-btn"
+              onClick={() => { setEditingGoal(null); setManageGoalOpen(true); }}
+              style={{
+                background: `linear-gradient(135deg, #ef4565, #f5a623)`,
+                border: 'none', borderRadius: 12, padding: '12px 24px',
+                color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+              }}
+            >
+              <PlusOutlined /> Set my first goal
+            </button>
+            <button
+              type="button"
+              onClick={() => setContextAssistOpen(true)}
+              style={{
+                padding: '10px 18px', borderRadius: 12, border: `1.5px solid ${C.primary}50`,
+                background: `${C.primary}12`, color: C.primary, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              ✨ Add with AI
+            </button>
+          </div>
         </div>
       ) : (
         <div data-tour-id="goals-section" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
