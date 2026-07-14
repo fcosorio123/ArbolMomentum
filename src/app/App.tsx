@@ -366,37 +366,59 @@ export default function App() {
     trackEvent(activeProfile.id, 'app_opened');
   }, [activeProfile?.id]);
 
-  // ── Cloud sync: merge profile data from cloud on every session ──
+  // ── Cloud sync: merge profile data on load + whenever the tab becomes visible ──
   useEffect(() => {
     if (!activeProfile) return;
-    const sessionKey = `arbol-restore-attempted-${activeProfile.id}`;
-    if (sessionStorage.getItem(sessionKey)) return;
-
     const profileId = activeProfile.id;
+    let lastSyncAt = 0;
+    let inFlight = false;
+    const MIN_GAP_MS = 12_000;
 
-    const tryHydrate = () => {
-      import('./data/supabaseSync').then(({ hydrateProfileFromSupabase }) => {
-        hydrateProfileFromSupabase(profileId).then(hydrated => {
-          if (hydrated) window.location.reload();
+    const runSync = (reason: 'mount' | 'focus') => {
+      const now = Date.now();
+      if (inFlight) return;
+      if (reason === 'focus' && now - lastSyncAt < MIN_GAP_MS) return;
+      inFlight = true;
+
+      const tryHydrate = () => {
+        import('./data/supabaseSync').then(({ hydrateProfileFromSupabase }) => {
+          hydrateProfileFromSupabase(profileId).then(hydrated => {
+            if (hydrated) window.location.reload();
+          });
         });
+      };
+
+      import('./data/cloudBackup').then(({ syncProfileFromCloud, pushQualificationAfterSync }) => {
+        syncProfileFromCloud(profileId)
+          .then(result => {
+            lastSyncAt = Date.now();
+            if (result === 'full-restore') {
+              window.location.reload();
+              return;
+            }
+            if (result === 'merged') {
+              try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
+              try { window.dispatchEvent(new CustomEvent(DASHBOARD_REFRESH_EVENT)); } catch {}
+            }
+            return pushQualificationAfterSync(profileId).finally(() => {
+              if (reason === 'mount') tryHydrate();
+            });
+          })
+          .finally(() => { inFlight = false; });
       });
     };
 
-    import('./data/cloudBackup').then(({ syncProfileFromCloud, pushQualificationAfterSync }) => {
-      syncProfileFromCloud(profileId).then(result => {
-        sessionStorage.setItem(sessionKey, 'true');
-        if (result === 'full-restore') {
-          window.location.reload();
-          return;
-        }
-        if (result === 'merged') {
-          try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
-        }
-        pushQualificationAfterSync(profileId).finally(() => {
-          tryHydrate();
-        });
-      });
-    });
+    runSync('mount');
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') runSync('focus');
+    };
+    window.addEventListener('focus', onVisible);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [activeProfile?.id]);
 
   const advanceOnboarding = useCallback((completed: OnboardingModal) => {

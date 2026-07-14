@@ -33,6 +33,53 @@ function readPersonalGoals(profileId: string): unknown {
 
 // ── Collect all localStorage entries for a profile ──────────────────
 
+/** Prefer stronger task status so mobile/desktop done marks aren't lost. */
+function preferTaskStatus(a: string | undefined, b: string | undefined): string {
+  const rank = (s: string | undefined) => {
+    if (s === 'done') return 4;
+    if (s === 'inprogress') return 3;
+    if (s === 'skipped') return 2;
+    if (s) return 1;
+    return 0;
+  };
+  return (rank(b) > rank(a) ? b : a) || a || b || '';
+}
+
+function preferBooleanish(a: string | undefined, b: string | undefined): string {
+  if (a === 'true' || b === 'true') return 'true';
+  return b || a || '';
+}
+
+function preferVisitCount(a: string | undefined, b: string | undefined): string {
+  const na = parseInt(a || '0', 10) || 0;
+  const nb = parseInt(b || '0', 10) || 0;
+  return String(Math.max(na, nb));
+}
+
+/**
+ * Union-merge string maps into localStorage.
+ * `prefer` picks the winning value when both sides have the same key.
+ * Returns true if any local key was written/changed.
+ */
+function unionMergeStringMap(
+  cloudMap: unknown,
+  prefer: (local: string | undefined, cloud: string | undefined) => string,
+): boolean {
+  if (!cloudMap || typeof cloudMap !== 'object') return false;
+  let changed = false;
+  for (const [k, cloudVal] of Object.entries(cloudMap as Record<string, string>)) {
+    if (!k || cloudVal == null) continue;
+    const localVal = localStorage.getItem(k) ?? undefined;
+    const next = prefer(localVal, String(cloudVal));
+    if (!next) continue;
+    if (localVal !== next) {
+      localStorage.setItem(k, next);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 function collectLocalData(profileId: string): Record<string, unknown> {
   const taskStatuses: Record<string, string> = {};
   const taskDeletions: Record<string, string> = {};
@@ -40,6 +87,10 @@ function collectLocalData(profileId: string): Record<string, unknown> {
   const taskNotes: Record<string, string> = {};
   const taskBlocked: Record<string, string> = {};
   const goalProgressLogs: Record<string, string> = {};
+  const checkInDays: Record<string, string> = {};
+  const feedbackEntries: Record<string, string> = {};
+  const goalTaskChecks: Record<string, string> = {};
+  const visitCounts: Record<string, string> = {};
 
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
@@ -67,6 +118,18 @@ function collectLocalData(profileId: string): Record<string, unknown> {
     } else if (key.startsWith(`arbol-task-blocked-${profileId}-`)) {
       const v = localStorage.getItem(key);
       if (v) taskBlocked[key] = v;
+    } else if (key.startsWith(`arbol-checkin-${profileId}-`)) {
+      const v = localStorage.getItem(key);
+      if (v) checkInDays[key] = v;
+    } else if (key.startsWith(`arbol-feedback-${profileId}-`)) {
+      const v = localStorage.getItem(key);
+      if (v) feedbackEntries[key] = v;
+    } else if (key.startsWith(`arbol-gtask-${profileId}-`)) {
+      const v = localStorage.getItem(key);
+      if (v) goalTaskChecks[key] = v;
+    } else if (key.startsWith(`visit-${profileId}-`)) {
+      const v = localStorage.getItem(key);
+      if (v) visitCounts[key] = v;
     }
   }
 
@@ -115,6 +178,10 @@ function collectLocalData(profileId: string): Record<string, unknown> {
     taskNotes,
     taskBlocked,
     goalProgressLogs,
+    checkInDays,
+    feedbackEntries,
+    goalTaskChecks,
+    visitCounts,
     tourDismissals,
     calendarPrefs: raw(CALENDAR_PREFS_KEY(profileId)),
     calendarProvider: localStorage.getItem(CALENDAR_PROVIDER_KEY(profileId)) || null,
@@ -233,36 +300,53 @@ function restoreStringMap(map: unknown): void {
   }
 }
 
-/** When cloud backup is newer than last local merge, pull activity maps + task blobs. */
-function mergeCloudActivityWhenNewer(profileId: string, cloud: Record<string, unknown>): boolean {
+/**
+ * Union-merge cloud activity into local so mobile/desktop both keep progress.
+ * Task statuses prefer "done"; streak/check-in flags OR together; visit counts take max.
+ * When cloud is newer, also pull task/goal blob fields that aren't key-level mergeable.
+ */
+function mergeCloudActivityUnion(profileId: string, cloud: Record<string, unknown>): boolean {
   const localAt = Number(localStorage.getItem(LOCAL_CLOUD_AT_KEY(profileId)) || 0);
   const cloudAt = typeof cloud.savedAt === 'number' ? cloud.savedAt : 0;
-  if (cloudAt <= localAt) return false;
 
-  const write = (k: string, v: unknown) => {
-    if (v === null || v === undefined) return;
-    localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
-  };
+  let changed = false;
+  if (unionMergeStringMap(cloud.taskStatuses, preferTaskStatus)) changed = true;
+  if (unionMergeStringMap(cloud.taskDeletions, (a, b) => b || a || '')) changed = true;
+  if (unionMergeStringMap(cloud.streakDays, preferBooleanish)) changed = true;
+  if (unionMergeStringMap(cloud.taskNotes, (a, b) => (b && b.length >= (a?.length ?? 0) ? b : a) || '')) changed = true;
+  if (unionMergeStringMap(cloud.taskBlocked, preferBooleanish)) changed = true;
+  if (unionMergeStringMap(cloud.goalProgressLogs, (a, b) => b || a || '')) changed = true;
+  if (unionMergeStringMap(cloud.checkInDays, preferBooleanish)) changed = true;
+  if (unionMergeStringMap(cloud.feedbackEntries, (a, b) => b || a || '')) changed = true;
+  if (unionMergeStringMap(cloud.goalTaskChecks, preferBooleanish)) changed = true;
+  if (unionMergeStringMap(cloud.visitCounts, preferVisitCount)) changed = true;
+  if (unionMergeStringMap(cloud.tourDismissals, preferBooleanish)) changed = true;
 
-  restoreStringMap(cloud.taskStatuses);
-  restoreStringMap(cloud.taskDeletions);
-  restoreStringMap(cloud.streakDays);
-  restoreStringMap(cloud.taskNotes);
-  restoreStringMap(cloud.taskBlocked);
-  restoreStringMap(cloud.goalProgressLogs);
-  restoreStringMap(cloud.tourDismissals);
+  // Blobs: only overwrite when cloud is strictly newer (avoid clobbering concurrent edits).
+  if (cloudAt > localAt) {
+    const write = (k: string, v: unknown) => {
+      if (v === null || v === undefined) return;
+      const next = typeof v === 'string' ? v : JSON.stringify(v);
+      if (localStorage.getItem(k) !== next) {
+        localStorage.setItem(k, next);
+        changed = true;
+      }
+    };
 
-  write(`arbol-user-tasks-${profileId}`, cloud.userTasks);
-  write(`arbol-user-cats-${profileId}`, cloud.userCategories);
-  write(`arbol-goal-logs-${profileId}`, cloud.goalLogs);
-  write(`streak-best-${profileId}`, cloud.streakBest);
-  write(`arbol-live-reports-${profileId}`, cloud.liveReports);
-  write(`arbol-live-snapshots-${profileId}`, cloud.liveSnapshots);
-  write(`arbol-hidden-seed-${profileId}`, cloud.permanentlyHiddenSeedTasks);
-  write(DELETED_DEFAULT_GOALS_KEY(profileId), cloud.deletedDefaultGoals);
+    write(`arbol-user-tasks-${profileId}`, cloud.userTasks);
+    write(`arbol-user-cats-${profileId}`, cloud.userCategories);
+    write(`arbol-goal-logs-${profileId}`, cloud.goalLogs);
+    write(`streak-best-${profileId}`, cloud.streakBest);
+    write(`arbol-live-reports-${profileId}`, cloud.liveReports);
+    write(`arbol-live-snapshots-${profileId}`, cloud.liveSnapshots);
+    write(`arbol-hidden-seed-${profileId}`, cloud.permanentlyHiddenSeedTasks);
+    write(DELETED_DEFAULT_GOALS_KEY(profileId), cloud.deletedDefaultGoals);
+  }
 
-  localStorage.setItem(LOCAL_CLOUD_AT_KEY(profileId), String(cloudAt));
-  return true;
+  if (changed && cloudAt > 0) {
+    localStorage.setItem(LOCAL_CLOUD_AT_KEY(profileId), String(Math.max(localAt, cloudAt)));
+  }
+  return changed;
 }
 
 // ── Apply a backup payload back into localStorage ────────────────────
@@ -304,6 +388,10 @@ function applyLocalData(profileId: string, data: Record<string, unknown>): void 
   restoreMap(data.taskNotes);
   restoreMap(data.taskBlocked);
   restoreMap(data.goalProgressLogs);
+  restoreMap(data.checkInDays);
+  restoreMap(data.feedbackEntries);
+  restoreMap(data.goalTaskChecks);
+  restoreMap(data.visitCounts);
   restoreMap(data.tourDismissals);
 
   if (typeof data.profileArchived === 'boolean') {
@@ -530,12 +618,16 @@ export async function syncProfileFromCloud(
   if (mergeTaskGoalLinksFromCloud(profileId, cloud.taskGoalLinks)) merged = true;
   if (mergeQualificationFieldsFromCloud(profileId, cloud)) merged = true;
   if (mergeArchiveFromCloud(profileId, cloud)) merged = true;
-  if (mergeCloudActivityWhenNewer(profileId, cloud)) merged = true;
+  if (mergeCloudActivityUnion(profileId, cloud)) merged = true;
 
   if (merged) {
     const cloudAt = typeof cloud.savedAt === 'number' ? cloud.savedAt : Date.now();
     const prev = Number(localStorage.getItem(LOCAL_CLOUD_AT_KEY(profileId)) || 0);
     localStorage.setItem(LOCAL_CLOUD_AT_KEY(profileId), String(Math.max(prev, cloudAt)));
+    // Recalc personal-best streaks after unioning activity from the other device.
+    import('./profiles').then(({ updateStreakBests }) => {
+      try { updateStreakBests(profileId); } catch { /* ignore */ }
+    }).catch(() => {});
     scheduleSave(profileId);
     return 'merged';
   }

@@ -176,6 +176,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
     checkInRecordedRef.current = true;
     try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
     import('../data/dashboardSnapshot').then(({ dispatchDashboardRefresh }) => dispatchDashboardRefresh());
+    import('../data/cloudBackup').then(({ scheduleSave }) => scheduleSave(profile.id));
 
     import('../data/emailSettings').then(({ isEmailTypeEnabled }) => {
       if (!isEmailTypeEnabled('checkInConfirmationEnabled')) return;
