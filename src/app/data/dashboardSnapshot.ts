@@ -119,6 +119,7 @@ export function getTodayTaskRows(profileId: string, dateKey = getTodayKey()): To
   }
 
   for (const ut of userTasks) {
+    if (ut.archivedAt) continue;
     if (!isScheduledUserTask(ut, dateKey)) continue;
     if (seen.has(ut.id)) continue;
     seen.add(ut.id);
@@ -164,7 +165,7 @@ export function calculateBannerState(
       const seedTasks = cats.flatMap(c =>
         c.tasks.filter(t => getPrimaryGoalIdForTask(profileId, t.id, c.goalId) === goal.id),
       );
-      const userTasksForGoal = uts.filter(ut => ut.goalId === goal.id && isTaskScheduledForDate(ut, dateKey));
+      const userTasksForGoal = uts.filter(ut => !ut.archivedAt && ut.goalId === goal.id && isTaskScheduledForDate(ut, dateKey));
       return [...seedTasks, ...userTasksForGoal].some(t => {
         if (!isTaskActiveForDate(profileId, t.id, dateKey)) return false;
         const st = getTaskStatus(profileId, t.id, dateKey);

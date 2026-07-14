@@ -31,6 +31,8 @@ export interface UserTask {
   /** Simplification / replacement lineage */
   sourceSimplifiedFrom?: string;
   potentialValue?: import('./potentialValue').PotentialValue;
+  /** Soft-archive timestamp; archived tasks are hidden from Active filters */
+  archivedAt?: number;
 }
 
 // ── Scheduling helpers ────────────────────────────────────────────────
@@ -99,9 +101,46 @@ export function getUserTasks(profileId: string): UserTask[] {
   }
 }
 
-/** User tasks scheduled for a date (excludes skipped occurrences). */
+/** Non-archived user tasks. */
+export function getActiveUserTasks(profileId: string): UserTask[] {
+  return getUserTasks(profileId).filter(ut => !ut.archivedAt);
+}
+
+/** User tasks scheduled for a date (excludes skipped occurrences and archived). */
 export function getActiveUserTasksForDate(profileId: string, dateKey: string): UserTask[] {
-  return getUserTasks(profileId).filter(ut => isTaskScheduledForDate(ut, dateKey));
+  return getActiveUserTasks(profileId).filter(ut => isTaskScheduledForDate(ut, dateKey));
+}
+
+/** One-time task whose specificDate is before today and not completed. */
+export function isOverdueUserTask(
+  task: UserTask,
+  todayKey: string,
+  getStatus: (taskId: string, dateKey: string) => string | null,
+): boolean {
+  if (task.archivedAt) return false;
+  const rec = task.recurrence;
+  if (!rec || rec.type !== 'one-time' || !rec.specificDate) return false;
+  if (rec.specificDate >= todayKey) return false;
+  return getStatus(task.id, rec.specificDate) !== 'done';
+}
+
+export function archiveUserTask(profileId: string, taskId: string): void {
+  updateUserTask(profileId, taskId, { archivedAt: Date.now() });
+  try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch {}
+}
+
+export function restoreUserTask(profileId: string, taskId: string): void {
+  const tasks = getUserTasks(profileId);
+  saveUserTasks(
+    profileId,
+    tasks.map(t => {
+      if (t.id !== taskId) return t;
+      const { archivedAt: _a, ...rest } = t;
+      return rest as UserTask;
+    }),
+  );
+  try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
+  try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch {}
 }
 
 export function saveUserTasks(profileId: string, tasks: UserTask[]) {

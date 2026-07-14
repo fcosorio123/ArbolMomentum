@@ -84,7 +84,8 @@ assert('feedback trigger polling', /evaluateFeedbackTrigger|feedbackTriggers/.te
 
 const taskList = readFileSync(join(root, 'src/app/components/TaskList.tsx'), 'utf8');
 assert('touch targets in TaskList', /touchIconButton|MIN_TOUCH/.test(taskList));
-assert('ContextAssistModal wired', existsSync(join(src, 'ContextAssistModal.tsx')));
+assert('TasksMonthView wired', existsSync(join(src, 'TasksMonthView.tsx')));
+assert('tasksInventory helpers', existsSync(join(root, 'src/app/data/tasksInventory.ts')));
 assert('SimplifyTaskModal wired', existsSync(join(src, 'SimplifyTaskModal.tsx')));
 assert('potentialValue module', existsSync(join(root, 'src/app/data/potentialValue.ts')));
 

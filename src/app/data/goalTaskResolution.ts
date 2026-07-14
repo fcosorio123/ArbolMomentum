@@ -35,6 +35,7 @@ export function getGoalTaskBreakdown(profileId: string, goalId: string, dateKey:
   });
 
   userTasks.forEach(ut => {
+    if (ut.archivedAt) return;
     if (ut.goalId !== goalId) return;
     if (!isTaskScheduledForDate(ut, dateKey)) return;
     countTaskStatus(profileId, ut.id, dateKey, tallies);
@@ -65,6 +66,7 @@ export function getTasksForGoal(
   });
 
   getUserTasks(profileId).forEach(ut => {
+    if (ut.archivedAt) return;
     if (ut.goalId !== goalId) return;
     if (!isTaskScheduledForDate(ut, dateKey)) return;
     if (!isTaskActiveForDate(profileId, ut.id, dateKey)) return;

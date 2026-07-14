@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { App, Button, Progress } from 'antd';
-import { DeleteOutlined, CheckCircleFilled, PlayCircleOutlined, ArrowRightOutlined, EditOutlined, PlusOutlined, CloseOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { DeleteOutlined, CheckCircleFilled, PlayCircleOutlined, EditOutlined, PlusOutlined, CloseOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import {
   type Profile, type Task, type TaskStatus,
   getTaskCategoriesForProfile, getTaskStatus,
@@ -17,15 +17,23 @@ import {
 import {
   getUserTasks, createUserTask, updateUserTask, deleteUserTask,
   orphanUserTasksForGoal, isTaskScheduledForDate, skipTaskOccurrence,
-  recurrenceLabel, type UserTask, type Recurrence,
+  recurrenceLabel, isOverdueUserTask, archiveUserTask, restoreUserTask,
+  type UserTask, type Recurrence,
 } from '../data/userTasks';
+import {
+  buildAllTasksInventory,
+  filterInventoryTasks,
+  type TaskStatusFilter,
+  type InventoryTask,
+} from '../data/tasksInventory';
 import { ManageTaskModal } from './ManageTaskModal';
 import { ContextAssistModal } from './ContextAssistModal';
 import { SimplifyTaskModal } from './SimplifyTaskModal';
 import { DeleteTaskModal, type DeleteTaskChoice } from './DeleteTaskModal';
+import { TasksMonthView } from './TasksMonthView';
 import { C } from '../data/colors';
 import { PV_LABELS } from '../data/potentialValue';
-import { touchIconButton } from '../styles/touchTargets';
+import { touchIconButton, touchPrimaryButton, MIN_TOUCH } from '../styles/touchTargets';
 import type { SeedSuggestionGroup } from '../data/profileSeedParser';
 import { trackActivity } from '../data/feedback';
 import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile } from './AppTour';
@@ -56,7 +64,26 @@ interface Props {
 
 type StatusMap = Record<string, TaskStatus | null>;
 type NotesMap = Record<string, string>;
-type UserTask_ = Task & { isUserCreated?: boolean; recurrence?: Recurrence; potentialValue?: UserTask['potentialValue'] };
+type UserTask_ = Task & {
+  isUserCreated?: boolean;
+  recurrence?: Recurrence;
+  potentialValue?: UserTask['potentialValue'];
+  archivedAt?: number;
+  scheduleLabel?: string;
+  goalId?: string;
+};
+
+type TaskViewMode = 'all' | 'today' | 'month';
+
+function taskViewStorageKey(profileId: string) {
+  return `arbol-task-view-${profileId}`;
+}
+
+function loadTaskView(profileId: string): TaskViewMode {
+  const v = localStorage.getItem(taskViewStorageKey(profileId));
+  if (v === 'all' || v === 'today' || v === 'month') return v;
+  return 'all';
+}
 
 function isRecurringUT(task: UserTask): boolean {
   return !!task.recurrence && task.recurrence.type !== 'daily' && task.recurrence.type !== 'one-time';
@@ -75,18 +102,21 @@ function taskDurationLabel(task: UserTask_): string {
 
 // ── Task item
 function TaskItem({
-  task, catColor, status, remark, onOpenUpdate, onDelete, onEdit, onSimplify, statusLocked,
-  profileId, profileName, calendarDateKey,
+  task, catColor, status, remark, onOpenUpdate, onDelete, onEdit, onSimplify, onArchive, onRestore, statusLocked,
+  profileId, profileName, calendarDateKey, statusHint,
   selectionMode, selected, onToggleSelect,
 }: {
   task: UserTask_; catColor: string; status: TaskStatus | null; remark?: string;
   onOpenUpdate: () => void; onDelete: () => void;
   onEdit?: () => void;
   onSimplify?: () => void;
+  onArchive?: () => void;
+  onRestore?: () => void;
   statusLocked?: boolean;
   profileId: string;
   profileName: string;
   calendarDateKey: string;
+  statusHint?: string;
   selectionMode?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
@@ -95,6 +125,8 @@ function TaskItem({
   const display = status ? TASK_STATUS_DISPLAY[status] : TASK_STATUS_DISPLAY.null;
   const remarkText = remark ? truncateRemark(remark) : '';
   const showRemark = shouldShowRemark(status, remarkText);
+  const scheduleText = task.scheduleLabel
+    || (task.recurrence ? recurrenceLabel(task.recurrence) : null);
 
   const handleActivate = () => {
     if (selectionMode) {
@@ -158,8 +190,11 @@ function TaskItem({
         }}>
           {task.label}
         </div>
-        <div style={{ fontSize: 11, color: C.secondary, marginTop: 3 }}>
+        <div style={{ fontSize: 11, color: C.secondary, marginTop: 3, lineHeight: 1.4 }}>
           {taskDurationLabel(task)}
+          {scheduleText && (
+            <span style={{ marginLeft: 8 }}>· {scheduleText}</span>
+          )}
           {task.potentialValue && (
             <span style={{
               marginLeft: 8, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 5,
@@ -179,7 +214,7 @@ function TaskItem({
             fontSize: 11, fontWeight: 700, marginTop: 4,
             color: display.color,
           }}>
-            {display.label}
+            {statusHint ?? display.label}
           </div>
         )}
         {showRemark && (
@@ -236,6 +271,32 @@ function TaskItem({
             onMouseLeave={e => { e.currentTarget.style.color = C.secondary; e.currentTarget.style.background = 'none'; }}
           >
             <EditOutlined />
+          </button>
+        )}
+        {onRestore && (
+          <button
+            onClick={onRestore}
+            type="button"
+            title="Restore"
+            style={{
+              ...touchIconButton,
+              background: 'none', border: 'none', color: C.primary, fontSize: 11, fontWeight: 700,
+            }}
+          >
+            Restore
+          </button>
+        )}
+        {onArchive && !onRestore && (
+          <button
+            onClick={onArchive}
+            type="button"
+            title="Archive"
+            style={{
+              ...touchIconButton,
+              background: 'none', border: 'none', color: C.secondary, fontSize: 11, fontWeight: 700,
+            }}
+          >
+            Archive
           </button>
         )}
         <button onClick={onDelete} type="button" style={{
@@ -357,8 +418,11 @@ function goalAccentColor(goalId: string) {
 // ── Goal group: goal header + flat task list
 function GoalGroup({
   goal, tasks, statuses, notes, onOpenUpdate, onDelete, timeFilter,
-  onEditTask, onAddSuggestedTask, onSimplifyTask, isFirst, profileId, profileName, calendarDateKey,
+  onEditTask, onAddSuggestedTask, onSimplifyTask, onArchiveTask, onRestoreTask,
+  isFirst, profileId, profileName, calendarDateKey,
   selectionMode, selectedTaskIds, onToggleTaskSelect, showExploreSuggestions = true,
+  emptyMessage = 'No tasks yet for this goal today.',
+  getStatusHint,
 }: {
   goal: PersonalGoal; tasks: UserTask_[];
   statuses: StatusMap; notes: NotesMap;
@@ -368,6 +432,8 @@ function GoalGroup({
   onEditTask: (t: UserTask_) => void;
   onAddSuggestedTask: (label: string, goalId: string) => void;
   onSimplifyTask?: (t: UserTask_, goal: PersonalGoal) => void;
+  onArchiveTask?: (t: UserTask_) => void;
+  onRestoreTask?: (t: UserTask_) => void;
   isFirst?: boolean;
   profileId: string;
   profileName: string;
@@ -376,6 +442,8 @@ function GoalGroup({
   selectedTaskIds?: Set<string>;
   onToggleTaskSelect?: (taskId: string) => void;
   showExploreSuggestions?: boolean;
+  emptyMessage?: string;
+  getStatusHint?: (task: UserTask_) => string | undefined;
 }) {
   const [collapsed, setCollapsed] = useState(!isFirst);
   const accentColor = goalAccentColor(goal.id);
@@ -395,7 +463,7 @@ function GoalGroup({
         }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 15, color: C.headline }}>{goal.title}</div>
-            <div style={{ fontSize: 12, color: C.body, marginTop: 4 }}>No tasks yet for this goal today.</div>
+            <div style={{ fontSize: 12, color: C.body, marginTop: 4 }}>{emptyMessage}</div>
           </div>
           <button
             type="button"
@@ -494,6 +562,7 @@ function GoalGroup({
               key={task.id} task={task} catColor={accent}
               status={statuses[task.id] ?? null}
               remark={notes[task.id]}
+              statusHint={getStatusHint?.(task)}
               profileId={profileId}
               profileName={profileName}
               calendarDateKey={calendarDateKey}
@@ -504,6 +573,8 @@ function GoalGroup({
               onDelete={() => onDelete(task)}
               onEdit={() => onEditTask(task)}
               onSimplify={task.isUserCreated && onSimplifyTask ? () => onSimplifyTask(task, goal) : undefined}
+              onArchive={task.isUserCreated && onArchiveTask && !task.archivedAt ? () => onArchiveTask(task) : undefined}
+              onRestore={task.isUserCreated && onRestoreTask && task.archivedAt ? () => onRestoreTask(task) : undefined}
             />
           ))}
         </div>
@@ -606,8 +677,10 @@ function suggestTasksForGoal(goal: PersonalGoal): Array<{ label: string; timeOfD
 // Main TaskList
 // ──────────────────────────────────────────────
 
-export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange }: Props) {
+export function TaskList({ profile, onNavigateWeek: _onNavigateWeek, onPerfectDay, onTasksChange }: Props) {
   const { message } = App.useApp();
+  const [taskView, setTaskView] = useState<TaskViewMode>(() => loadTaskView(profile.id));
+  const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>('active');
   const [timeFilter, setTimeFilter] = useState<'all' | 'morning' | 'evening'>('all');
   const [statuses, setStatuses] = useState<StatusMap>({});
   const [notes, setNotes] = useState<NotesMap>({});
@@ -634,16 +707,30 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     statuses, notes, taskUpdateContext, momentumEntry,
   ]);
 
+  useEffect(() => {
+    setTaskView(loadTaskView(profile.id));
+  }, [profile.id]);
+
+  const setTaskViewPersisted = (v: TaskViewMode) => {
+    setTaskView(v);
+    localStorage.setItem(taskViewStorageKey(profile.id), v);
+  };
+
   const today = getTodayKey();
   const calendarDateKey = getEffectiveDaySyncDateKey(profile.id);
   const categories = getTaskCategoriesForProfile(profile.id);
   const allTasks = categories.flatMap(c => c.tasks);
+  const activeUserTasks = userTasks.filter(ut => !ut.archivedAt);
   const allTasksCombined = [
     ...allTasks,
-    ...userTasks
+    ...activeUserTasks
       .filter(ut => isTaskScheduledForDate(ut, today))
       .map(ut => ({ id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, type: ut.type, category: 'user' } as Task)),
   ];
+
+  const overdueUserTasks = activeUserTasks.filter(ut =>
+    isOverdueUserTask(ut, today, (id, dk) => getTaskStatus(profile.id, id, dk)),
+  );
 
   const loadState = useCallback(() => {
     const s: StatusMap = {};
@@ -936,7 +1023,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     message.success({ content: 'Task simplified into smaller steps!', duration: 2 });
   };
 
-  // Build goal → tasks map directly (no category layer)
+  // Build today goal → tasks map
   const goalTaskMap: Record<string, UserTask_[]> = {};
   goals.forEach(g => { goalTaskMap[g.id] = []; });
   const ungroupedTasks: UserTask_[] = [];
@@ -950,13 +1037,12 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   const shouldSkipSeedTask = (seedId: string) =>
     hiddenSeedIds.has(seedId) || convertedSeedIds.has(seedId);
 
-  // Seed tasks from categories
+  // Seed tasks from categories (today view)
   categories.forEach(cat => {
     cat.tasks.forEach(t => {
       if (shouldSkipSeedTask(t.id)) return;
-      // Skip seed if a user task already owns this row (same id from a prior conversion)
       if (userTaskIds.has(t.id)) return;
-      const taskObj: UserTask_ = { ...t };
+      const taskObj: UserTask_ = { ...t, scheduleLabel: 'Daily' };
       const effectiveGoalId = getPrimaryGoalIdForTask(profile.id, t.id, cat.goalId);
       if (effectiveGoalId && goalTaskMap[effectiveGoalId] !== undefined) {
         goalTaskMap[effectiveGoalId].push(taskObj);
@@ -966,12 +1052,14 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     });
   });
 
-  // User tasks - only include those scheduled for today
-  userTasks.filter(ut => isTaskScheduledForDate(ut, today)).forEach(ut => {
+  // User tasks scheduled for today (exclude archived)
+  activeUserTasks.filter(ut => isTaskScheduledForDate(ut, today)).forEach(ut => {
     const taskObj: UserTask_ = {
       id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, type: ut.type,
       category: 'user', isUserCreated: true, recurrence: ut.recurrence,
       potentialValue: ut.potentialValue,
+      scheduleLabel: recurrenceLabel(ut.recurrence),
+      goalId: ut.goalId,
     };
     if (ut.goalId && goalTaskMap[ut.goalId] !== undefined) {
       goalTaskMap[ut.goalId].push(taskObj);
@@ -979,6 +1067,24 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
       ungroupedTasks.push(taskObj);
     }
   });
+
+  // All Tasks inventory
+  const allInventory = buildAllTasksInventory(profile.id);
+  const allGoalTaskMap: Record<string, UserTask_[]> = {};
+  allInventory.goals.forEach(g => {
+    allGoalTaskMap[g.id] = filterInventoryTasks(
+      allInventory.goalTaskMap[g.id] ?? [],
+      statusFilter,
+      profile.id,
+      today,
+    ) as UserTask_[];
+  });
+  const allUnassigned = filterInventoryTasks(
+    allInventory.unassigned,
+    statusFilter,
+    profile.id,
+    today,
+  ) as UserTask_[];
 
   const visible = allTasksCombined.filter(t =>
     timeFilter === 'all' || t.timeOfDay === timeFilter
@@ -988,6 +1094,17 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
   const overallPct = countable.length > 0 ? Math.round((done / countable.length) * 100) : 0;
   const isEmpty = categories.length === 0 && userTasks.length === 0 && goals.length === 0;
   const hideExploreSuggestions = isFreshProfile(profile.id) || isUserDefinedProfile(profile.id);
+
+  const statusHintForAll = (task: UserTask_): string | undefined => {
+    const scheduledToday = task.isUserCreated
+      ? (() => {
+          const ut = userTasks.find(u => u.id === task.id);
+          return ut ? isTaskScheduledForDate(ut, today) : false;
+        })()
+      : true;
+    if (!scheduledToday) return 'Not due today';
+    return undefined;
+  };
 
   const openTaskUpdate = (
     task: Task,
@@ -1086,6 +1203,112 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
     }
   };
 
+  const handleArchiveTask = (task: UserTask_) => {
+    if (!task.isUserCreated) return;
+    archiveUserTask(profile.id, task.id);
+    loadState();
+    message.success('Task archived');
+  };
+
+  const handleRestoreTask = (task: UserTask_) => {
+    if (!task.isUserCreated) return;
+    restoreUserTask(profile.id, task.id);
+    loadState();
+    message.success('Task restored');
+  };
+
+  const handleMonthManage = (task: InventoryTask) => {
+    handleEditAnyTask(task as UserTask_, task.goalId);
+  };
+
+  const viewTabs: Array<{ key: TaskViewMode; label: string }> = [
+    { key: 'all', label: 'All Tasks' },
+    { key: 'today', label: 'Today' },
+    { key: 'month', label: 'Month' },
+  ];
+
+  const statusChips: Array<{ key: TaskStatusFilter; label: string }> = [
+    { key: 'active', label: 'Active' },
+    { key: 'completed', label: 'Completed' },
+    { key: 'overdue', label: 'Overdue' },
+    { key: 'archived', label: 'Archived' },
+  ];
+
+  const renderGoalLists = (
+    map: Record<string, UserTask_[]>,
+    ungrouped: UserTask_[],
+    opts: {
+      showExplore: boolean;
+      unassignedLabel: string;
+      emptyMessage: string;
+      getStatusHint?: (task: UserTask_) => string | undefined;
+    },
+  ) => (
+    <>
+      {goals.map((goal, idx) => (
+        <div key={goal.id} {...(idx === 0 ? { 'data-tour-id': 'tasks-goal-group' } : {})}>
+          <GoalGroup
+            goal={goal}
+            tasks={map[goal.id] ?? []}
+            statuses={statuses} notes={notes}
+            profileId={profile.id}
+            profileName={profile.name}
+            calendarDateKey={calendarDateKey}
+            onOpenUpdate={openTaskUpdate}
+            onDelete={t => openDeleteTask(t)}
+            timeFilter={timeFilter}
+            isFirst={idx === 0}
+            onEditTask={t => handleEditAnyTask(t, goal.id)}
+            onAddSuggestedTask={handleAddSuggestedTask}
+            onSimplifyTask={(t, g) => setSimplifyTarget({ task: t, goal: g })}
+            onArchiveTask={handleArchiveTask}
+            onRestoreTask={handleRestoreTask}
+            showExploreSuggestions={opts.showExplore && !hideExploreSuggestions}
+            emptyMessage={opts.emptyMessage}
+            getStatusHint={opts.getStatusHint}
+            selectionMode={selectMode}
+            selectedTaskIds={selectedTaskIds}
+            onToggleTaskSelect={toggleTaskSelect}
+          />
+        </div>
+      ))}
+
+      {ungrouped.filter(t => timeFilter === 'all' || t.timeOfDay === timeFilter).length > 0 && (
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div style={{ flex: 1, height: 1, background: C.border }} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: C.secondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              {opts.unassignedLabel}
+            </span>
+            <div style={{ flex: 1, height: 1, background: C.border }} />
+          </div>
+          {ungrouped
+            .filter(t => timeFilter === 'all' || t.timeOfDay === timeFilter)
+            .map(task => (
+              <TaskItem
+                key={task.id} task={task} catColor={C.secondary}
+                status={statuses[task.id] ?? null}
+                remark={notes[task.id]}
+                statusHint={opts.getStatusHint?.(task)}
+                profileId={profile.id}
+                profileName={profile.name}
+                calendarDateKey={calendarDateKey}
+                selectionMode={selectMode}
+                selected={selectedTaskIds.has(task.id)}
+                onToggleSelect={() => toggleTaskSelect(task.id)}
+                onOpenUpdate={() => openTaskUpdate(task)}
+                onDelete={() => openDeleteTask(task)}
+                onEdit={() => handleEditAnyTask(task, undefined)}
+                onSimplify={task.isUserCreated ? () => setSimplifyTarget({ task }) : undefined}
+                onArchive={task.isUserCreated && !task.archivedAt ? () => handleArchiveTask(task) : undefined}
+                onRestore={task.isUserCreated && task.archivedAt ? () => handleRestoreTask(task) : undefined}
+              />
+            ))}
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 100px', background: C.bg, minHeight: '100dvh' }}>
       {/* Header */}
@@ -1098,9 +1321,44 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
         </div>
         <PageTourButton onClick={() => setShowTour(true)} />
       </div>
-      <p style={{ margin: '0 0 16px', color: C.secondary, fontSize: 13, lineHeight: 1.5 }}>
-        Complete the tasks that move your goals forward.
+      <p style={{ margin: '0 0 12px', color: C.secondary, fontSize: 13, lineHeight: 1.5 }}>
+        {taskView === 'all' && 'Manage every task — find it without hunting the calendar.'}
+        {taskView === 'today' && 'What needs attention right now.'}
+        {taskView === 'month' && 'See timing and workload across the month.'}
       </p>
+
+      {/* View segmented control */}
+      <div
+        role="tablist"
+        aria-label="Task views"
+        style={{
+          display: 'flex', gap: 4, marginBottom: 14, padding: 4,
+          background: C.bgAlt, borderRadius: 14, border: `1px solid ${C.border}`,
+        }}
+      >
+        {viewTabs.map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={taskView === key}
+            onClick={() => setTaskViewPersisted(key)}
+            style={{
+              ...touchPrimaryButton,
+              flex: 1,
+              border: 'none',
+              borderRadius: 10,
+              background: taskView === key ? C.bgCard : 'transparent',
+              color: taskView === key ? C.primary : C.secondary,
+              fontWeight: taskView === key ? 800 : 600,
+              fontSize: 13,
+              boxShadow: taskView === key ? C.shadow : 'none',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       {/* Overall progress */}
       {!isEmpty && (
@@ -1111,153 +1369,162 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
           </div>
           <Progress percent={overallPct} strokeColor={{ '0%': C.primary, '100%': C.headline }}
             railColor={C.bgAlt} showInfo={false} size={['100%', 8]} />
-          <div style={{ display: 'flex', gap: 12, marginTop: 10, fontSize: 12 }}>
-            {(['inprogress', 'done'] as TaskStatus[]).map(s => {
-              const count = visible.filter(t => statuses[t.id] === s).length;
-              return (
-                <span key={s} style={{ color: STATUS_META[s].color, fontWeight: 600 }}>
-                  {STATUS_META[s].dot} {count} {STATUS_META[s].label}
-                </span>
-              );
-            })}
-            <span style={{ color: C.secondary }}>
-              ○ {visible.filter(t => !statuses[t.id]).length} Not started
-            </span>
-          </div>
+          {taskView !== 'month' && (
+            <div style={{ display: 'flex', gap: 12, marginTop: 10, fontSize: 12 }}>
+              {(['inprogress', 'done'] as TaskStatus[]).map(s => {
+                const count = visible.filter(t => statuses[t.id] === s).length;
+                return (
+                  <span key={s} style={{ color: STATUS_META[s].color, fontWeight: 600 }}>
+                    {STATUS_META[s].dot} {count} {STATUS_META[s].label}
+                  </span>
+                );
+              })}
+              <span style={{ color: C.secondary }}>
+                ○ {visible.filter(t => !statuses[t.id]).length} Not started
+              </span>
+            </div>
+          )}
         </div>
       )}
 
-      {liveCheckInEnabled && !isEmpty && (
+      {liveCheckInEnabled && !isEmpty && taskView !== 'month' && (
         <LiveCheckInFeedbackCard profileId={profile.id} />
       )}
 
-      {/* Time filter pills */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button
-          type="button"
-          onClick={() => { setSelectMode(m => !m); setSelectedTaskIds(new Set()); }}
-          style={{
-            padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.border}`,
-            background: selectMode ? `${C.primary}15` : C.bgCard,
-            color: selectMode ? C.primary : C.secondary, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-          }}
-        >
-          {selectMode ? 'Cancel select' : 'Select tasks'}
-        </button>
-        {selectMode && selectedTaskIds.size > 0 && (
-          <>
-            <button type="button" onClick={() => runBulkDelete('today')} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.border}`, background: C.bgCard, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-              Skip today ({selectedTaskIds.size})
-            </button>
-            <button type="button" onClick={() => runBulkDelete('forever')} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.tertiary}40`, background: `${C.tertiary}10`, color: C.tertiary, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-              Remove ({selectedTaskIds.size})
-            </button>
-          </>
-        )}
-      </div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
-        {([
-          { key: 'all',     label: 'All tasks' },
-          { key: 'morning', label: '☀️ Morning' },
-          { key: 'evening', label: '🌙 Evening' },
-        ] as const).map(({ key, label }) => (
-          <button key={key} onClick={() => setTimeFilter(key)} style={{
-            padding: '6px 12px', borderRadius: 20, cursor: 'pointer',
-            background: timeFilter === key ? C.primary : C.bgAlt,
-            color: timeFilter === key ? '#fff' : C.secondary,
-            fontWeight: timeFilter === key ? 700 : 400, fontSize: 12,
-            border: `1px solid ${timeFilter === key ? C.primary : C.border}`,
-            transition: 'all 0.18s',
-          }}>
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Week Plan CTA - sticky at top of content */}
-      {onNavigateWeek && (
-        <div
-          onClick={onNavigateWeek}
-          style={{
-            marginBottom: 16, background: `linear-gradient(135deg, ${C.headline}, #1a6da8)`,
-            borderRadius: 14, padding: '12px 16px', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 10,
-            boxShadow: '0 4px 16px rgba(9,64,103,0.18)',
-          }}
-        >
-          <span style={{ fontSize: 20 }}>📅</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, color: '#fff' }}>View Weekly Plan</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 1 }}>Plan ahead and stay on track</div>
-          </div>
-          <ArrowRightOutlined style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }} />
-        </div>
-      )}
-
-      {/* Goals > Tasks hierarchy */}
-      {isEmpty ? (
-        <div style={{ textAlign: 'center', padding: '32px 16px' }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>📅</div>
-          <div style={{ fontWeight: 600, fontSize: 16, color: C.headline, marginBottom: 8 }}>No tasks today</div>
-          <div style={{ color: C.body, fontSize: 13 }}>Enjoy your day off or check the Week Plan!</div>
-        </div>
+      {taskView === 'month' ? (
+        <TasksMonthView
+          profileId={profile.id}
+          onManageTask={handleMonthManage}
+          onGoAllTasks={() => setTaskViewPersisted('all')}
+        />
       ) : (
         <>
-          {/* Goal-grouped categories */}
-          {goals.map((goal, idx) => (
-            <div key={goal.id} {...(idx === 0 ? { 'data-tour-id': 'tasks-goal-group' } : {})}>
-              <GoalGroup
-                goal={goal}
-                tasks={goalTaskMap[goal.id] ?? []}
-                statuses={statuses} notes={notes}
-                profileId={profile.id}
-                profileName={profile.name}
-                calendarDateKey={calendarDateKey}
-                onOpenUpdate={openTaskUpdate}
-                onDelete={t => openDeleteTask(t)}
-                timeFilter={timeFilter}
-                isFirst={idx === 0}
-                onEditTask={t => handleEditAnyTask(t, goal.id)}
-                onAddSuggestedTask={handleAddSuggestedTask}
-                onSimplifyTask={(t, g) => setSimplifyTarget({ task: t, goal: g })}
-                showExploreSuggestions={!hideExploreSuggestions}
-                selectionMode={selectMode}
-                selectedTaskIds={selectedTaskIds}
-                onToggleTaskSelect={toggleTaskSelect}
-              />
+          {taskView === 'all' && (
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+              {statusChips.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setStatusFilter(key)}
+                  style={{
+                    minHeight: MIN_TOUCH,
+                    padding: '8px 14px',
+                    borderRadius: 20,
+                    cursor: 'pointer',
+                    background: statusFilter === key ? C.primary : C.bgCard,
+                    color: statusFilter === key ? '#fff' : C.secondary,
+                    fontWeight: statusFilter === key ? 700 : 600,
+                    fontSize: 12,
+                    border: `1.5px solid ${statusFilter === key ? C.primary : C.border}`,
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
-          ))}
+          )}
 
-          {/* Routines - tasks not linked to any goal */}
-          {ungroupedTasks.filter(t => timeFilter === 'all' || t.timeOfDay === timeFilter).length > 0 && (
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <div style={{ flex: 1, height: 1, background: C.border }} />
-                <span style={{ fontSize: 11, fontWeight: 700, color: C.secondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                  Routines
-                </span>
-                <div style={{ flex: 1, height: 1, background: C.border }} />
+          {taskView === 'today' && overdueUserTasks.length > 0 && (
+            <div style={{
+              marginBottom: 14, padding: '12px 14px', borderRadius: 14,
+              background: `${C.tertiary}10`, border: `1.5px solid ${C.tertiary}35`,
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: C.tertiary, marginBottom: 8 }}>
+                Overdue ({overdueUserTasks.length})
               </div>
-              {ungroupedTasks
-                .filter(t => timeFilter === 'all' || t.timeOfDay === timeFilter)
-                .map(task => (
+              {overdueUserTasks.map(ut => {
+                const taskObj: UserTask_ = {
+                  id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, type: ut.type,
+                  category: 'user', isUserCreated: true, recurrence: ut.recurrence,
+                  potentialValue: ut.potentialValue,
+                  scheduleLabel: recurrenceLabel(ut.recurrence),
+                  goalId: ut.goalId,
+                };
+                const statusDate = ut.recurrence?.specificDate ?? today;
+                return (
                   <TaskItem
-                    key={task.id} task={task} catColor={C.secondary}
-                    status={statuses[task.id] ?? null}
-                    remark={notes[task.id]}
+                    key={ut.id}
+                    task={taskObj}
+                    catColor={C.tertiary}
+                    status={getTaskStatus(profile.id, ut.id, statusDate)}
+                    statusHint="Overdue"
                     profileId={profile.id}
                     profileName={profile.name}
                     calendarDateKey={calendarDateKey}
-                    selectionMode={selectMode}
-                    selected={selectedTaskIds.has(task.id)}
-                    onToggleSelect={() => toggleTaskSelect(task.id)}
-                    onOpenUpdate={() => openTaskUpdate(task)}
-                    onDelete={() => openDeleteTask(task)}
-                    onEdit={() => handleEditAnyTask(task, undefined)}
-                    onSimplify={task.isUserCreated ? () => setSimplifyTarget({ task }) : undefined}
+                    onOpenUpdate={() => openTaskUpdate(taskObj, goals.find(g => g.id === ut.goalId))}
+                    onDelete={() => openDeleteTask(taskObj)}
+                    onEdit={() => handleEditAnyTask(taskObj, ut.goalId)}
+                    onArchive={() => handleArchiveTask(taskObj)}
                   />
-                ))}
+                );
+              })}
             </div>
+          )}
+
+          {/* Select + time filters */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => { setSelectMode(m => !m); setSelectedTaskIds(new Set()); }}
+              style={{
+                minHeight: MIN_TOUCH,
+                padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${C.border}`,
+                background: selectMode ? `${C.primary}15` : C.bgCard,
+                color: selectMode ? C.primary : C.secondary, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              {selectMode ? 'Cancel select' : 'Select tasks'}
+            </button>
+            {selectMode && selectedTaskIds.size > 0 && (
+              <>
+                <button type="button" onClick={() => runBulkDelete('today')} style={{ minHeight: MIN_TOUCH, padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${C.border}`, background: C.bgCard, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                  Skip today ({selectedTaskIds.size})
+                </button>
+                <button type="button" onClick={() => runBulkDelete('forever')} style={{ minHeight: MIN_TOUCH, padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${C.tertiary}40`, background: `${C.tertiary}10`, color: C.tertiary, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                  Remove ({selectedTaskIds.size})
+                </button>
+              </>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
+            {([
+              { key: 'all',     label: 'All times' },
+              { key: 'morning', label: '☀️ Morning' },
+              { key: 'evening', label: '🌙 Evening' },
+            ] as const).map(({ key, label }) => (
+              <button key={key} onClick={() => setTimeFilter(key)} style={{
+                minHeight: MIN_TOUCH,
+                padding: '8px 14px', borderRadius: 20, cursor: 'pointer',
+                background: timeFilter === key ? C.primary : C.bgAlt,
+                color: timeFilter === key ? '#fff' : C.secondary,
+                fontWeight: timeFilter === key ? 700 : 400, fontSize: 12,
+                border: `1px solid ${timeFilter === key ? C.primary : C.border}`,
+                transition: 'all 0.18s',
+              }}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {isEmpty ? (
+            <div style={{ textAlign: 'center', padding: '32px 16px' }}>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>📅</div>
+              <div style={{ fontWeight: 600, fontSize: 16, color: C.headline, marginBottom: 8 }}>No tasks yet</div>
+              <div style={{ color: C.body, fontSize: 13 }}>Tap + to add your first task.</div>
+            </div>
+          ) : taskView === 'all' ? (
+            renderGoalLists(allGoalTaskMap, allUnassigned, {
+              showExplore: false,
+              unassignedLabel: 'Unassigned',
+              emptyMessage: 'No tasks for this goal yet.',
+              getStatusHint: statusHintForAll,
+            })
+          ) : (
+            renderGoalLists(goalTaskMap, ungroupedTasks, {
+              showExplore: true,
+              unassignedLabel: 'Unassigned',
+              emptyMessage: 'No tasks yet for this goal today.',
+            })
           )}
         </>
       )}
@@ -1281,6 +1548,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
             style={{
               display: 'block', width: '100%', padding: '12px 16px', border: 'none', background: 'none',
               textAlign: 'left', fontSize: 13, fontWeight: 600, color: C.headline, cursor: 'pointer',
+              minHeight: MIN_TOUCH,
             }}
           >
             Add manually
@@ -1291,7 +1559,7 @@ export function TaskList({ profile, onNavigateWeek, onPerfectDay, onTasksChange 
             style={{
               display: 'block', width: '100%', padding: '12px 16px', border: 'none', background: C.bgAlt,
               borderTop: `1px solid ${C.border}`, textAlign: 'left', fontSize: 13, fontWeight: 600,
-              color: C.primary, cursor: 'pointer',
+              color: C.primary, cursor: 'pointer', minHeight: MIN_TOUCH,
             }}
           >
             ✨ Add with AI
