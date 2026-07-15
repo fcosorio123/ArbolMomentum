@@ -1,6 +1,6 @@
 // AI-assisted task simplification — task-anchored decomposition with answer context.
-// Domain lifestyle templates are NOT used for final output.
-// Mirror of src/app/data/simplifyTaskCore.ts behavior (+ LLM with validation).
+// Always returns answer-review data for UI. Atomic tasks prefer validated rules packages
+// so device/time answers materially change the output.
 
 import * as kv from "./kv_store.tsx";
 import {
@@ -9,7 +9,10 @@ import {
   isGoalRelevantToTask,
   buildTaskContextFromAnswers,
   classifyTaskComplexity,
+  buildSimplifyPackage,
   type SimplifiedStep,
+  type AnswerReviewItem,
+  type SimplifiedSuggestion,
 } from "./simplifyTaskCore.ts";
 
 const RATE_LIMIT_PER_HOUR = 30;
@@ -23,6 +26,8 @@ export interface SimplifyTaskAnswers {
 
 export interface SimplifyTaskInput {
   taskLabel: string;
+  taskId?: string;
+  requestId?: string;
   goalTitle?: string;
   goalWhy?: string;
   blocker?: string;
@@ -34,13 +39,24 @@ export interface SimplifyTaskInput {
 export interface SimplifiedTask {
   label: string;
   timeOfDay: "morning" | "evening";
+  howTo?: string[];
+  resourceLink?: { label: string; url: string };
+  signalsUsed?: string[];
 }
 
 export interface SimplifyTaskResult {
   ok: boolean;
+  requestId: string;
+  taskId: string;
+  originalTask: string;
+  answers: AnswerReviewItem[];
   tasks: SimplifiedTask[];
   source: "llm" | "rules";
   reason?: string;
+}
+
+function newRequestId(): string {
+  return `simp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function normalizeSimplifyAnswers(input: SimplifyTaskInput): Required<SimplifyTaskAnswers> {
@@ -60,15 +76,55 @@ export function normalizeSimplifyAnswers(input: SimplifyTaskInput): Required<Sim
   };
 }
 
-/** @deprecated Prefer ruleBasedSimplifyCore via simplifyTask; kept for any direct imports. */
-export function ruleBasedSimplify(input: SimplifyTaskInput): SimplifiedTask[] {
-  const answers = normalizeSimplifyAnswers(input);
-  const goalTitle = isGoalRelevantToTask(input.taskLabel, input.goalTitle) ? input.goalTitle : undefined;
-  return ruleBasedSimplifyCore({
-    taskLabel: input.taskLabel,
-    goalTitle,
-    ...answers,
+function packageToResult(
+  pkg: ReturnType<typeof buildSimplifyPackage>,
+  meta: { requestId: string; taskId: string; source: "llm" | "rules"; reason?: string },
+): SimplifyTaskResult {
+  return {
+    ok: pkg.suggestions.length >= 1,
+    requestId: meta.requestId,
+    taskId: meta.taskId,
+    originalTask: pkg.originalTask,
+    answers: pkg.answers,
+    tasks: pkg.suggestions.map((s) => ({
+      label: s.label,
+      timeOfDay: s.timeOfDay,
+      howTo: s.howTo,
+      resourceLink: s.resourceLink,
+      signalsUsed: s.signalsUsed,
+    })),
+    source: meta.source,
+    reason: meta.reason,
+  };
+}
+
+/** Attach how-to / links / answer review from rules package onto LLM labels. */
+function enrichWithPackage(
+  labels: SimplifiedStep[],
+  pkg: ReturnType<typeof buildSimplifyPackage>,
+  meta: { requestId: string; taskId: string; source: "llm" | "rules"; reason?: string },
+): SimplifyTaskResult {
+  const template = pkg.suggestions[0];
+  const tasks: SimplifiedTask[] = labels.map((s, i) => {
+    const fromPkg = pkg.suggestions[i];
+    return {
+      label: s.label,
+      timeOfDay: s.timeOfDay,
+      howTo: fromPkg?.howTo ?? template?.howTo ?? [],
+      resourceLink: fromPkg?.resourceLink ?? template?.resourceLink,
+      signalsUsed: fromPkg?.signalsUsed ?? template?.signalsUsed ?? [],
+    };
   });
+  return {
+    ok: tasks.length >= 1,
+    requestId: meta.requestId,
+    taskId: meta.taskId,
+    originalTask: pkg.originalTask,
+    answers: pkg.answers,
+    tasks,
+    source: meta.source,
+    reason: meta.reason,
+  };
 }
 
 async function checkRateLimit(key: string): Promise<boolean> {
@@ -80,7 +136,7 @@ async function checkRateLimit(key: string): Promise<boolean> {
   return true;
 }
 
-async function callOpenAi(input: SimplifyTaskInput): Promise<SimplifiedTask[] | null> {
+async function callOpenAi(input: SimplifyTaskInput): Promise<SimplifiedStep[] | null> {
   const apiKey = Deno.env.get("LLM_API_KEY")?.trim();
   if (!apiKey) return null;
 
@@ -133,10 +189,11 @@ async function callOpenAi(input: SimplifyTaskInput): Promise<SimplifiedTask[] | 
               + "(3) Never quote or paraphrase user answers. Never say because you said. "
               + "(4) Never repeat the original task as a suggestion. "
               + "(5) Never add lifestyle habits, goal plans, or unrelated tips (no sleep hygiene when the task is setting a reminder). "
-              + "(6) Atomic tasks (set reminder, send email, cancel subscription, calendar event): return exactly 2 compact actions. Combine open-app + create into meaningful units. "
-              + "Do NOT split choose-time / name / repeat / save into separate tracked tasks — those belong in How-to instructions. "
+              + "(6) Atomic tasks: return exactly 2 compact actions. Combine open-app + create. "
+              + "Do NOT split choose-time / name / repeat / save into separate tracked tasks. "
               + "(7) Decomposable tasks: 2-5 only when pieces are genuinely separable. Never pad. "
-              + "(8) Result must not feel larger/harder than the original. Max 120 chars per label.",
+              + "(8) If the user names iPhone or Android, name that platform’s app in the open step. "
+              + "(9) Result must not feel larger/harder than the original. Max 120 chars per label.",
           },
           { role: "user", content: context },
         ],
@@ -194,30 +251,46 @@ export async function simplifyTask(
   opts?: { rateLimitKey?: string },
 ): Promise<SimplifyTaskResult> {
   const taskLabel = input.taskLabel?.trim() ?? "";
+  const requestId = (input.requestId && String(input.requestId).trim()) || newRequestId();
+  const taskId = (input.taskId && String(input.taskId).trim()) || "";
+
   if (taskLabel.length < 2) {
-    return { ok: false, tasks: [], source: "rules", reason: "input_too_short" };
+    return {
+      ok: false,
+      requestId,
+      taskId,
+      originalTask: taskLabel,
+      answers: [],
+      tasks: [],
+      source: "rules",
+      reason: "input_too_short",
+    };
   }
 
   const answers = normalizeSimplifyAnswers(input);
   const goalTitle = isGoalRelevantToTask(taskLabel, input.goalTitle) ? input.goalTitle : undefined;
-  const maxSteps = classifyTaskComplexity(taskLabel) === "atomic" ? 2 : 5;
-
-  const rateKey = opts?.rateLimitKey || "global";
-  const rulesTasks = ruleBasedSimplifyCore({
+  const complexity = classifyTaskComplexity(taskLabel);
+  const pkg = buildSimplifyPackage({
     taskLabel,
     goalTitle,
     blocker: answers.blocker,
     motivation: answers.motivation,
     constraint: answers.constraint,
-  }).slice(0, maxSteps);
+  });
 
-  if (!(await checkRateLimit(rateKey))) {
-    return {
-      ok: rulesTasks.length >= 2,
-      tasks: rulesTasks,
+  // Atomic: prefer rules so iPhone/Android/time answers always materialize in labels.
+  if (complexity === "atomic") {
+    return packageToResult(pkg, {
+      requestId,
+      taskId,
       source: "rules",
-      reason: "rate_limited",
-    };
+      reason: "atomic_rules_prefer",
+    });
+  }
+
+  const rateKey = opts?.rateLimitKey || "global";
+  if (!(await checkRateLimit(rateKey))) {
+    return packageToResult(pkg, { requestId, taskId, source: "rules", reason: "rate_limited" });
   }
 
   const llmTasks = await callOpenAi({
@@ -226,31 +299,40 @@ export async function simplifyTask(
     goalWhy: goalTitle ? input.goalWhy : undefined,
   });
 
-  // Prefer validated LLM; fill gaps only with validated rules (never unvalidated templates).
   if (llmTasks && llmTasks.length >= 2) {
-    return { ok: true, tasks: llmTasks.slice(0, maxSteps), source: "llm" };
+    return enrichWithPackage(llmTasks, pkg, { requestId, taskId, source: "llm" });
   }
 
-  if (llmTasks && llmTasks.length === 1 && rulesTasks.length >= 1) {
-    const merged: SimplifiedTask[] = [];
-    const seen = new Set<string>();
-    for (const t of [...llmTasks, ...rulesTasks]) {
-      const key = t.label.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      merged.push(t);
-      if (merged.length >= maxSteps) break;
-    }
-    if (merged.length >= 2) return { ok: true, tasks: merged, source: "llm" };
+  if (pkg.suggestions.length < 1) {
+    return {
+      ok: false,
+      requestId,
+      taskId,
+      originalTask: pkg.originalTask,
+      answers: pkg.answers,
+      tasks: [],
+      source: "rules",
+      reason: "no_suggestions",
+    };
   }
 
-  if (rulesTasks.length < 2) {
-    return { ok: false, tasks: [], source: "rules", reason: "no_suggestions" };
-  }
-  return {
-    ok: true,
-    tasks: rulesTasks,
+  return packageToResult(pkg, {
+    requestId,
+    taskId,
     source: "rules",
     reason: llmTasks ? "llm_filtered" : "llm_unavailable",
-  };
+  });
 }
+
+/** @deprecated Prefer buildSimplifyPackage / simplifyTask. */
+export function ruleBasedSimplify(input: SimplifyTaskInput): SimplifiedTask[] {
+  const answers = normalizeSimplifyAnswers(input);
+  const goalTitle = isGoalRelevantToTask(input.taskLabel, input.goalTitle) ? input.goalTitle : undefined;
+  return ruleBasedSimplifyCore({
+    taskLabel: input.taskLabel,
+    goalTitle,
+    ...answers,
+  });
+}
+
+export type { AnswerReviewItem, SimplifiedSuggestion };

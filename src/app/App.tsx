@@ -11,6 +11,7 @@ import { CalendarScreen } from './components/CalendarScreen';
 import { ProfileScreen } from './components/ProfileScreen';
 import { AdminView } from './components/AdminView';
 import { CheckInPage } from './components/CheckInPage';
+import { SimplifyHarnessPage } from './SimplifyHarnessPage';
 
 import { BottomNav } from './components/BottomNav';
 import { CoachMarks } from './components/CoachMarks';
@@ -550,6 +551,16 @@ export default function App() {
     if (activeProfile) markCoachDone(activeProfile.id);
     advanceOnboarding('coach');
   };
+
+  if (import.meta.env.DEV && typeof window !== 'undefined' && window.location.hash === '#simplify-harness') {
+    return (
+      <ConfigProvider theme={arbolTheme}>
+        <AntdApp message={{ maxCount: 3, duration: 2.5 }}>
+          <SimplifyHarnessPage />
+        </AntdApp>
+      </ConfigProvider>
+    );
+  }
 
   if (showAdmin) {
     return (

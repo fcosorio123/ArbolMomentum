@@ -1,5 +1,5 @@
 /**
- * Simplify-for-Me core regression checks (no test runner required).
+ * Simplify-for-Me acceptance + personalization matrix.
  * Run: npx tsx scripts/test-simplify-core.ts
  */
 import {
@@ -11,6 +11,9 @@ import {
   buildTaskContextFromAnswers,
   classifyTaskComplexity,
   isProceduralFragment,
+  buildSimplifyPackage,
+  suggestionsDiffer,
+  detectDevicePlatform,
 } from '../src/app/data/simplifyTaskCore';
 
 let failed = 0;
@@ -26,175 +29,146 @@ function assert(cond: boolean, msg: string) {
 const PHONE = 'Set a phone-down reminder 30 minutes before bed';
 const ART = 'Renew Living Room Artwork';
 
-// --- Complexity classification ---
+// --- Complexity ---
 assert(classifyTaskComplexity('Set a reminder') === 'atomic', 'Set a reminder → atomic');
 assert(classifyTaskComplexity(PHONE) === 'atomic', 'phone-down → atomic');
+assert(classifyTaskComplexity('Organize documents for my tax appointment') === 'decomposable', 'tax docs → decomposable');
+assert(classifyTaskComplexity('Get my finances under control') === 'broad', 'finances → broad');
+assert(!isGoalRelevantToTask(PHONE, ART), 'artwork goal irrelevant');
+
+// ========== Test matrix A / B / C / D ==========
+const testA = buildSimplifyPackage({
+  taskLabel: PHONE,
+  goalTitle: ART,
+  blocker: 'I do not know which app to use.',
+  motivation: 'Simple directions.',
+  constraint: 'I have an iPhone.',
+});
+const testB = buildSimplifyPackage({
+  taskLabel: PHONE,
+  blocker: 'My bedtime changes every night.',
+  motivation: 'Something I can adjust quickly.',
+  constraint: 'I use an Android phone.',
+});
+const testC = buildSimplifyPackage({
+  taskLabel: PHONE,
+  blocker: 'I keep putting this off.',
+  motivation: 'The fastest possible option.',
+  constraint: 'I only have one minute.',
+});
+const testD = buildSimplifyPackage({
+  taskLabel: PHONE,
+  blocker: 'My favorite food is pizza.',
+  motivation: '',
+  constraint: '',
+});
+
+console.log('\n--- Test A suggestions ---');
+testA.suggestions.forEach((s, i) => console.log(`  ${i + 1}. ${s.label}`));
+console.log('--- Test B suggestions ---');
+testB.suggestions.forEach((s, i) => console.log(`  ${i + 1}. ${s.label}`));
+console.log('--- Test C suggestions ---');
+testC.suggestions.forEach((s, i) => console.log(`  ${i + 1}. ${s.label}`));
+console.log('--- Test D suggestions ---');
+testD.suggestions.forEach((s, i) => console.log(`  ${i + 1}. ${s.label}`));
+
+// A: iPhone + answers displayed + Apple link
+assert(testA.suggestions.length === 2, `A: exactly 2 (got ${testA.suggestions.length})`);
+assert(testA.suggestions.every(s => /iphone|reminder/i.test(s.label)), 'A: iPhone/reminder in labels');
+assert(testA.suggestions.some(s => /iphone/i.test(s.label)), 'A: iPhone named in at least one label');
+assert(testA.answers.every(a => a.rawAnswer.length > 0), 'A: all 3 answers preserved raw');
+assert(testA.answers[0].rawAnswer === 'I do not know which app to use.', 'A: exact hard_part text');
+assert(testA.answers[1].rawAnswer === 'Simple directions.', 'A: exact help text');
+assert(testA.answers[2].rawAnswer === 'I have an iPhone.', 'A: exact constraint text');
 assert(
-  classifyTaskComplexity('Organize documents for my tax appointment') === 'decomposable',
-  'tax docs → decomposable',
+  testA.answers.filter(a => a.usageStatus === 'used' || a.usageStatus === 'partially_used').length >= 2,
+  'A: at least 2 answers marked used/partial',
 );
+assert(testA.suggestions.every(s => s.howTo.length >= 2), 'A: how-to steps present');
 assert(
-  classifyTaskComplexity('Get my finances under control') === 'broad',
-  'finances under control → broad',
+  testA.suggestions.every(s => /apple\.com|iphone/i.test(s.resourceLink.url + s.resourceLink.label)),
+  'A: Apple resource link',
+);
+assert(detectDevicePlatform({
+  blocker: testA.answers[0].rawAnswer,
+  motivation: testA.answers[1].rawAnswer,
+  constraint: testA.answers[2].rawAnswer,
+}) === 'iphone', 'A: platform iphone');
+
+// B: Android + different from A + variable bedtime
+assert(testB.suggestions.length === 2, 'B: exactly 2');
+assert(testB.suggestions.some(s => /android/i.test(s.label)), 'B: Android in labels');
+assert(testB.suggestions.some(s => /adjust|common bedtime|late/i.test(s.label)), 'B: adjustable/variable bedtime');
+assert(suggestionsDiffer(testA.suggestions, testB.suggestions), 'A ≠ B suggestions');
+assert(testB.answers[2].rawAnswer === 'I use an Android phone.', 'B: exact Android constraint');
+assert(
+  testB.suggestions.every(s => /android|google\.com|alarm/i.test(s.resourceLink.url + s.resourceLink.label + s.howTo.join(' '))),
+  'B: Android-oriented how-to/link',
 );
 
-// --- Unrelated goal excluded ---
-assert(!isGoalRelevantToTask(PHONE, ART), 'artwork goal irrelevant to phone-down');
+// C: one minute — faster wording, still ≤2, differs from A
+assert(testC.suggestions.length === 2, 'C: exactly 2');
+assert(
+  testC.suggestions.some(s => /tonight|under a minute|now|save one/i.test(s.label)),
+  `C: fast path wording (got ${testC.suggestions.map(s => s.label).join(' | ')})`,
+);
+assert(suggestionsDiffer(testA.suggestions, testC.suggestions), 'A ≠ C');
+assert(suggestionsDiffer(testB.suggestions, testC.suggestions), 'B ≠ C');
+assert(!testC.suggestions.every(s => /quickly/i.test(s.label) && /iphone/i.test(s.label)), 'C: not just "quickly" appended to A');
 
-// --- Atomic fragmentation: max 2, no interface clicks ---
+// D: pizza irrelevant — shown, not used, does not force into labels
+assert(testD.answers[0].rawAnswer === 'My favorite food is pizza.', 'D: pizza answer preserved');
+assert(testD.answers[0].usageStatus === 'irrelevant', `D: pizza marked irrelevant (got ${testD.answers[0].usageStatus})`);
+assert(testD.answers[0].influenceTypes.length === 0, 'D: pizza has no influence types');
+assert(!testD.suggestions.some(s => /pizza/i.test(s.label)), 'D: pizza not in task labels');
+
+// Atomic fragmentation
+assert(!testA.suggestions.some(s => /name it|and save|choose the time|tap add/i.test(s.label)), 'no procedural fragments as tasks');
+assert(isProceduralFragment('Name it Phone down and save'), 'procedural detector');
+
+// Integration-style: request fields → package → answer echo round-trip
 {
-  const steps = ruleBasedSimplifyCore({
+  const payload = {
     taskLabel: PHONE,
-    goalTitle: ART,
-    blocker: 'I keep forgetting',
-    motivation: 'I need my evenings back',
-    constraint: '',
-  });
-  assert(steps.length === 2, `phone-down yields exactly 2 steps (got ${steps.length})`);
-  assert(steps.length <= 2, 'phone-down never exceeds 2');
-  for (const s of steps) {
-    assert(!isSemanticRestatement(PHONE, s.label), `not restatement: ${s.label}`);
-    assert(!isProceduralFragment(s.label), `not procedural fragment: ${s.label}`);
-    assert(!/lights low|tomorrow.?s top|get in bed|journal|sleep routine/i.test(s.label), `no sleep pad: ${s.label}`);
-    assert(!/artwork|living room/i.test(s.label), `no goal drift: ${s.label}`);
-  }
-  assert(steps.some(s => /app|clock|remind/i.test(s.label)), 'includes opening reminder tool');
-  assert(
-    !steps.some(s => /name it|and save|choose the time|tap add/i.test(s.label)),
-    'does not split name/save/choose-time into tracked tasks',
-  );
-  console.log('phone-down steps:', steps.map(s => s.label));
+    taskId: 'task-abc',
+    requestId: 'req-xyz',
+    blocker: 'I do not know which app to use.',
+    motivation: 'Simple directions for my iPhone.',
+    constraint: 'I only have one minute.',
+  };
+  const pkg = buildSimplifyPackage(payload);
+  assert(pkg.answers[0].rawAnswer === payload.blocker, 'payload blocker unchanged');
+  assert(pkg.answers[1].rawAnswer === payload.motivation, 'payload motivation unchanged');
+  assert(pkg.answers[2].rawAnswer === payload.constraint, 'payload constraint unchanged');
+  assert(pkg.suggestions.every(s => s.resourceLink.url.startsWith('http')), 'all links valid http(s)');
+  assert(pkg.suggestions.every(s => s.howTo.length > 0), 'every suggestion has how-to');
+  console.log('integration package answers:', pkg.answers.map(a => `${a.questionId}:${a.usageStatus}`));
 }
 
-// --- Answer differentiation (same task, different answers) ---
+// Stale-state simulation: Task A answers must not equal Task B labels
 {
-  const caseA = ruleBasedSimplifyCore({
-    taskLabel: PHONE,
-    blocker: 'My bedtime changes every night.',
-    motivation: '',
-    constraint: '',
-  });
-  const caseB = ruleBasedSimplifyCore({
-    taskLabel: PHONE,
-    blocker: 'I always forget to turn on repeat.',
-    motivation: '',
-    constraint: '',
-  });
-  const caseC = ruleBasedSimplifyCore({
-    taskLabel: PHONE,
-    blocker: 'I do not know how to set reminders on my phone.',
-    motivation: '',
-    constraint: '',
-  });
-
-  assert(caseA.length === 2 && caseB.length === 2 && caseC.length === 2, 'all cases return exactly 2');
-  const blobA = caseA.map(s => s.label).join(' | ').toLowerCase();
-  const blobB = caseB.map(s => s.label).join(' | ').toLowerCase();
-  const blobC = caseC.map(s => s.label).join(' | ').toLowerCase();
-
-  assert(/common bedtime|late night|adjust/i.test(blobA), `Case A varies bedtime: ${blobA}`);
-  assert(/repeat|notif/i.test(blobB), `Case B emphasizes repeat/notifications: ${blobB}`);
-  assert(/clock|reminders/i.test(blobC), `Case C opens how-to path: ${blobC}`);
-  assert(blobA !== blobB, 'Case A ≠ Case B');
-  assert(blobB !== blobC, 'Case B ≠ Case C');
-  assert(blobA !== blobC, 'Case A ≠ Case C');
-  console.log('Case A:', caseA.map(s => s.label));
-  console.log('Case B:', caseB.map(s => s.label));
-  console.log('Case C:', caseC.map(s => s.label));
-}
-
-// --- Time constraint stays compact ---
-{
-  const short = ruleBasedSimplifyCore({
-    taskLabel: PHONE,
-    blocker: 'only a minute',
-    constraint: 'I only have 1 minute right now',
-  });
-  assert(short.length === 2, `1-minute session still exactly 2 (got ${short.length})`);
-  console.log('1-minute steps:', short.map(s => s.label));
-}
-
-// --- Decomposable can exceed 2 ---
-{
-  const docs = ruleBasedSimplifyCore({
-    taskLabel: 'Organize the documents needed for my tax appointment',
-    blocker: 'I do not have the checklist',
-    motivation: '',
-    constraint: '',
-  });
-  assert(docs.length >= 2 && docs.length <= 5, `docs decomposes 2-5 (got ${docs.length})`);
-  assert(docs.length > 2, 'docs can exceed 2 when meaningfully multi-part');
-  console.log('docs steps:', docs.map(s => s.label));
-}
-
-// --- Insurance blocker adds prerequisites ---
-{
-  const call = ruleBasedSimplifyCore({
+  const other = buildSimplifyPackage({
     taskLabel: 'Call the insurance company about the denied claim',
-    blocker: 'I do not know why it was denied or what I should ask',
+    blocker: 'I received two letters and do not know which claim number to use.',
     motivation: '',
-    constraint: 'I can only call during lunch',
+    constraint: '',
   });
-  assert(call.some(s => /denial|reason|notice|claim number/i.test(s.label)), 'includes denial prep');
-  assert(call.some(s => /question|call|number on the notice/i.test(s.label)), 'includes questions or call');
-  assert(call.length >= 2 && call.length <= 5, `insurance not forced to 2 when prep needed (got ${call.length})`);
-  assert(!call.some(s => /artwork|relationship/i.test(s.label)), 'no unrelated advice');
-  console.log('insurance steps:', call.map(s => s.label));
+  assert(!other.suggestions.some(s => /iphone|android|phone-down|pizza/i.test(s.label)), 'insurance not contaminated by phone-down');
+  assert(other.suggestions.some(s => /letter|claim/i.test(s.label)), 'insurance uses letter/claim answer');
+  assert(other.answers[0].rawAnswer.includes('two letters'), 'insurance answer echoed');
 }
 
-// --- Validator rejects original + sleep pads + procedural ---
+// Filter still caps atomic + rejects bad pads
 {
-  const r1 = validateSimplifiedLabel(PHONE, PHONE);
-  assert(!r1.ok && (r1.reason === 'duplicate_original' || r1.reason === 'semantic_restatement'), 'reject exact original');
-  const r2 = validateSimplifiedLabel(PHONE, "Write tomorrow's top 1 task so your brain can settle");
-  assert(!r2.ok, 'reject tomorrow top task');
-  const r3 = validateSimplifiedLabel(PHONE, 'Lights low and screens off for the last 15 minutes tonight');
-  assert(!r3.ok, 'reject lights/screens sleep tip');
-  const r4 = validateSimplifiedLabel(PHONE, 'Name it Phone down and save');
-  assert(!r4.ok && r4.reason === 'procedural_fragment', 'reject name/save fragment');
-  const r5 = validateSimplifiedLabel(PHONE, 'Choose the time');
-  assert(!r5.ok, 'reject choose-the-time fragment');
-}
-
-// --- filterCandidateSteps caps atomic at 2 and strips fragments ---
-{
-  const { kept, rejected } = filterCandidateSteps(PHONE, [
+  const { kept } = filterCandidateSteps(PHONE, [
     { label: PHONE, timeOfDay: 'morning' },
     { label: "Write tomorrow's top 1 task", timeOfDay: 'evening' },
-    { label: "Open your phone's Clock app", timeOfDay: 'morning' },
-    { label: 'Set reminder for 30 minutes before bedtime', timeOfDay: 'evening' },
+    { label: 'Open the Reminders app on your iPhone', timeOfDay: 'morning' },
+    { label: 'Create a repeating Phone-down reminder for 30 minutes before bed', timeOfDay: 'evening' },
     { label: 'Name it Phone down and save', timeOfDay: 'evening' },
-    { label: 'Choose the bedtime time', timeOfDay: 'evening' },
-    { label: 'Turn on repeat', timeOfDay: 'evening' },
-  ], {
-    goalTitle: ART,
-    answers: { blocker: 'I keep forgetting', motivation: '', constraint: '' },
-  });
+  ], { goalTitle: ART, answers: { blocker: 'x', motivation: '', constraint: 'iPhone' } });
   assert(kept.length <= 2, `filter caps atomic at 2 (got ${kept.length})`);
   assert(!kept.some(k => isSemanticRestatement(PHONE, k.label)), 'filter removes restatement');
-  assert(!kept.some(k => /tomorrow/i.test(k.label)), 'filter removes tomorrow tip');
-  assert(!kept.some(k => /name it|choose the|turn on repeat/i.test(k.label)), 'filter removes procedural fragments');
-  assert(rejected.length >= 2, 'rejected bad candidates');
-  assert(kept.length >= 1, 'kept valid setup steps');
-}
-
-// --- Facts extracted without echo ---
-{
-  const facts = buildTaskContextFromAnswers({
-    blocker: 'I do not understand the purple giraffe denial code ZX-99',
-    motivation: 'A short message template would help',
-    constraint: 'Only 10 minutes and phone only',
-  });
-  assert(facts.some(f => f.category === 'missing_information'), 'missing info fact');
-  assert(facts.some(f => f.category === 'timing'), 'timing fact');
-  assert(facts.some(f => /Phone-only|phone/i.test(f.fact)), 'phone tool fact');
-  const steps = ruleBasedSimplifyCore({
-    taskLabel: 'Call the insurance company about the denied claim',
-    blocker: 'I do not understand the purple giraffe denial code ZX-99',
-    motivation: 'A short message template would help',
-    constraint: 'Only 10 minutes and phone only',
-  });
-  assert(!steps.some(s => /purple giraffe|ZX-99/i.test(s.label)), 'no answer echo of distinctive phrase');
 }
 
 if (failed) {

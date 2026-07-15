@@ -1142,7 +1142,12 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
     setManageTaskOpen(true);
   };
 
-  const handleSimplifyConfirm = (replacements: Array<{ label: string; timeOfDay: 'morning' | 'evening' }>) => {
+  const handleSimplifyConfirm = (replacements: Array<{
+    label: string;
+    timeOfDay: 'morning' | 'evening';
+    howTo?: string[];
+    resourceLink?: { label: string; url: string };
+  }>) => {
     if (!simplifyTarget) return;
     const { task, goal } = simplifyTarget;
     let existing = userTasks.find(u => u.id === task.id);
@@ -1169,6 +1174,13 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
     }
 
     replacements.forEach(rep => {
+      const resources = (rep.howTo?.length || rep.resourceLink?.url)
+        ? [{
+          title: rep.resourceLink?.label || 'How to get this done',
+          url: rep.resourceLink?.url,
+          steps: rep.howTo,
+        }]
+        : undefined;
       const created = createUserTask(profile.id, {
         label: rep.label,
         timeOfDay: rep.timeOfDay,
@@ -1176,8 +1188,11 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
         goalId: goal?.id ?? existing!.goalId,
         potentialValue: getDisplayPotentialValue(existing!.potentialValue),
         sourceSimplifiedFrom: existing!.id,
+        ...(resources ? { resources } : {}),
       });
-      void attachResourcesToNewTask(profile.id, created.id, created.label, goal?.title);
+      if (!resources) {
+        void attachResourcesToNewTask(profile.id, created.id, created.label, goal?.title);
+      }
     });
     deleteUserTask(profile.id, existing.id);
     setSimplifyTarget(null);
@@ -1815,6 +1830,7 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
         <SimplifyTaskModal
           open={!!simplifyTarget}
           onClose={() => setSimplifyTarget(null)}
+          taskId={simplifyTarget.task.id}
           taskLabel={simplifyTarget.task.label}
           goalTitle={simplifyTarget.goal?.title}
           goalWhy={simplifyTarget.goal?.deepWhy}

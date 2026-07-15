@@ -1,24 +1,33 @@
 import { useState, useEffect, useRef } from 'react';
 import { Modal, Input, Button } from 'antd';
 import { C } from '../data/colors';
-import { simplifyTaskFromEdge, isGoalRelevantToTask, type SimplifyTaskResult } from '../data/aiTaskCreation';
+import {
+  simplifyTaskFromEdge,
+  isGoalRelevantToTask,
+  type SimplifyTaskResult,
+  type SimplifiedTaskSuggestion,
+} from '../data/aiTaskCreation';
 import { ACCENT_MODAL_STYLES, ModalAccentBar } from '../styles/modalChrome';
 
 const { TextArea } = Input;
 
+/** Question prompts (form) — display labels for review use SIMPLIFY_QUESTION_META semantics. */
 const QUESTIONS = [
-  "What's making it hard to start this task?",
-  'What would help you take the first small step?',
-  'Anything we should work around (time, energy, tools)?',
+  'What feels difficult?',
+  'What would make this easier?',
+  'Anything we should work around?',
 ] as const;
+
+const QUESTION_FALLBACK_LABELS = QUESTIONS;
 
 interface Props {
   open: boolean;
   onClose: () => void;
+  taskId: string;
   taskLabel: string;
   goalTitle?: string;
   goalWhy?: string;
-  onConfirm: (replacements: Array<{ label: string; timeOfDay: 'morning' | 'evening' }>) => void;
+  onConfirm: (replacements: SimplifiedTaskSuggestion[]) => void;
 }
 
 function friendlySimplifyError(reason?: string): string {
@@ -28,8 +37,12 @@ function friendlySimplifyError(reason?: string): string {
   return "Couldn't simplify. Try again.";
 }
 
+function newRequestId(): string {
+  return `simp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function SimplifyTaskModal({
-  open, onClose, taskLabel, goalTitle, goalWhy, onConfirm,
+  open, onClose, taskId, taskLabel, goalTitle, goalWhy, onConfirm,
 }: Props) {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<string[]>(['', '', '']);
@@ -37,34 +50,46 @@ export function SimplifyTaskModal({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SimplifyTaskResult | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [expandedHowTo, setExpandedHowTo] = useState<Set<number>>(new Set());
   const requestSeq = useRef(0);
-  const openTaskRef = useRef(taskLabel);
+  const activeRequestId = useRef<string | null>(null);
+  const openTaskIdRef = useRef(taskId);
+  const openTaskLabelRef = useRef(taskLabel);
 
   const relevantGoal = goalTitle && isGoalRelevantToTask(taskLabel, goalTitle) ? goalTitle : undefined;
   const relevantGoalWhy = relevantGoal ? goalWhy : undefined;
 
-  const reset = () => {
-    setStep(0);
-    setAnswers(['', '', '']);
+  const resetSoft = () => {
     setLoading(false);
     setError(null);
     setResult(null);
     setSelected(new Set());
+    setExpandedHowTo(new Set());
+    activeRequestId.current = null;
+  };
+
+  const resetFull = () => {
+    setStep(0);
+    setAnswers(['', '', '']);
+    resetSoft();
   };
 
   useEffect(() => {
     if (!open) {
-      requestSeq.current += 1; // invalidate in-flight responses
-      reset();
+      requestSeq.current += 1;
+      resetFull();
       return;
     }
-    openTaskRef.current = taskLabel;
-    reset();
-  }, [open, taskLabel]);
+    // New task open: wipe prior answers/results
+    openTaskIdRef.current = taskId;
+    openTaskLabelRef.current = taskLabel;
+    requestSeq.current += 1;
+    resetFull();
+  }, [open, taskId, taskLabel]);
 
   const handleClose = () => {
     requestSeq.current += 1;
-    reset();
+    resetFull();
     onClose();
   };
 
@@ -77,25 +102,52 @@ export function SimplifyTaskModal({
       return;
     }
     const seq = ++requestSeq.current;
-    const boundTask = taskLabel;
+    const reqId = newRequestId();
+    activeRequestId.current = reqId;
+    const boundTaskId = taskId;
+    const boundTaskLabel = taskLabel;
     setLoading(true);
     setError(null);
+    setResult(null);
     try {
       const res = await simplifyTaskFromEdge({
-        taskLabel: boundTask,
+        taskLabel: boundTaskLabel,
+        taskId: boundTaskId,
+        requestId: reqId,
         goalTitle: relevantGoal,
         goalWhy: relevantGoalWhy,
         blocker: answers[0] ?? '',
         motivation: answers[1] ?? '',
         constraint: answers[2] ?? '',
       });
-      // Ignore stale responses from a prior task / closed modal
-      if (seq !== requestSeq.current || openTaskRef.current !== boundTask) return;
+      // Stale: different request, task, or modal closed/replaced
+      if (
+        seq !== requestSeq.current
+        || openTaskIdRef.current !== boundTaskId
+        || openTaskLabelRef.current !== boundTaskLabel
+        || activeRequestId.current !== reqId
+        || (res.requestId && res.requestId !== reqId)
+        || (res.taskId && res.taskId !== boundTaskId)
+      ) {
+        return;
+      }
       if (!res.ok || res.tasks.length === 0) {
         setError(friendlySimplifyError(res.reason));
         return;
       }
-      setResult(res);
+      const mergedAnswers = QUESTIONS.map((label, i) => {
+        const fromServer = res.answers?.find(a => a.questionLabel === label)
+          ?? res.answers?.[i];
+        const localRaw = (answers[i] ?? '').trim();
+        return {
+          questionId: fromServer?.questionId ?? (['hard_part', 'what_would_help', 'constraints'] as const)[i],
+          questionLabel: fromServer?.questionLabel ?? QUESTION_FALLBACK_LABELS[i],
+          rawAnswer: localRaw || fromServer?.rawAnswer || '',
+          usageStatus: fromServer?.usageStatus ?? (localRaw ? 'not_applicable' as const : 'empty' as const),
+          influenceTypes: fromServer?.influenceTypes ?? [],
+        };
+      });
+      setResult({ ...res, answers: mergedAnswers });
       setSelected(new Set(res.tasks.map((_, i) => i)));
       setStep(QUESTIONS.length);
     } finally {
@@ -105,9 +157,7 @@ export function SimplifyTaskModal({
 
   const handleConfirm = () => {
     if (!result) return;
-    const picks = result.tasks
-      .filter((_, i) => selected.has(i))
-      .map(t => ({ label: t.label, timeOfDay: t.timeOfDay }));
+    const picks = result.tasks.filter((_, i) => selected.has(i));
     if (picks.length === 0) return;
     onConfirm(picks);
     handleClose();
@@ -122,7 +172,20 @@ export function SimplifyTaskModal({
     });
   };
 
+  const toggleHowTo = (idx: number) => {
+    setExpandedHowTo(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
   const reviewing = step >= QUESTIONS.length && result;
+
+  const displayAnswers = reviewing && result
+    ? result.answers.filter(a => a.rawAnswer.trim().length > 0)
+    : [];
 
   return (
     <Modal
@@ -131,7 +194,7 @@ export function SimplifyTaskModal({
       footer={null}
       title={null}
       centered
-      width="min(400px, calc(100vw - 24px))"
+      width="min(420px, calc(100vw - 24px))"
       destroyOnClose
       styles={ACCENT_MODAL_STYLES}
     >
@@ -207,33 +270,103 @@ export function SimplifyTaskModal({
                 </div>
               )}
             </div>
-            <p style={{ margin: '0 0 14px', fontSize: 12, color: C.body }}>
+
+            {/* Answer review — exact user text */}
+            <div style={{
+              marginBottom: 14, padding: '10px 12px', borderRadius: 10,
+              background: '#f8f7fc', border: `1px solid ${C.border}`,
+            }}>
+              <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 0.45, textTransform: 'uppercase', color: C.secondary, marginBottom: 8 }}>
+                Your answers
+              </div>
+              {displayAnswers.length === 0 ? (
+                <div style={{ fontSize: 12, color: C.secondary }}>Not answered</div>
+              ) : (
+                displayAnswers.map((a, i) => (
+                  <div key={a.questionId} style={{ marginBottom: i < displayAnswers.length - 1 ? 10 : 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.secondary, marginBottom: 2 }}>
+                      {a.questionLabel}
+                    </div>
+                    <div style={{ fontSize: 13, color: C.headline, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                      {a.rawAnswer}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <p style={{ margin: '0 0 12px', fontSize: 12, color: C.body }}>
               Choose the tiny actions that replace the original. Uncheck any you don&apos;t want.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
               {result.tasks.map((t, i) => (
-                <label
-                  key={i}
+                <div
+                  key={`${result.requestId}-${i}`}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12,
+                    padding: '10px 12px', borderRadius: 12,
                     background: selected.has(i) ? `${C.primary}10` : C.bgAlt,
                     border: `1.5px solid ${selected.has(i) ? C.primary : C.border}`,
-                    cursor: 'pointer',
                   }}
                 >
-                  <input
-                    type="checkbox"
-                    checked={selected.has(i)}
-                    onChange={() => togglePick(i)}
-                    style={{ width: 16, height: 16 }}
-                  />
-                  <span style={{ flex: 1, fontSize: 13, color: C.headline }}>{t.label}</span>
-                  <span style={{ fontSize: 10, color: C.secondary }}>{t.timeOfDay === 'morning' ? '☀️' : '🌙'}</span>
-                </label>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(i)}
+                      onChange={() => togglePick(i)}
+                      style={{ width: 16, height: 16, marginTop: 2 }}
+                    />
+                    <span style={{ flex: 1, fontSize: 13, color: C.headline, fontWeight: 600 }}>{t.label}</span>
+                    <span style={{ fontSize: 10, color: C.secondary }}>{t.timeOfDay === 'morning' ? '☀️' : '🌙'}</span>
+                  </label>
+                  {(t.howTo?.length || t.resourceLink?.url) && (
+                    <div style={{ marginLeft: 26, marginTop: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => toggleHowTo(i)}
+                        style={{
+                          background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                          fontSize: 11, fontWeight: 700, color: C.primary,
+                        }}
+                      >
+                        {expandedHowTo.has(i) ? 'Hide how to get this done' : 'How to get this done'}
+                      </button>
+                      {expandedHowTo.has(i) && (
+                        <div style={{ marginTop: 6 }}>
+                          {t.resourceLink?.url && (
+                            <a
+                              href={t.resourceLink.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ fontSize: 12, fontWeight: 700, color: C.primary, display: 'block', marginBottom: 4 }}
+                            >
+                              {t.resourceLink.label || 'Open guide'}
+                            </a>
+                          )}
+                          {t.howTo && t.howTo.length > 0 && (
+                            <ol style={{ margin: 0, paddingLeft: 18 }}>
+                              {t.howTo.map((s, si) => (
+                                <li key={si} style={{ fontSize: 11, color: C.body, lineHeight: 1.4 }}>{s}</li>
+                              ))}
+                            </ol>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <Button block onClick={() => { setStep(QUESTIONS.length - 1); setResult(null); }} style={{ borderRadius: 12, height: 46 }}>
+              <Button
+                block
+                onClick={() => {
+                  setStep(QUESTIONS.length - 1);
+                  setResult(null);
+                  setExpandedHowTo(new Set());
+                  activeRequestId.current = null;
+                }}
+                style={{ borderRadius: 12, height: 46 }}
+              >
                 Back
               </Button>
               <Button

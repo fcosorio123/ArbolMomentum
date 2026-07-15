@@ -5,11 +5,13 @@
 import { projectId, publicAnonKey } from '/utils/supabase/info';
 import { parseGoalInput, type SeedSuggestionGroup } from './profileSeedParser';
 import {
-  ruleBasedSimplifyCore,
   filterCandidateSteps,
   isGoalRelevantToTask,
   buildTaskContextFromAnswers,
+  buildSimplifyPackage,
+  classifyTaskComplexity,
   type SimplifyAnswers,
+  type AnswerReviewItem,
 } from './simplifyTaskCore';
 
 const FN = 'make-server-5d90ddf5';
@@ -25,7 +27,14 @@ export interface ParseContextTasksResult {
 }
 
 /** Authorization-only fetch — avoid apikey header (CORS preflight breaks POSTs). */
-async function edgePost(path: string, body: Record<string, unknown>): Promise<{ data: any; error: string | null }> {
+async function edgePost(
+  path: string,
+  body: Record<string, unknown>,
+  opts?: { timeoutMs?: number },
+): Promise<{ data: any; error: string | null }> {
+  const timeoutMs = opts?.timeoutMs ?? 12_000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${FN_BASE}/${path.replace(/^\//, '')}`, {
       method: 'POST',
@@ -34,6 +43,7 @@ async function edgePost(path: string, body: Record<string, unknown>): Promise<{ 
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
     let data: any = null;
     try { data = await res.json(); } catch { data = null; }
@@ -42,8 +52,69 @@ async function edgePost(path: string, body: Record<string, unknown>): Promise<{ 
     }
     return { data, error: null };
   } catch (err) {
-    return { data: null, error: String(err) };
+    const msg = String(err);
+    if (/AbortError|aborted/i.test(msg)) {
+      return { data: null, error: 'timeout' };
+    }
+    return { data: null, error: msg };
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+/** Normalize any path (edge/LLM/rules/fallback) to the shared Simplify response contract. */
+export function normalizeSimplifyResult(
+  input: SimplifyTaskInput,
+  answers: SimplifyAnswers,
+  partial: Partial<SimplifyTaskResult> & { tasks?: SimplifiedTaskSuggestion[] },
+  meta: { requestId: string; taskId: string; source: ParseContextSource; reason?: string },
+): SimplifyTaskResult {
+  const goalTitle = isGoalRelevantToTask(input.taskLabel, input.goalTitle) ? input.goalTitle : undefined;
+  const pkg = buildSimplifyPackage({
+    taskLabel: input.taskLabel,
+    goalTitle,
+    ...answers,
+  });
+
+  const reviewAnswers = Array.isArray(partial.answers) && partial.answers.length > 0
+    ? partial.answers.map((a, i) => ({
+      ...a,
+      rawAnswer: (a.rawAnswer && a.rawAnswer.trim()) || answers[['blocker', 'motivation', 'constraint'][i] as keyof SimplifyAnswers] || a.rawAnswer,
+    }))
+    : pkg.answers;
+
+  const rawTasks = Array.isArray(partial.tasks) ? partial.tasks : [];
+  const { kept } = filterCandidateSteps(input.taskLabel, rawTasks, { goalTitle, answers });
+  const baseSteps = kept.length >= 1 ? kept : pkg.suggestions;
+
+  const tasks: SimplifiedTaskSuggestion[] = baseSteps.map((s, i) => {
+    const fromServer = rawTasks.find(t => t.label === s.label) ?? rawTasks[i];
+    // Prefer shared-core how-to/link matched by label so client and edge stay on one contract.
+    const fromPkg = pkg.suggestions.find(p => p.label === s.label)
+      ?? pkg.suggestions[i]
+      ?? pkg.suggestions[0];
+    const howTo = (fromPkg?.howTo && fromPkg.howTo.length > 0)
+      ? fromPkg.howTo
+      : (fromServer?.howTo && fromServer.howTo.length > 0 ? fromServer.howTo : []);
+    return {
+      label: s.label,
+      timeOfDay: s.timeOfDay,
+      howTo,
+      resourceLink: fromPkg?.resourceLink ?? fromServer?.resourceLink,
+      signalsUsed: fromServer?.signalsUsed ?? fromPkg?.signalsUsed,
+    };
+  });
+
+  return {
+    ok: tasks.length >= 1,
+    requestId: partial.requestId || meta.requestId,
+    taskId: partial.taskId || meta.taskId,
+    originalTask: partial.originalTask || pkg.originalTask,
+    answers: reviewAnswers,
+    tasks,
+    source: meta.source,
+    reason: meta.reason ?? partial.reason,
+  };
 }
 
 export async function parseContextTasksFromEdge(
@@ -92,6 +163,8 @@ export async function parseContextTasksFromEdge(
 
 export interface SimplifyTaskInput {
   taskLabel: string;
+  taskId?: string;
+  requestId?: string;
   goalTitle?: string;
   goalWhy?: string;
   blocker?: string;
@@ -104,13 +177,24 @@ export interface SimplifyTaskInput {
 export interface SimplifiedTaskSuggestion {
   label: string;
   timeOfDay: 'morning' | 'evening';
+  howTo?: string[];
+  resourceLink?: { label: string; url: string };
+  signalsUsed?: string[];
 }
 
 export interface SimplifyTaskResult {
   ok: boolean;
+  requestId: string;
+  taskId: string;
+  originalTask: string;
+  answers: AnswerReviewItem[];
   tasks: SimplifiedTaskSuggestion[];
   source: ParseContextSource;
   reason?: string;
+}
+
+function newClientRequestId(): string {
+  return `simp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function normalizeClientAnswers(input: SimplifyTaskInput): SimplifyAnswers {
@@ -130,23 +214,50 @@ function normalizeClientAnswers(input: SimplifyTaskInput): SimplifyAnswers {
   };
 }
 
-/** Client-side mirror — uses shared task-anchored core (same validators as edge). */
-export function ruleBasedSimplifyClient(input: SimplifyTaskInput): SimplifiedTaskSuggestion[] {
-  const answers = normalizeClientAnswers(input);
+function packageToClientResult(
+  input: SimplifyTaskInput,
+  answers: SimplifyAnswers,
+  meta: { requestId: string; taskId: string; source: ParseContextSource; reason?: string },
+): SimplifyTaskResult {
   const goalTitle = isGoalRelevantToTask(input.taskLabel, input.goalTitle) ? input.goalTitle : undefined;
-  return ruleBasedSimplifyCore({
+  const pkg = buildSimplifyPackage({
     taskLabel: input.taskLabel,
     goalTitle,
     ...answers,
   });
+  return {
+    ok: pkg.suggestions.length >= 1,
+    requestId: meta.requestId,
+    taskId: meta.taskId,
+    originalTask: pkg.originalTask,
+    answers: pkg.answers,
+    tasks: pkg.suggestions,
+    source: meta.source,
+    reason: meta.reason,
+  };
+}
+
+/** Client-side mirror — uses shared task-anchored core (same validators as edge). */
+export function ruleBasedSimplifyClient(input: SimplifyTaskInput): SimplifiedTaskSuggestion[] {
+  const answers = normalizeClientAnswers(input);
+  const goalTitle = isGoalRelevantToTask(input.taskLabel, input.goalTitle) ? input.goalTitle : undefined;
+  return buildSimplifyPackage({
+    taskLabel: input.taskLabel,
+    goalTitle,
+    ...answers,
+  }).suggestions;
 }
 
 export async function simplifyTaskFromEdge(input: SimplifyTaskInput): Promise<SimplifyTaskResult> {
   const answers = normalizeClientAnswers(input);
   const goalTitle = isGoalRelevantToTask(input.taskLabel, input.goalTitle) ? input.goalTitle : undefined;
   const goalWhy = goalTitle ? input.goalWhy : undefined;
+  const requestId = (input.requestId && input.requestId.trim()) || newClientRequestId();
+  const taskId = (input.taskId && input.taskId.trim()) || '';
   const payload = {
     taskLabel: input.taskLabel,
+    taskId,
+    requestId,
     goalTitle,
     goalWhy,
     blocker: answers.blocker,
@@ -154,58 +265,70 @@ export async function simplifyTaskFromEdge(input: SimplifyTaskInput): Promise<Si
     constraint: answers.constraint,
   };
 
-  // Dev observability (never log raw answer text)
   if (typeof import.meta !== 'undefined' && (import.meta as { env?: { DEV?: boolean } }).env?.DEV) {
     const facts = buildTaskContextFromAnswers(answers);
     console.debug('[Simplify]', {
       taskLabel: input.taskLabel,
+      taskId,
+      requestId,
+      complexity: classifyTaskComplexity(input.taskLabel),
       goalAccepted: !!goalTitle,
       goalDiscarded: !!input.goalTitle && !goalTitle,
       factCategories: facts.map(f => f.category),
       factCount: facts.length,
+      answerLens: [answers.blocker, answers.motivation, answers.constraint].map(a => a.length),
+      route: 'edge_first_then_shared_fallback',
     });
   }
 
-  const clientFallback = (): SimplifyTaskResult => {
-    const tasks = ruleBasedSimplifyClient({ ...input, goalTitle, ...answers });
-    if (tasks.length >= 2) {
-      return { ok: true, tasks, source: 'rules', reason: 'client_fallback' };
-    }
-    return { ok: false, tasks: [], source: 'rules', reason: tasks.length === 0 ? 'network_error' : 'no_suggestions' };
-  };
+  const fallback = (reason: string): SimplifyTaskResult =>
+    normalizeSimplifyResult(input, answers, {}, {
+      requestId,
+      taskId,
+      source: 'rules',
+      reason,
+    });
 
+  // Single production path: try edge (LLM or rules on server), then shared-core fallback.
+  // Atomic and decomposable use the same response contract via normalizeSimplifyResult.
   try {
-    const { data, error } = await edgePost(`${FN}/simplify-task`, payload);
+    const { data, error } = await edgePost(`${FN}/simplify-task`, payload, {
+      // Atomic replies should be fast after edge deploy; keep a hard ceiling for all paths.
+      timeoutMs: classifyTaskComplexity(input.taskLabel) === 'atomic' ? 8_000 : 15_000,
+    });
+
     if (error) {
-      return clientFallback();
+      return fallback(error === 'timeout' ? 'timeout_fallback' : 'client_fallback');
     }
+
     const result = data as SimplifyTaskResult | null;
-    if (!result?.ok || !Array.isArray(result.tasks) || result.tasks.length < 2) {
-      if (result?.reason === 'input_too_short') {
-        return { ok: false, tasks: [], source: 'rules', reason: 'input_too_short' };
-      }
-      // Re-validate edge payload, then fallback
-      if (result?.tasks?.length) {
-        const { kept } = filterCandidateSteps(input.taskLabel, result.tasks, { goalTitle, answers });
-        if (kept.length >= 2) {
-          return { ok: true, tasks: kept, source: result.source === 'llm' ? 'llm' : 'rules', reason: result.reason };
-        }
-      }
-      return clientFallback();
-    }
-    const { kept } = filterCandidateSteps(input.taskLabel, result.tasks, { goalTitle, answers });
-    if (kept.length >= 2) {
+    if (result?.reason === 'input_too_short') {
       return {
-        ok: true,
-        tasks: kept,
-        source: result.source === 'llm' ? 'llm' : 'rules',
-        reason: result.reason,
+        ok: false,
+        requestId: result.requestId || requestId,
+        taskId: result.taskId || taskId,
+        originalTask: input.taskLabel,
+        answers: result.answers ?? [],
+        tasks: [],
+        source: 'rules',
+        reason: 'input_too_short',
       };
     }
-    return clientFallback();
+
+    if (!result?.ok || !Array.isArray(result.tasks) || result.tasks.length < 1) {
+      return fallback(result?.reason || 'empty_edge');
+    }
+
+    return normalizeSimplifyResult(input, answers, result, {
+      requestId,
+      taskId,
+      source: result.source === 'llm' ? 'llm' : 'rules',
+      reason: result.reason || 'edge',
+    });
   } catch {
-    return clientFallback();
+    return fallback('network_error');
   }
 }
 
-export { isGoalRelevantToTask };
+export { isGoalRelevantToTask, buildSimplifyPackage };
+export type { AnswerReviewItem };
