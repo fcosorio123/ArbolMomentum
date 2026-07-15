@@ -550,7 +550,7 @@ export function getTodayChartData(profileId: string, dateKey?: string): TodayCha
     .reverse();
   if (reports.length === 0) return [];
   return reports.map((r, i) => ({
-    label: i === 0 ? 'Start' : `${i + 1}`,
+    label: `Done ${i + 1}`,
     progress: r.progressAtTime,
     momentum: r.momentumScore,
   }));
