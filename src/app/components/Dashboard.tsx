@@ -542,8 +542,14 @@ export function Dashboard({
         <TasksMonthView
           profileId={profile.id}
           previewLimit={3}
-          onManageTask={() => onNavigateAllTasks?.() ?? onNavigateTasks?.()}
-          onGoAllTasks={() => onNavigateAllTasks?.() ?? onNavigateTasks?.()}
+          onManageTask={() => {
+            if (onNavigateAllTasks) onNavigateAllTasks();
+            else onNavigateTasks?.();
+          }}
+          onGoAllTasks={() => {
+            if (onNavigateAllTasks) onNavigateAllTasks();
+            else onNavigateTasks?.();
+          }}
         />
       </div>
 
