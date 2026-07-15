@@ -91,10 +91,19 @@ export function buildSmartNudgeCopy(
   const taskLines = formatTaskLines(topTasks);
   const taskSuffix = taskLines ? `\n\n${taskLines}` : '';
   const hour = new Date().getHours();
+  const period = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
   const timeGreeting =
     hour < 12 ? `Good morning, ${firstName}! ☀️`
       : hour < 17 ? `Good afternoon, ${firstName}!`
       : `Good evening, ${firstName}!`;
+
+  // Never ship night/evening tone in the morning (same rule as server cron).
+  if ((tag === 'daily-evening' || tag === 'daily-streak-risk') && period !== 'evening') {
+    return null;
+  }
+  if (tag === 'daily-morning' && period === 'evening') {
+    return null;
+  }
 
   if (tag === 'daily-morning') {
     if (pending <= 0) return null;
@@ -107,7 +116,7 @@ export function buildSmartNudgeCopy(
   if (tag === 'daily-midday') {
     if (pending <= 0) return null;
     return {
-      title: 'Quick check-in 📋',
+      title: period === 'morning' ? timeGreeting : 'Quick check-in 📋',
       body: `${pending} ${taskWord} still open today. Tap a task to mark progress and keep your goals moving.${taskSuffix}`,
     };
   }
@@ -122,7 +131,7 @@ export function buildSmartNudgeCopy(
     }
     if (pending > 0) {
       return {
-        title: `Evening reminder, ${firstName}`,
+        title: timeGreeting,
         body: `${pending} ${taskWord} still open. A few minutes now keeps your momentum going.${taskSuffix}`,
       };
     }
@@ -247,6 +256,18 @@ export async function processDueNudges({
       if (nowMs < notif.atMs) continue;
       if (wasNudgeFiredToday(profile.id, notif.tag)) {
         markScheduleFired(profile.id, notif.tag);
+        continue;
+      }
+
+      // Match server guards: evening/streak never fire in the morning local hours.
+      const localHour = new Date().getHours();
+      if (
+        (notif.tag === 'daily-evening' || notif.tag === 'daily-streak-risk')
+        && localHour < 16
+      ) {
+        continue;
+      }
+      if (notif.tag === 'daily-morning' && localHour >= 12) {
         continue;
       }
 

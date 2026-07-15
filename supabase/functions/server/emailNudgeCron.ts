@@ -15,6 +15,10 @@ import { isValidEmail } from "./resend.ts";
 const BACKUP_PREFIX = "arbol-backup-";
 /** Wider window so GitHub Actions UTC schedule drift is less likely to miss a slot (C1 evidence). */
 const CRON_WINDOW_MINUTES = 20;
+/** Evening / streak emails must not fire before this local hour (blocks 8am "night" mis-fires). */
+const EVENING_EARLIEST_HOUR = 16;
+/** Morning emails must not fire at/after this local hour. */
+const MORNING_LATEST_HOUR = 12;
 export const CRON_LAST_RUN_KEY = "arbol-cron-last-run";
 export const CRON_ATTEMPT_LOG_KEY = "arbol-cron-attempt-log";
 const ATTEMPT_LOG_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -87,17 +91,17 @@ function isEmailEnabledForProfile(prefs?: ProfileAlertPrefs | null): boolean {
   return prefs?.emailEnabled !== false;
 }
 
-/** Local calendar parts for a profile timezone (tzOffset = Date.getTimezoneOffset()). */
+/** Local calendar parts for a profile timezone (tzOffset = Date.getTimezoneOffset() minutes). */
 export function localDateTimeForProfile(tzOffset: number): {
   dateKey: string;
   hour: number;
   minute: number;
   totalMinutes: number;
 } {
-  const now = new Date();
-  const utcMs = now.getTime() + now.getTimezoneOffset() * 60_000;
-  const userMs = utcMs - tzOffset * 60_000;
-  const local = new Date(userMs);
+  const offset = normalizeTzOffsetMinutes(tzOffset);
+  // getTimezoneOffset convention: minutes to add to local → UTC, so local = UTC − offset.
+  // Do not also add the server's getTimezoneOffset() — Date.now() is already UTC epoch ms.
+  const local = new Date(Date.now() - offset * 60_000);
   const y = local.getUTCFullYear();
   const m = local.getUTCMonth() + 1;
   const d = local.getUTCDate();
@@ -111,8 +115,17 @@ export function localDateTimeForProfile(tzOffset: number): {
   };
 }
 
-function isSlotDueNow(slot: SmartSlotConfig, localTotalMinutes: number): boolean {
+function isSlotDueNow(slot: SmartSlotConfig, localTotalMinutes: number, slotKey?: SlotKey): boolean {
   if (!slot.enabled) return false;
+  const hour = Math.floor(localTotalMinutes / 60);
+  // Slot labels imply day-part. Never send evening/streak copy before late afternoon,
+  // even if the configured clock time was mistyped as 8:00 AM.
+  if ((slotKey === "evening" || slotKey === "streakRisk") && hour < EVENING_EARLIEST_HOUR) {
+    return false;
+  }
+  if (slotKey === "morning" && hour >= MORNING_LATEST_HOUR) {
+    return false;
+  }
   const slotStart = slot.hour * 60 + slot.minute;
   return localTotalMinutes >= slotStart && localTotalMinutes < slotStart + CRON_WINDOW_MINUTES;
 }
@@ -128,6 +141,12 @@ function greetingForHour(hour: number, firstName: string): string {
   if (hour < 12) return `Good morning, ${firstName}! ☀️`;
   if (hour < 17) return `Good afternoon, ${firstName}!`;
   return `Good evening, ${firstName}!`;
+}
+
+function periodOfDay(hour: number): "morning" | "afternoon" | "evening" {
+  if (hour < 12) return "morning";
+  if (hour < 17) return "afternoon";
+  return "evening";
 }
 
 /** Normalize to Date.getTimezoneOffset()-style minutes (positive west of UTC). */
@@ -153,7 +172,16 @@ function buildNudgeCopy(
   const taskSuffix = formatTaskLines(topTasks);
   const taskLines = taskSuffix ? `\n\n${taskSuffix}` : "";
   const taskWord = pending === 1 ? "task" : "tasks";
+  const period = periodOfDay(localHour);
   const timeGreeting = greetingForHour(localHour, firstName);
+
+  // Never ship night/evening tone outside evening hours (fixes 8am "night update").
+  if ((tag === "daily-evening" || tag === "daily-streak-risk") && period !== "evening") {
+    return null;
+  }
+  if (tag === "daily-morning" && period === "evening") {
+    return null;
+  }
 
   if (tag === "daily-morning") {
     if (pending <= 0 && snapshot) return null;
@@ -168,7 +196,7 @@ function buildNudgeCopy(
   if (tag === "daily-midday") {
     if (pending <= 0 && snapshot) return null;
     return {
-      title: "Quick check-in 📋",
+      title: period === "morning" ? timeGreeting : "Quick check-in 📋",
       body: pending > 0
         ? `${pending} ${taskWord} still open today. Tap a task to mark progress and keep your goals moving.${taskLines}`
         : `Check in on your goals — open Arbol Momentum to update today's tasks.`,
@@ -185,13 +213,13 @@ function buildNudgeCopy(
     }
     if (pending > 0) {
       return {
-        title: `Evening reminder, ${firstName}`,
+        title: timeGreeting,
         body: `${pending} ${taskWord} still open. A few minutes now keeps your momentum going.${taskLines}`,
       };
     }
     if (!snapshot) {
       return {
-        title: `Evening check-in, ${firstName}`,
+        title: timeGreeting,
         body: "Open Arbol Momentum to wrap up today's tasks before the day ends.",
       };
     }
@@ -343,7 +371,7 @@ export async function runScheduledEmailNudges(): Promise<{
     for (const key of Object.keys(SLOT_TAGS) as SlotKey[]) {
       const slot = slots[key];
       const tag = SLOT_TAGS[key];
-      if (!isSlotDueNow(slot, local.totalMinutes)) continue;
+      if (!isSlotDueNow(slot, local.totalMinutes, key)) continue;
 
       const copy = buildNudgeCopy(tag, snapshotFresh, profileName, local.hour);
       if (!copy) {
