@@ -14,6 +14,17 @@ import {
 } from './profiles';
 import { CALENDAR_PREFS_KEY, CALENDAR_PROVIDER_KEY } from './calendarExport';
 import { buildNudgeSnapshot } from './dashboardSnapshot';
+import {
+  readDeletedUserGoalsRaw,
+  readDeletedUserTasksRaw,
+  writeDeletedUserGoalsRaw,
+  writeDeletedUserTasksRaw,
+  unionIdLists,
+  filterGoalsByTombstones,
+  filterTasksByTombstones,
+  getDeletedUserGoalIds,
+  getDeletedUserTaskIds,
+} from './deletionTombstones';
 
 const FN = 'make-server-5d90ddf5';
 const FN_BASE = `https://${projectId}.supabase.co/functions/v1`;
@@ -194,6 +205,8 @@ function collectLocalData(profileId: string): Record<string, unknown> {
     seedOverrides: raw(`arbol-seed-overrides-${profileId}`),
     taskGoalLinks:    raw(TASK_GOAL_LINKS_KEY(profileId)),
     deletedDefaultGoals: raw(DELETED_DEFAULT_GOALS_KEY(profileId)),
+    deletedUserGoals: readDeletedUserGoalsRaw(profileId),
+    deletedUserTasks: readDeletedUserTasksRaw(profileId),
     taskStatuses,
     taskDeletions,
     streakDays,
@@ -230,13 +243,16 @@ function mergePersonalGoalsFromCloud(profileId: string, cloudGoals: unknown): bo
   } catch { local = []; }
 
   if (local.length === 0) {
-    localStorage.setItem(PERSONAL_GOALS_KEY(profileId), JSON.stringify(cloudGoals));
+    const filtered = filterGoalsByTombstones(cloudGoals as { id?: string }[], getDeletedUserGoalIds(profileId));
+    localStorage.setItem(PERSONAL_GOALS_KEY(profileId), JSON.stringify(filtered));
     return true;
   }
 
   const byId = new Map(local.map(g => [g.id, g]));
+  const deleted = getDeletedUserGoalIds(profileId);
   let changed = false;
   for (const cg of cloudUser) {
+    if (!cg?.id || deleted.has(cg.id)) continue;
     const existing = byId.get(cg.id);
     if (!existing) {
       byId.set(cg.id, cg);
@@ -246,6 +262,13 @@ function mergePersonalGoalsFromCloud(profileId: string, cloudGoals: unknown): bo
       JSON.stringify(existing) !== JSON.stringify(cg)
     ) {
       byId.set(cg.id, cg);
+      changed = true;
+    }
+  }
+  // Drop any local goals that were tombstoned (defensive)
+  for (const id of [...byId.keys()]) {
+    if (deleted.has(id)) {
+      byId.delete(id);
       changed = true;
     }
   }
@@ -382,7 +405,13 @@ function mergeCloudActivityUnion(profileId: string, cloud: Record<string, unknow
       }
     };
 
-    write(`arbol-user-tasks-${profileId}`, cloud.userTasks);
+    writeDeletedUserGoalsRaw(profileId, unionIdLists(cloud.deletedUserGoals, readDeletedUserGoalsRaw(profileId)));
+    writeDeletedUserTasksRaw(profileId, unionIdLists(cloud.deletedUserTasks, readDeletedUserTasksRaw(profileId)));
+    const deadGoals = getDeletedUserGoalIds(profileId);
+    const deadTasks = getDeletedUserTaskIds(profileId);
+
+    write(`arbol-user-tasks-${profileId}`, filterTasksByTombstones(cloud.userTasks as { id?: string }[] | undefined, deadTasks));
+    write(PERSONAL_GOALS_KEY(profileId), filterGoalsByTombstones(cloud.personalGoals as { id?: string }[] | undefined, deadGoals));
     write(`arbol-user-cats-${profileId}`, cloud.userCategories);
     write(`arbol-goal-logs-${profileId}`, cloud.goalLogs);
     write(`streak-best-${profileId}`, cloud.streakBest);
@@ -390,7 +419,11 @@ function mergeCloudActivityUnion(profileId: string, cloud: Record<string, unknow
     write(`arbol-live-snapshots-${profileId}`, cloud.liveSnapshots);
     write(`arbol-hidden-seed-${profileId}`, cloud.permanentlyHiddenSeedTasks);
     write(`arbol-seed-overrides-${profileId}`, cloud.seedOverrides);
-    write(DELETED_DEFAULT_GOALS_KEY(profileId), cloud.deletedDefaultGoals);
+    {
+      let localDefaults: unknown = null;
+      try { localDefaults = JSON.parse(localStorage.getItem(DELETED_DEFAULT_GOALS_KEY(profileId)) || 'null'); } catch { /* ignore */ }
+      write(DELETED_DEFAULT_GOALS_KEY(profileId), unionIdLists(cloud.deletedDefaultGoals, localDefaults));
+    }
   }
 
   if (changed && cloudAt > 0) {
@@ -407,8 +440,13 @@ function applyLocalData(profileId: string, data: Record<string, unknown>): void 
     localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
   };
 
-  write(`arbol-user-tasks-${profileId}`, data.userTasks);
-  write(PERSONAL_GOALS_KEY(profileId), data.personalGoals);
+  writeDeletedUserGoalsRaw(profileId, unionIdLists(data.deletedUserGoals, readDeletedUserGoalsRaw(profileId)));
+  writeDeletedUserTasksRaw(profileId, unionIdLists(data.deletedUserTasks, readDeletedUserTasksRaw(profileId)));
+  const deadGoals = getDeletedUserGoalIds(profileId);
+  const deadTasks = getDeletedUserTaskIds(profileId);
+
+  write(`arbol-user-tasks-${profileId}`, filterTasksByTombstones(data.userTasks as { id?: string }[] | undefined, deadTasks));
+  write(PERSONAL_GOALS_KEY(profileId), filterGoalsByTombstones(data.personalGoals as { id?: string }[] | undefined, deadGoals));
   write(`arbol-user-cats-${profileId}`, data.userCategories);
   write(`arbol-goal-logs-${profileId}`, data.goalLogs);
   write(`streak-best-${profileId}`, data.streakBest);
@@ -417,7 +455,11 @@ function applyLocalData(profileId: string, data: Record<string, unknown>): void 
   write(`arbol-hidden-seed-${profileId}`, data.permanentlyHiddenSeedTasks);
   write(`arbol-seed-overrides-${profileId}`, data.seedOverrides);
   write(TASK_GOAL_LINKS_KEY(profileId), data.taskGoalLinks);
-  write(DELETED_DEFAULT_GOALS_KEY(profileId), data.deletedDefaultGoals);
+  {
+    let localDefaults: unknown = null;
+    try { localDefaults = JSON.parse(localStorage.getItem(DELETED_DEFAULT_GOALS_KEY(profileId)) || 'null'); } catch { /* ignore */ }
+    write(DELETED_DEFAULT_GOALS_KEY(profileId), unionIdLists(data.deletedDefaultGoals, localDefaults));
+  }
 
   if (typeof data.profileEmail === 'string' && data.profileEmail.trim()) {
     localStorage.setItem(getStorageKey(`arbol-email-${profileId}`), data.profileEmail.trim());
@@ -708,16 +750,34 @@ async function buildUnionPayload(profileId: string): Promise<Record<string, unkn
 
   local.streakBest = mergeStreakBest(local.streakBest, cloud.streakBest);
 
-  // Keep richer array blobs when cloud has more items (goals/tasks).
-  const cloudTasks = Array.isArray(cloud.userTasks) ? cloud.userTasks : null;
-  const localTasks = Array.isArray(local.userTasks) ? local.userTasks : null;
-  if (cloudTasks && (!localTasks || cloudTasks.length > localTasks.length)) {
-    local.userTasks = cloud.userTasks;
+  // Keep goals/tasks by ID union, minus deletion tombstones (never revive deletes via "longer array").
+  const deletedGoals = new Set(unionIdLists(local.deletedUserGoals, cloud.deletedUserGoals));
+  const deletedTasks = new Set(unionIdLists(local.deletedUserTasks, cloud.deletedUserTasks));
+  local.deletedUserGoals = [...deletedGoals];
+  local.deletedUserTasks = [...deletedTasks];
+  local.deletedDefaultGoals = unionIdLists(local.deletedDefaultGoals, cloud.deletedDefaultGoals);
+
+  const cloudTasks = Array.isArray(cloud.userTasks) ? cloud.userTasks : [];
+  const localTasks = Array.isArray(local.userTasks) ? local.userTasks : [];
+  {
+    const byId = new Map<string, unknown>();
+    for (const t of [...cloudTasks, ...localTasks]) {
+      const id = (t as { id?: string })?.id;
+      if (!id || deletedTasks.has(id)) continue;
+      byId.set(id, t);
+    }
+    local.userTasks = [...byId.values()];
   }
-  const cloudGoals = Array.isArray(cloud.personalGoals) ? cloud.personalGoals : null;
-  const localGoals = Array.isArray(local.personalGoals) ? local.personalGoals : null;
-  if (cloudGoals && (!localGoals || cloudGoals.length > localGoals.length)) {
-    if (!localGoals || localGoals.length === 0) local.personalGoals = cloud.personalGoals;
+  const cloudGoals = Array.isArray(cloud.personalGoals) ? cloud.personalGoals : [];
+  const localGoals = Array.isArray(local.personalGoals) ? local.personalGoals : [];
+  {
+    const byId = new Map<string, unknown>();
+    for (const g of [...cloudGoals, ...localGoals]) {
+      const id = (g as { id?: string })?.id;
+      if (!id || deletedGoals.has(id)) continue;
+      byId.set(id, g);
+    }
+    local.personalGoals = [...byId.values()];
   }
 
   // Prefer stored profile timezone (often from the first/primary device).

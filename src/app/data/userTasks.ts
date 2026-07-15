@@ -1,6 +1,7 @@
 import type { TimeOfDay, TaskType } from './profiles';
 import { purgeTaskLocalState } from './profiles';
 import { scheduleSave } from './cloudBackup';
+import { recordDeletedUserTask } from './deletionTombstones';
 import {
   defaultPotentialValue,
   isValidPotentialValueScore,
@@ -215,6 +216,7 @@ export function updateUserTask(profileId: string, taskId: string, data: Partial<
 }
 
 export function deleteUserTask(profileId: string, taskId: string) {
+  recordDeletedUserTask(profileId, taskId);
   const tasks = getUserTasks(profileId);
   saveUserTasks(profileId, tasks.filter(t => t.id !== taskId));
   purgeTaskLocalState(profileId, taskId);

@@ -52,13 +52,13 @@ export const CALENDAR_PROVIDER_OPTIONS: CalendarProviderOption[] = [
   {
     id: 'google',
     label: 'Google Calendar',
-    description: 'Opens Google Calendar — or downloads a file to import many events',
+    description: 'Opens Google Calendar - or downloads a file to import many events',
     emoji: '📅',
   },
   {
     id: 'outlook',
     label: 'Outlook',
-    description: 'Opens Outlook on the web — or downloads a file to import many events',
+    description: 'Opens Outlook on the web - or downloads a file to import many events',
     emoji: '📧',
   },
   {
@@ -70,7 +70,7 @@ export const CALENDAR_PROVIDER_OPTIONS: CalendarProviderOption[] = [
   {
     id: 'ics',
     label: 'Other (.ics file)',
-    description: 'Universal format — import into any calendar app',
+    description: 'Universal format - import into any calendar app',
     emoji: '📎',
   },
 ];
@@ -167,7 +167,7 @@ export function buildValarmLines(label: string, minutesBefore: number): string[]
   ];
 }
 
-/** Mon–Sun of the current calendar week (same resolution as WeekPlan). */
+/** Mon-Sun of the current calendar week (same resolution as WeekPlan). */
 export function getDateForWeekDay(day: string, ref = new Date()): Date {
   const weekIndex = WEEK_DAYS.indexOf(day as (typeof WEEK_DAYS)[number]);
   if (weekIndex < 0) return new Date(ref);
@@ -276,7 +276,7 @@ function buildCalendarEventRow(
 }
 
 /**
- * Tasks to export — mirrors Week tab task IDs, excludes done/skipped/removed seeds.
+ * Tasks to export - mirrors Week tab task IDs, excludes done/skipped/removed seeds.
  */
 export function formatShortDateKey(dateKey: string): string {
   const [y, m, d] = dateKey.split('-').map(Number);
@@ -459,7 +459,7 @@ function buildEventDescription(event: CalendarEventRow): string {
   return parts.join('\n');
 }
 
-/** Google Calendar compose URL — works for a single event. */
+/** Google Calendar compose URL - works for a single event. */
 export function buildGoogleCalendarUrl(
   event: CalendarEventRow,
   prefs: CalendarExportPrefs = DEFAULT_CALENDAR_PREFS,
@@ -474,7 +474,7 @@ export function buildGoogleCalendarUrl(
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
-/** Outlook web compose URL — works for a single event. */
+/** Outlook web compose URL - works for a single event. */
 export function buildOutlookCalendarUrl(
   event: CalendarEventRow,
   prefs: CalendarExportPrefs = DEFAULT_CALENDAR_PREFS,
@@ -532,17 +532,17 @@ export function getCalendarDeliveryMessage(
 
   if (method === 'deeplink') {
     if (provider === 'google') {
-      return `${scopePrefix}Opened Google Calendar — save the event to add it.`;
+      return `${scopePrefix}Opened Google Calendar - save the event to add it.`;
     }
     if (provider === 'outlook') {
-      return `${scopePrefix}Opened Outlook — save the event to add it.`;
+      return `${scopePrefix}Opened Outlook - save the event to add it.`;
     }
   }
 
   const importHints: Record<CalendarProvider, string> = {
     google: 'In Google Calendar: Settings → Import & export → Import → select the downloaded file.',
     outlook: 'In Outlook: Add calendar → Upload from file → select the downloaded file.',
-    apple: 'Tap the downloaded file — it should open in Apple Calendar. Alarms are included.',
+    apple: 'Tap the downloaded file - it should open in Apple Calendar. Alarms are included.',
     ics: 'Open the file in your calendar app, or use its Import option.',
   };
 

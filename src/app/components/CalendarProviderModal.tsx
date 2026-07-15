@@ -77,7 +77,7 @@ export function CalendarProviderModal({ open, scopeDescription, eventCount, onSe
                 </span>
                 <span style={{ display: 'block', marginTop: 3, fontSize: 12, color: C.secondary, lineHeight: 1.45 }}>
                   {multiEvent && (option.id === 'google' || option.id === 'outlook')
-                    ? 'Downloads a file — then import into ' + option.label
+                    ? 'Downloads a file - then import into ' + option.label
                     : option.description}
                 </span>
               </span>

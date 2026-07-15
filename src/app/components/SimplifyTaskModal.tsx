@@ -128,8 +128,8 @@ export function SimplifyTaskModal({
         </h3>
         {!reviewing && (
           <p style={{ margin: '0 0 14px', fontSize: 12, color: C.body, lineHeight: 1.45 }}>
-            Learning more so we can simplify: <strong>{taskLabel}</strong>
-            {goalTitle && <> (supports goal: {goalTitle})</>}
+            Your answers shape how we break this into tiny steps for: <strong>{taskLabel}</strong>
+            {goalTitle && <> (goal: {goalTitle})</>}
           </p>
         )}
 

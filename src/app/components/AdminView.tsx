@@ -455,48 +455,12 @@ function AnalyticsTab() {
   const [loading, setLoading] = useState(false);
   const [todayVisits, setTodayVisits] = useState(0);
   const [backup, setBackup] = useState<Record<string, unknown> | null>(null);
+  const [engagementRefreshKey, setEngagementRefreshKey] = useState(0);
 
   const profile = getOperativeProfiles().find(p => p.id === selectedId)!;
   const adminToday = getTodayKey();
 
-  useEffect(() => {
-    fetchVisitCountForAdmin(selectedId, adminToday).then(setTodayVisits);
-    fetchProfileBackupForAdmin(selectedId).then(setBackup).catch(() => setBackup(null));
-  }, [selectedId, adminToday]);
-
-  const today = backup ? getBackupTodayKey(backup) : adminToday;
-  const hourlyData = getActivityChartData(selectedId, today);
-  const todayView = computeAdminViewFromBackup(selectedId, backup, today);
-  const todayDetail = todayView.hasBackup
-    ? todayView.dayStats
-    : computeDayStatsFromPersisted(selectedId, today);
-  const liveStreak = todayView.hasBackup ? todayView.liveStreak : 0;
-  const bestStreak = Math.max(
-    Number((backup?.streakBest as { daily?: number } | undefined)?.daily) || 0,
-    computeBestStreak(selectedId),
-    liveStreak,
-    profile.bestStreak,
-  );
-
-  // Peak hour
-  const allHours: number[] = JSON.parse(localStorage.getItem(`arbol-activity-${selectedId}-${today}`) || '[]') || [];
-  const peakHour = allHours.length > 0 ? allHours.indexOf(Math.max(...allHours)) : -1;
-  const peakLabel = peakHour >= 0
-    ? peakHour === 0 ? '12AM' : peakHour < 12 ? `${peakHour}AM` : peakHour === 12 ? '12PM' : `${peakHour - 12}PM`
-    : null;
-
-  const insight = generateInsight({
-    completionRate: profile.completionRate,
-    streak: liveStreak,
-    todayPct: todayDetail.pct,
-    peakHour: peakHour >= 0 ? peakHour : 14,
-    visitCount: todayVisits,
-  });
-
-  const card: React.CSSProperties = { background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16, boxShadow: C.shadow };
-
-  // Get date range based on selected time period
-  const getDateRange = (): { startDate: string; endDate: string; days: number } => {
+  const getDateRange = useCallback((): { startDate: string; endDate: string; days: number } => {
     const end = new Date();
     const endDate = getDateKey(end);
     let startDate: string;
@@ -539,54 +503,15 @@ function AnalyticsTab() {
     startDate = getDateKey(start);
 
     return { startDate, endDate, days };
-  };
+  }, [timePeriod, customStartDate, customEndDate]);
 
-  // Load engagement data for selected time period
-  const loadEngagementData = async () => {
-    setLoading(true);
-    const { startDate, endDate, days } = getDateRange();
-
-    try {
-      let data: EngagementData[] = [];
-
-      // Determine aggregation level based on date range
-      const shouldAggregate = days > 90; // Aggregate by week if > 90 days
-
-      if (isPublishedVersion()) {
-        // Fetch from Supabase
-        const completions = await fetchAllTaskCompletions({ profileId: selectedId });
-        const deletions = await fetchAllTaskDeletions({ profileId: selectedId });
-
-        if (shouldAggregate) {
-          // Aggregate by week
-          data = getWeeklyAggregatedData(startDate, endDate, completions, deletions);
-        } else {
-          // Daily data
-          data = getDailyEngagementData(startDate, endDate, completions, deletions);
-        }
-      } else {
-        // Development mode - use localStorage
-        if (shouldAggregate) {
-          data = getWeeklyAggregatedDataLocal(startDate, endDate);
-        } else {
-          data = getDailyEngagementDataLocal(startDate, endDate);
-        }
-      }
-
-      setEngagementData(data);
-    } catch (error) {
-      console.error('Failed to load engagement data:', error);
-      // Fallback to local data
-      const { startDate, endDate } = getDateRange();
-      const data = getDailyEngagementDataLocal(startDate, endDate);
-      setEngagementData(data);
-    }
-
-    setLoading(false);
-  };
-
-  // Helper: Get daily engagement data from backup (+ optional SQL overlay)
-  const getDailyEngagementData = (startDate: string, endDate: string, completions: any[], deletions: any[]): EngagementData[] => {
+  const getDailyEngagementData = useCallback((
+    startDate: string,
+    endDate: string,
+    completions: any[],
+    deletions: any[],
+    backupSnap: Record<string, unknown> | null,
+  ): EngagementData[] => {
     const data: EngagementData[] = [];
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -594,8 +519,8 @@ function AnalyticsTab() {
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dateStr = getDateKey(d);
       const overlay = buildRemoteDayOverlay(selectedId, dateStr, completions, deletions);
-      const detail = backup
-        ? computeAdminViewFromBackup(selectedId, backup, dateStr, overlay).dayStats
+      const detail = backupSnap
+        ? computeAdminViewFromBackup(selectedId, backupSnap, dateStr, overlay).dayStats
         : computeDayStatsFromPersisted(selectedId, dateStr, overlay);
 
       data.push({
@@ -608,15 +533,19 @@ function AnalyticsTab() {
     }
 
     return data;
-  };
+  }, [selectedId]);
 
-  // Helper: Get weekly aggregated data from Supabase
-  const getWeeklyAggregatedData = (startDate: string, endDate: string, completions: any[], deletions: any[]): EngagementData[] => {
+  const getWeeklyAggregatedData = useCallback((
+    startDate: string,
+    endDate: string,
+    completions: any[],
+    deletions: any[],
+    backupSnap: Record<string, unknown> | null,
+  ): EngagementData[] => {
     const data: EngagementData[] = [];
     const start = new Date(startDate);
     const end = new Date(endDate);
 
-    // Group by weeks (Monday-Sunday)
     let weekStart = new Date(start);
     while (weekStart <= end) {
       const weekEnd = new Date(weekStart);
@@ -625,7 +554,6 @@ function AnalyticsTab() {
       const weekStartStr = getDateKey(weekStart);
       const weekEndStr = getDateKey(weekEnd <= end ? weekEnd : end);
 
-      // Calculate average completion for the week
       let totalPct = 0;
       let dayCount = 0;
       let weekDone = 0;
@@ -634,8 +562,8 @@ function AnalyticsTab() {
       for (let d = new Date(weekStart); d <= new Date(weekEndStr); d.setDate(d.getDate() + 1)) {
         const dateStr = getDateKey(d);
         const overlay = buildRemoteDayOverlay(selectedId, dateStr, completions, deletions);
-        const detail = backup
-          ? computeAdminViewFromBackup(selectedId, backup, dateStr, overlay).dayStats
+        const detail = backupSnap
+          ? computeAdminViewFromBackup(selectedId, backupSnap, dateStr, overlay).dayStats
           : computeDayStatsFromPersisted(selectedId, dateStr, overlay);
 
         totalPct += detail.pct;
@@ -658,10 +586,9 @@ function AnalyticsTab() {
     }
 
     return data;
-  };
+  }, [selectedId]);
 
-  // Helper: Get daily engagement data from localStorage
-  const getDailyEngagementDataLocal = (startDate: string, endDate: string): EngagementData[] => {
+  const getDailyEngagementDataLocal = useCallback((startDate: string, endDate: string): EngagementData[] => {
     const data: EngagementData[] = [];
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -680,10 +607,9 @@ function AnalyticsTab() {
     }
 
     return data;
-  };
+  }, [selectedId]);
 
-  // Helper: Get weekly aggregated data from localStorage
-  const getWeeklyAggregatedDataLocal = (startDate: string, endDate: string): EngagementData[] => {
+  const getWeeklyAggregatedDataLocal = useCallback((startDate: string, endDate: string): EngagementData[] => {
     const data: EngagementData[] = [];
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -724,7 +650,102 @@ function AnalyticsTab() {
     }
 
     return data;
-  };
+  }, [selectedId]);
+
+  // Fetch backup first, then engagement — previously engagement ran before backup landed (stale zeros).
+  useEffect(() => {
+    let cancelled = false;
+    setBackup(null);
+    setLoading(true);
+
+    (async () => {
+      fetchVisitCountForAdmin(selectedId, adminToday).then(v => {
+        if (!cancelled) setTodayVisits(v);
+      });
+
+      let backupSnap: Record<string, unknown> | null = null;
+      try {
+        backupSnap = await fetchProfileBackupForAdmin(selectedId);
+      } catch {
+        backupSnap = null;
+      }
+      if (cancelled) return;
+      setBackup(backupSnap);
+
+      const { startDate, endDate, days } = getDateRange();
+      const shouldAggregate = days > 90;
+
+      try {
+        let data: EngagementData[] = [];
+        if (isPublishedVersion()) {
+          const completions = await fetchAllTaskCompletions({ profileId: selectedId });
+          const deletions = await fetchAllTaskDeletions({ profileId: selectedId });
+          if (cancelled) return;
+          data = shouldAggregate
+            ? getWeeklyAggregatedData(startDate, endDate, completions, deletions, backupSnap)
+            : getDailyEngagementData(startDate, endDate, completions, deletions, backupSnap);
+        } else {
+          data = shouldAggregate
+            ? getWeeklyAggregatedDataLocal(startDate, endDate)
+            : getDailyEngagementDataLocal(startDate, endDate);
+        }
+        if (!cancelled) setEngagementData(data);
+      } catch (error) {
+        console.error('Failed to load engagement data:', error);
+        if (!cancelled) {
+          const range = getDateRange();
+          setEngagementData(getDailyEngagementDataLocal(range.startDate, range.endDate));
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [
+    selectedId,
+    adminToday,
+    timePeriod,
+    customStartDate,
+    customEndDate,
+    engagementRefreshKey,
+    getDateRange,
+    getDailyEngagementData,
+    getWeeklyAggregatedData,
+    getDailyEngagementDataLocal,
+    getWeeklyAggregatedDataLocal,
+  ]);
+
+  const today = backup ? getBackupTodayKey(backup) : adminToday;
+  const hourlyData = getActivityChartData(selectedId, today);
+  const todayView = computeAdminViewFromBackup(selectedId, backup, today);
+  const todayDetail = todayView.hasBackup
+    ? todayView.dayStats
+    : computeDayStatsFromPersisted(selectedId, today);
+  const liveStreak = todayView.hasBackup ? todayView.liveStreak : 0;
+  const bestStreak = Math.max(
+    Number((backup?.streakBest as { daily?: number } | undefined)?.daily) || 0,
+    computeBestStreak(selectedId),
+    liveStreak,
+    profile.bestStreak,
+  );
+
+  // Peak hour
+  const allHours: number[] = JSON.parse(localStorage.getItem(`arbol-activity-${selectedId}-${today}`) || '[]') || [];
+  const peakHour = allHours.length > 0 ? allHours.indexOf(Math.max(...allHours)) : -1;
+  const peakLabel = peakHour >= 0
+    ? peakHour === 0 ? '12AM' : peakHour < 12 ? `${peakHour}AM` : peakHour === 12 ? '12PM' : `${peakHour - 12}PM`
+    : null;
+
+  const insight = generateInsight({
+    completionRate: profile.completionRate,
+    streak: liveStreak,
+    todayPct: todayDetail.pct,
+    peakHour: peakHour >= 0 ? peakHour : 14,
+    visitCount: todayVisits,
+  });
+
+  const card: React.CSSProperties = { background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16, boxShadow: C.shadow };
 
   // Calculate summary metrics
   const summaryMetrics = useMemo(() => {
@@ -747,11 +768,6 @@ function AnalyticsTab() {
 
     return { avgCompletion, totalCompletions, activeDays, peakDay, trend };
   }, [engagementData, selectedId]);
-
-  // Load data when period or profile changes
-  useEffect(() => {
-    loadEngagementData();
-  }, [selectedId, timePeriod, customStartDate, customEndDate]);
 
   const timePeriods: { id: TimePeriod; label: string }[] = [
     { id: 'week', label: 'Week' },
@@ -853,28 +869,39 @@ function AnalyticsTab() {
               Task completion trends
             </div>
           </div>
-          {!loading && (
+          <div style={{ display: 'flex', gap: 6 }}>
             <Button
               size="small"
-              icon={<DownloadOutlined />}
-              onClick={() => {
-                // Export data as CSV
-                const csv = [
-                  ['Date', 'Completion %', 'Tasks Done', 'Total Tasks'],
-                  ...engagementData.map(d => [d.date, d.pct, d.done, d.total])
-                ].map(row => row.join(',')).join('\n');
-                const blob = new Blob([csv], { type: 'text/csv' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `engagement-${selectedId}-${timePeriod}-${getTodayKey()}.csv`;
-                a.click();
-              }}
+              icon={<ReloadOutlined />}
+              loading={loading}
+              onClick={() => setEngagementRefreshKey(k => k + 1)}
               style={{ fontSize: 11 }}
             >
-              Export
+              Refresh
             </Button>
-          )}
+            {!loading && (
+              <Button
+                size="small"
+                icon={<DownloadOutlined />}
+                onClick={() => {
+                  // Export data as CSV
+                  const csv = [
+                    ['Date', 'Completion %', 'Tasks Done', 'Total Tasks'],
+                    ...engagementData.map(d => [d.date, d.pct, d.done, d.total])
+                  ].map(row => row.join(',')).join('\n');
+                  const blob = new Blob([csv], { type: 'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `engagement-${selectedId}-${timePeriod}-${getTodayKey()}.csv`;
+                  a.click();
+                }}
+                style={{ fontSize: 11 }}
+              >
+                Export
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Time Period Filter */}

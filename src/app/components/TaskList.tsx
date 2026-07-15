@@ -10,7 +10,6 @@ import {
 import { isUserDefinedProfile } from '../data/customProfiles';
 import {
   getPersonalGoals,
-  createUserGoal,
   type PersonalGoal,
 } from '../data/personalGoals';
 
@@ -28,7 +27,6 @@ import {
   type InventoryTask,
 } from '../data/tasksInventory';
 import { ManageTaskModal } from './ManageTaskModal';
-import { ContextAssistModal } from './ContextAssistModal';
 import { SimplifyTaskModal } from './SimplifyTaskModal';
 import { DeleteTaskModal, type DeleteTaskChoice } from './DeleteTaskModal';
 import { TasksMonthView } from './TasksMonthView';
@@ -45,7 +43,6 @@ import {
   type SeedTaskOverride,
 } from '../data/seedOverrides';
 import { touchIconButton, touchPrimaryButton, MIN_TOUCH } from '../styles/touchTargets';
-import type { SeedSuggestionGroup } from '../data/profileSeedParser';
 import { trackActivity } from '../data/feedback';
 import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile } from './AppTour';
 import { CongratModal } from './CongratModal';
@@ -848,15 +845,15 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
   const [momentumEntry, setMomentumEntry] = useState<ReportEntry | null>(null);
   const [taskUpdateContext, setTaskUpdateContext] = useState<TaskUpdateContext | null>(null);
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
-  const [contextAssistOpen, setContextAssistOpen] = useState(false);
   const [simplifyTarget, setSimplifyTarget] = useState<{ task: UserTask_; goal?: PersonalGoal } | null>(null);
   const { capture: captureScroll, restore: restoreScroll, allowProgrammaticScroll } = useScrollPositionLock([
     statuses, notes, taskUpdateContext, momentumEntry,
   ]);
 
+  // Respect App deep-links (Open Month / All Tasks). Only reset to Today on profile switch.
   useEffect(() => {
-    setTaskView('today');
-  }, [profile.id]);
+    setTaskView(initialTaskView ?? 'today');
+  }, [profile.id, initialTaskView]);
 
   const today = getTodayKey();
   const calendarDateKey = getEffectiveDaySyncDateKey(profile.id);
@@ -1143,34 +1140,6 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
     } as UserTask);
     setEditingSeedTaskId(null);
     setManageTaskOpen(true);
-  };
-
-  const handleContextAssistConfirm = (groups: SeedSuggestionGroup[]) => {
-    groups.forEach(group => {
-      let goal = goals.find(g => g.title.toLowerCase() === group.goal.title.toLowerCase());
-      if (!goal && group.selected) {
-        goal = createUserGoal(profile.id, {
-          title: group.goal.title,
-          deepWhy: group.goal.deepWhy,
-        });
-      }
-      if (!goal) return;
-      group.tasks.forEach(task => {
-        if (task.label.trim().toLowerCase() === goal!.title.trim().toLowerCase()) return;
-        const created = createUserTask(profile.id, {
-          label: task.label,
-          timeOfDay: task.timeOfDay,
-          type: task.type,
-          goalId: goal!.id,
-          recurrence: task.recurrence.type === 'daily' ? undefined : task.recurrence,
-        });
-        void attachResourcesToNewTask(profile.id, created.id, created.label, goal!.title);
-      });
-    });
-    loadState();
-    try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
-    try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch {}
-    message.success({ content: 'Tasks added!', duration: 2 });
   };
 
   const handleSimplifyConfirm = (replacements: Array<{ label: string; timeOfDay: 'morning' | 'evening' }>) => {
@@ -1544,13 +1513,14 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <button
           type="button"
-          onClick={() => setContextAssistOpen(true)}
+          disabled
+          title="AI-assisted task creation from a brain dump is coming soon. Add tasks manually for now."
           style={{
-            padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.primary}40`,
-            background: `${C.primary}10`, color: C.primary, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.border}`,
+            background: C.bgAlt, color: C.secondary, fontSize: 12, fontWeight: 600, cursor: 'not-allowed',
           }}
         >
-          ✨ Add with AI
+          ✨ AI assist · coming soon
         </button>
       </div>
 
@@ -1795,17 +1765,19 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
           >
             Add manually
           </button>
-          <button
-            type="button"
-            onClick={() => { setFabMenuOpen(false); setContextAssistOpen(true); }}
+          <div
+            title="AI brain-dump assist is coming soon."
             style={{
               display: 'block', width: '100%', padding: '12px 16px', border: 'none', background: C.bgAlt,
-              borderTop: `1px solid ${C.border}`, textAlign: 'left', fontSize: 13, fontWeight: 600,
-              color: C.primary, cursor: 'pointer', minHeight: MIN_TOUCH,
+              borderTop: `1px solid ${C.border}`, textAlign: 'left', fontSize: 12, fontWeight: 600,
+              color: C.secondary, minHeight: MIN_TOUCH, lineHeight: 1.4, boxSizing: 'border-box',
             }}
           >
-            ✨ Add with AI
-          </button>
+            ✨ AI assist · feature coming
+            <div style={{ fontSize: 11, fontWeight: 500, marginTop: 4 }}>
+              Not available yet. Add tasks manually for now.
+            </div>
+          </div>
         </div>
       )}
       <button
@@ -1837,15 +1809,6 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
         preserveTaskType={!!editingSeedTaskId}
         onSave={handleSaveUserTask}
         onCancel={() => { setManageTaskOpen(false); setEditingTask(null); setDefaultTaskGoalId(undefined); setEditingSeedTaskId(null); }}
-      />
-
-      <ContextAssistModal
-        open={contextAssistOpen}
-        onClose={() => setContextAssistOpen(false)}
-        profileId={profile.id}
-        mode="tasks"
-        existingGoals={goals.map(g => ({ id: g.id, title: g.title }))}
-        onConfirm={handleContextAssistConfirm}
       />
 
       {simplifyTarget && (

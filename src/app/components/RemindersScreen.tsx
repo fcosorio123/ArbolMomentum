@@ -113,7 +113,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
         : 'In-app reminders enabled while Arbol is open. For alerts when the app is closed, use the Calendar tab.');
       showTest();
     } else if (result.permission === 'denied') {
-      message.error('Blocked — open browser or device settings to allow notifications');
+      message.error('Blocked - open browser or device settings to allow notifications');
     }
   };
 
@@ -157,7 +157,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
         { skipDedupe: true },
       );
       if (result.ok) {
-        const msg = 'Test notification sent — check your system notification tray.';
+        const msg = 'Test notification sent - check your system notification tray.';
         setTestFeedback(msg);
         message.success(msg);
       } else {
@@ -167,7 +167,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
       }
     } catch (err) {
       console.warn('Notification test failed:', err);
-      const msg = 'Could not send notification — check device settings.';
+      const msg = 'Could not send notification - check device settings.';
       setTestFeedback(msg);
       message.error(msg);
     }
@@ -369,17 +369,17 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
         {[
           {
             label: 'In-app nudges',
-            closed: 'No — while Arbol is open',
+            closed: 'No - while Arbol is open',
             highlight: false,
           },
           {
             label: 'Calendar sync + alarms',
-            closed: 'Yes — via Google or Apple Calendar',
+            closed: 'Yes - via Google or Apple Calendar',
             highlight: true,
           },
           {
             label: 'Web push',
-            closed: 'Yes — needs backend (not live yet)',
+            closed: 'Yes - needs backend (not live yet)',
             highlight: false,
           },
         ].map(row => (
@@ -413,7 +413,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
           </div>
         ))}
         <p style={{ margin: '10px 0 12px', fontSize: 11, color: C.secondary, lineHeight: 1.45 }}>
-          Open the Calendar tab to sync tasks — your phone reminds you even when Arbol is closed.
+          Open the Calendar tab to sync tasks - your phone reminds you even when Arbol is closed.
         </p>
         <Button
           type="primary"
@@ -436,7 +436,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
             <div style={{ fontWeight: 700, fontSize: 13, color: C.headline }}>Email reminders</div>
             <p style={{ margin: '4px 0 0', fontSize: 11, color: C.secondary, lineHeight: 1.45 }}>
               {getProfileEmail(profile.id)
-                ? 'Scheduled emails send from the server — even when Arbol is closed.'
+                ? 'Scheduled emails send from the server - even when Arbol is closed.'
                 : 'Add your email on the Profile tab to enable email reminders.'}
             </p>
           </div>

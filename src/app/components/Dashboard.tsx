@@ -22,6 +22,7 @@ interface Props {
   swRegistration: ServiceWorkerRegistration | null;
   onCoachMark: () => void;
   onNavigateTasks?: () => void;
+  onNavigateAllTasks?: () => void;
   onNavigateGoals?: () => void;
   onNavigateMonth?: () => void;
   onNavigateReminders?: () => void;
@@ -139,7 +140,7 @@ function DashboardSkeleton() {
 
 export function Dashboard({
   profile, installPrompt, onInstall, onCoachMark,
-  onNavigateTasks, onNavigateGoals, onNavigateMonth, onNavigateReminders: _onNavigateReminders, onShowSummary, onShowFeedback, onGoals: _onGoals, onStartCheckIn,
+  onNavigateTasks, onNavigateAllTasks, onNavigateGoals, onNavigateMonth, onNavigateReminders: _onNavigateReminders, onShowSummary, onShowFeedback, onGoals: _onGoals, onStartCheckIn,
   isActive = true,
   canStartPageTours = true,
 }: Props) {
@@ -541,8 +542,8 @@ export function Dashboard({
         <TasksMonthView
           profileId={profile.id}
           previewLimit={3}
-          onManageTask={() => onNavigateTasks?.()}
-          onGoAllTasks={() => onNavigateTasks?.()}
+          onManageTask={() => onNavigateAllTasks?.() ?? onNavigateTasks?.()}
+          onGoAllTasks={() => onNavigateAllTasks?.() ?? onNavigateTasks?.()}
         />
       </div>
 

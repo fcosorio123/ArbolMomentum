@@ -624,6 +624,10 @@ export default function App() {
             setTasksInitialView('today');
             setActiveTab('tasks');
           }}
+          onNavigateAllTasks={() => {
+            setTasksInitialView('all');
+            setActiveTab('tasks');
+          }}
           onNavigateGoals={() => setActiveTab('goals')}
           onNavigateMonth={() => {
             setTasksInitialView('month');
@@ -645,6 +649,10 @@ export default function App() {
           profile={activeProfile}
           onNavigateTasks={() => {
             setTasksInitialView('today');
+            setActiveTab('tasks');
+          }}
+          onNavigateAllTasks={() => {
+            setTasksInitialView('all');
             setActiveTab('tasks');
           }}
         />
@@ -670,7 +678,7 @@ export default function App() {
         <MonthPlan
           profile={activeProfile}
           onGoAllTasks={() => {
-            setTasksInitialView('today');
+            setTasksInitialView('all');
             setActiveTab('tasks');
           }}
         />

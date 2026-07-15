@@ -135,7 +135,7 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
         <div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.headline }}>Calendar</h2>
           <p style={{ margin: '4px 0 0', color: C.body, fontSize: 13 }}>
-            Put funding tasks on your real calendar — reminders even when Arbol is closed
+            Put funding tasks on your real calendar - reminders even when Arbol is closed
           </p>
         </div>
         <PageTourButton onClick={() => setShowTour(true)} />
@@ -146,7 +146,7 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
           background: `${C.streak}15`, border: `1.5px solid ${C.streak}40`,
           borderRadius: 12, padding: '10px 14px', marginBottom: 14, fontSize: 12, color: C.body, lineHeight: 1.45,
         }}>
-          It&apos;s past {formatHour(daySync.eveningHour)} — we&apos;re syncing <strong>tomorrow</strong> so
+          It&apos;s past {formatHour(daySync.eveningHour)} - we&apos;re syncing <strong>tomorrow</strong> so
           calendar alerts still fire. Change this under Times &amp; alarms.
         </div>
       )}
@@ -186,7 +186,7 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
               background: '#fff', color: C.headline, border: 'none',
             }}
           >
-            Sync this week — {weekEvents.length} {weekEvents.length === 1 ? 'task' : 'tasks'}
+            Sync this week - {weekEvents.length} {weekEvents.length === 1 ? 'task' : 'tasks'}
           </Button>
           <Button
             size="large"
@@ -197,7 +197,7 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
               background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)',
             }}
           >
-            {dayButtonLabel} — {dayEvents.length} {dayEvents.length === 1 ? 'task' : 'tasks'}
+            {dayButtonLabel} - {dayEvents.length} {dayEvents.length === 1 ? 'task' : 'tasks'}
           </Button>
         </div>
         <p style={{ margin: '10px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.65)' }}>
@@ -310,7 +310,7 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
           fontSize: 11, textTransform: 'uppercase', letterSpacing: 1,
           color: C.secondary, marginBottom: 10, fontWeight: 600,
         }}>
-          {daySync.calendarDayLabel === 'tomorrow' ? 'Tomorrow' : 'Today'} — {dayLabel}
+          {daySync.calendarDayLabel === 'tomorrow' ? 'Tomorrow' : 'Today'} - {dayLabel}
         </div>
         {dayEvents.length === 0 ? (
           <div style={{
@@ -365,7 +365,7 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600, fontSize: 14, color: C.headline }}>In-app nudges</div>
             <div style={{ fontSize: 12, color: C.secondary, marginTop: 2 }}>
-              Alerts while Arbol is open — Profile → Alerts & Reminders
+              Alerts while Arbol is open - Profile → Alerts & Reminders
             </div>
           </div>
           <RightOutlined style={{ color: C.secondary, fontSize: 12 }} />
@@ -383,7 +383,7 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
         steps={[
           {
             title: '📅 Sync your week',
-            description: 'Tap Sync this week to download all open tasks. Pick Google, Outlook, or Apple — then import the file once.',
+            description: 'Tap Sync this week to download all open tasks. Pick Google, Outlook, or Apple - then import the file once.',
             targetId: 'calendar-hero',
             placement: 'bottom',
           },

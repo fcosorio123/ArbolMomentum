@@ -4,6 +4,7 @@
 
 import { getTodayKey } from './profiles';
 import { clearTaskGoalLinksForGoal } from './goalTaskResolution';
+import { recordDeletedUserGoal } from './deletionTombstones';
 
 export type MilestoneLevel = 'light' | 'medium' | 'medium-high' | 'hard' | 'epic';
 
@@ -1310,6 +1311,7 @@ export function updateUserGoal(profileId: string, goalId: string, data: { title:
 
 export function deleteUserGoal(profileId: string, goalId: string) {
   recordDeletedDefaultGoal(profileId, goalId);
+  recordDeletedUserGoal(profileId, goalId);
   clearTaskGoalLinksForGoal(profileId, goalId);
   const goals = getPersonalGoals(profileId);
   savePersonalGoals(profileId, goals.filter(g => g.id !== goalId));

@@ -14,10 +14,8 @@ import { getGoalTaskBreakdown, getGoalWeekProgressPercent, getGoalWeekBreakdown 
 import { getUserTasks, createUserTask, orphanUserTasksForGoal, deleteUserTask, isTaskScheduledForDate } from '../data/userTasks';
 import { attachResourcesToNewTask } from '../data/taskResources';
 import { ManageGoalModal } from './ManageGoalModal';
-import { ContextAssistModal } from './ContextAssistModal';
 import { C } from '../data/colors';
 import type { Profile } from '../data/profiles';
-import type { SeedSuggestionGroup } from '../data/profileSeedParser';
 
 function getWeekDays(): Array<{ label: string; short: string; dateKey: string; isToday: boolean }> {
   const now = new Date();
@@ -41,6 +39,8 @@ function getWeekDays(): Array<{ label: string; short: string; dateKey: string; i
 interface Props {
   profile: Profile;
   onNavigateTasks?: () => void;
+  /** Prefer All Tasks tab (Goals "See all tasks" link). */
+  onNavigateAllTasks?: () => void;
 }
 
 
@@ -123,7 +123,7 @@ function goalAccent(goalId: string) {
   return ACCENT_COLORS[Math.abs(goalId.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % ACCENT_COLORS.length];
 }
 
-export function GoalsPage({ profile, onNavigateTasks }: Props) {
+export function GoalsPage({ profile, onNavigateTasks, onNavigateAllTasks }: Props) {
   const [goals, setGoals] = useState<PersonalGoal[]>(() => getPersonalGoals(profile.id));
   const [manageGoalOpen, setManageGoalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<PersonalGoal | null>(null);
@@ -137,7 +137,6 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
   const [showTour, setShowTour] = useState(false);
   const [congratGoal, setCongratGoal] = useState<PersonalGoal | null>(null);
   const [pendingSuggestionGoal, setPendingSuggestionGoal] = useState<PersonalGoal | null>(null);
-  const [contextAssistOpen, setContextAssistOpen] = useState(false);
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
 
@@ -227,32 +226,7 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
     try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
   };
 
-  const handleContextAssistConfirm = (groups: SeedSuggestionGroup[]) => {
-    groups.forEach(group => {
-      let goal = goals.find(g => g.title.toLowerCase() === group.goal.title.toLowerCase());
-      if (!goal && group.selected !== false) {
-        goal = createUserGoal(profile.id, {
-          title: group.goal.title,
-          deepWhy: group.goal.deepWhy,
-        });
-      }
-      if (!goal) return;
-      group.tasks.forEach(task => {
-        if (task.label.trim().toLowerCase() === goal!.title.trim().toLowerCase()) return;
-        const created = createUserTask(profile.id, {
-          label: task.label,
-          timeOfDay: task.timeOfDay,
-          type: task.type,
-          goalId: goal!.id,
-          recurrence: task.recurrence.type === 'daily' ? undefined : task.recurrence,
-        });
-        void attachResourcesToNewTask(profile.id, created.id, created.label, goal!.title);
-      });
-    });
-    loadGoals();
-    try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
-    try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch {}
-  };
+  const goToLinkedTasks = onNavigateAllTasks ?? onNavigateTasks;
 
   return (
     <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 100px', background: C.bg, minHeight: '100dvh' }}>
@@ -275,13 +249,14 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
         <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
           <button
             type="button"
-            onClick={() => setContextAssistOpen(true)}
+            disabled
+            title="AI-assisted goal creation from a brain dump is coming soon. For now, add goals manually."
             style={{
-              padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.primary}40`,
-              background: `${C.primary}10`, color: C.primary, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.border}`,
+              background: C.bgAlt, color: C.secondary, fontSize: 12, fontWeight: 600, cursor: 'not-allowed',
             }}
           >
-            ✨ Add with AI
+            ✨ AI assist · coming soon
           </button>
           <button type="button" onClick={() => { setSelectMode(m => !m); setSelectedGoalIds(new Set()); }} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.border}`, background: selectMode ? `${C.primary}15` : C.bgCard, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
             {selectMode ? 'Cancel select' : 'Select goals'}
@@ -307,12 +282,12 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
           <div style={{ fontSize: 48, marginBottom: 14 }}>🎯</div>
           <div style={{ fontWeight: 700, fontSize: 16, color: C.headline, marginBottom: 8 }}>No goals yet</div>
           <div style={{ color: C.body, fontSize: 13, lineHeight: 1.6, marginBottom: 20 }}>
-            Set your first goal and build daily tasks around it. Start with something meaningful — or paste a brain dump for AI to organize.
+            Set your first goal and build daily tasks around it. Start with something meaningful. AI brain-dump assist is coming soon.
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
             <button
-              type="button"
-              onClick={() => setContextAssistOpen(true)}
+              data-tour-id="goals-add-btn"
+              onClick={() => { setEditingGoal(null); setManageGoalOpen(true); }}
               style={{
                 background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
                 border: 'none', borderRadius: 12, padding: '12px 24px',
@@ -320,19 +295,11 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
                 display: 'inline-flex', alignItems: 'center', gap: 8,
               }}
             >
-              ✨ Add with AI
+              <PlusOutlined /> Add a goal
             </button>
-            <button
-              data-tour-id="goals-add-btn"
-              onClick={() => { setEditingGoal(null); setManageGoalOpen(true); }}
-              style={{
-                padding: '10px 18px', borderRadius: 12, border: `1.5px solid ${C.border}`,
-                background: C.bgCard, color: C.headline, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-              }}
-            >
-              <PlusOutlined /> Type it myself
-            </button>
+            <div style={{ fontSize: 12, color: C.secondary, maxWidth: 280, lineHeight: 1.45 }}>
+              Feature coming: paste a brain dump and get suggested goals and tasks.
+            </div>
           </div>
         </div>
       ) : (
@@ -369,9 +336,9 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
       )}
 
       {/* Link to Tasks */}
-      {goals.length > 0 && onNavigateTasks && (
+      {goals.length > 0 && goToLinkedTasks && (
         <div
-          onClick={onNavigateTasks}
+          onClick={goToLinkedTasks}
           style={{
             marginTop: 24, background: `linear-gradient(135deg, ${C.headline}, #1a6da8)`,
             borderRadius: 14, padding: '14px 18px', cursor: 'pointer',
@@ -395,23 +362,9 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
         goal={editingGoal}
         onSave={handleSaveGoal}
         onCancel={() => { setManageGoalOpen(false); setEditingGoal(null); }}
-        onOpenAiAssist={() => {
-          setManageGoalOpen(false);
-          setEditingGoal(null);
-          setContextAssistOpen(true);
-        }}
       />
 
-      <ContextAssistModal
-        open={contextAssistOpen}
-        onClose={() => setContextAssistOpen(false)}
-        profileId={profile.id}
-        mode="goals"
-        existingGoals={goals.map(g => ({ id: g.id, title: g.title }))}
-        onConfirm={handleContextAssistConfirm}
-      />
-
-      {/* FAB always available — Manual vs AI, same as Tasks */}
+      {/* FAB — add goals manually; AI assist shown as coming soon */}
       <>
         {fabMenuOpen && (
           <div
@@ -433,19 +386,21 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
                 boxShadow: C.shadow,
               }}
             >
-              Add manually
+              Add goal
             </button>
-            <button
-              type="button"
-              onClick={() => { setFabMenuOpen(false); setContextAssistOpen(true); }}
+            <div
+              title="AI brain-dump assist is coming soon. Add goals manually for now."
               style={{
-                padding: '10px 16px', borderRadius: 12, border: `1.5px solid ${C.primary}40`,
-                background: `${C.primary}10`, color: C.primary, fontWeight: 700, fontSize: 13, cursor: 'pointer',
-                textAlign: 'left', boxShadow: C.shadow,
+                padding: '10px 16px', borderRadius: 12, border: `1.5px solid ${C.border}`,
+                background: C.bgAlt, color: C.secondary, fontWeight: 600, fontSize: 12, lineHeight: 1.4,
+                opacity: 0.9,
               }}
             >
-              ✨ Add with AI
-            </button>
+              ✨ AI assist · feature coming
+              <div style={{ fontSize: 11, fontWeight: 500, marginTop: 4 }}>
+                Paste a brain dump and get suggested goals. Not available yet.
+              </div>
+            </div>
           </div>
         )}
         <button

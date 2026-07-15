@@ -53,6 +53,31 @@ function preferRicherArray(existing: unknown, incoming: unknown): unknown {
   return incoming.length >= existing.length ? incoming : existing;
 }
 
+function unionStringIds(a: unknown, b: unknown): string[] {
+  const out = new Set<string>();
+  for (const src of [a, b]) {
+    if (!Array.isArray(src)) continue;
+    for (const x of src) {
+      if (typeof x === "string" && x) out.add(x);
+    }
+  }
+  return [...out];
+}
+
+/** Union entities by id, drop tombstoned ids (deletes survive longer-array merges). */
+function mergeEntityArraysById(existing: unknown, incoming: unknown, deleted: Set<string>): unknown {
+  const byId = new Map<string, unknown>();
+  for (const src of [existing, incoming]) {
+    if (!Array.isArray(src)) continue;
+    for (const item of src) {
+      const id = item && typeof item === "object" ? (item as { id?: string }).id : undefined;
+      if (!id || deleted.has(id)) continue;
+      byId.set(id, item);
+    }
+  }
+  return [...byId.values()];
+}
+
 function preferRicherObject(existing: unknown, incoming: unknown): unknown {
   if (incoming == null) return existing;
   if (existing == null) return incoming;
@@ -110,8 +135,15 @@ export function unionMergeBackupPayload(
   );
 
   merged.streakBest = mergeStreakBest(existing.streakBest, incoming.streakBest);
-  merged.userTasks = preferRicherArray(existing.userTasks, incoming.userTasks);
-  merged.personalGoals = preferRicherArray(existing.personalGoals, incoming.personalGoals);
+
+  const deletedGoals = unionStringIds(existing.deletedUserGoals, incoming.deletedUserGoals);
+  const deletedTasks = unionStringIds(existing.deletedUserTasks, incoming.deletedUserTasks);
+  merged.deletedUserGoals = deletedGoals;
+  merged.deletedUserTasks = deletedTasks;
+  merged.deletedDefaultGoals = unionStringIds(existing.deletedDefaultGoals, incoming.deletedDefaultGoals);
+
+  merged.userTasks = mergeEntityArraysById(existing.userTasks, incoming.userTasks, new Set(deletedTasks));
+  merged.personalGoals = mergeEntityArraysById(existing.personalGoals, incoming.personalGoals, new Set(deletedGoals));
   merged.permanentlyHiddenSeedTasks = preferRicherArray(
     existing.permanentlyHiddenSeedTasks,
     incoming.permanentlyHiddenSeedTasks,
