@@ -472,7 +472,7 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* ── [2] Active goals — horizontal swipe cards */}
+      {/* ── [2] My Goals — header + swipe cards (before Do This Now) */}
       <ActiveGoalsList
         profileId={profile.id}
         onNavigateGoals={onNavigateGoals}
@@ -516,33 +516,6 @@ export function Dashboard({
               Start task <ArrowRightOutlined style={{ fontSize: 11 }} />
             </button>
           </div>
-        </div>
-      )}
-
-      {/* ── [4] Goals quick-access */}
-      {onNavigateGoals && (
-        <div
-          onClick={onNavigateGoals}
-          style={{
-            ...card, padding: '14px 18px', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 14,
-            border: `1.5px solid ${C.primary}25`,
-          }}
-        >
-          <div style={{
-            width: 40, height: 40, borderRadius: 11, flexShrink: 0,
-            background: `${C.primary}15`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
-          }}>
-            🏆
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 14, color: C.headline }}>My Goals</div>
-            <div style={{ fontSize: 12, color: C.body, marginTop: 2 }}>
-              View, edit, and set new goals
-            </div>
-          </div>
-          <ArrowRightOutlined style={{ color: C.secondary, fontSize: 14 }} />
         </div>
       )}
 
@@ -742,8 +715,8 @@ export function Dashboard({
             placement: 'bottom',
           },
           {
-            title: '🎯 Your Active Goals',
-            description: 'Swipe through your active goals to see what\'s currently important. Progress here helps Arbol guide your next actions.',
+            title: '🏆 My Goals',
+            description: 'Swipe through your active goals, or tap this section to view, edit, and set new ones.',
             targetId: 'home-active-goals',
             placement: 'bottom',
           },
