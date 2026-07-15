@@ -153,6 +153,15 @@ export function LiveCheckInFeedbackCard({ profileId }: Props) {
     () => (chartHasData ? chartData : [{ label: '-', progress: 0, momentum: 0 }]),
     [chartData, chartHasData],
   );
+  const pointCount = displayChart.length;
+  const manyTicks = pointCount > 5;
+  // Never show every tick when crowded — Recharts interval=0 caused overlapping "Done N" labels
+  const xTickInterval = pointCount <= 3
+    ? 0
+    : pointCount <= 6
+      ? 1
+      : Math.max(1, Math.ceil(pointCount / 4) - 1);
+
 
   const cardStyle = {
     background: C.bgCard,
@@ -223,20 +232,28 @@ export function LiveCheckInFeedbackCard({ profileId }: Props) {
               How to read
             </button>
           </div>
-          <div style={{ width: '100%', height: 158 }}>
+          <div style={{ width: '100%', height: manyTicks ? 172 : 158 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={displayChart} margin={{ top: 8, right: 12, left: 4, bottom: 22 }}>
+              <LineChart data={displayChart} margin={{ top: 8, right: 12, left: 4, bottom: manyTicks ? 36 : 22 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
                 <XAxis
                   dataKey="label"
-                  tick={{ fontSize: 10, fill: C.secondary }}
-                  interval={0}
-                  height={36}
+                  tick={{ fontSize: manyTicks ? 9 : 10, fill: C.secondary }}
+                  interval={xTickInterval}
+                  minTickGap={manyTicks ? 28 : 16}
+                  height={manyTicks ? 52 : 36}
+                  angle={manyTicks ? -35 : 0}
+                  textAnchor={manyTicks ? 'end' : 'middle'}
+                  tickFormatter={(v: string) => {
+                    const m = String(v).match(/^Done\s+(\d+)$/i);
+                    if (m) return `#${m[1]}`;
+                    return String(v).length > 10 ? `${String(v).slice(0, 8)}…` : String(v);
+                  }}
                 >
                   <Label
                     value="Check-ins today →"
                     position="insideBottom"
-                    offset={-2}
+                    offset={manyTicks ? -2 : -2}
                     style={{ fontSize: 10, fill: C.secondary, fontWeight: 600 }}
                   />
                 </XAxis>

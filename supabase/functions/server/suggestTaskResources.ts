@@ -25,6 +25,77 @@ export function ruleBasedResources(taskLabel: string, goalTitle?: string): TaskR
   const t = label.toLowerCase();
   const context = goalTitle ? ` (${goalTitle})` : "";
 
+  // Reminder / alarm — before sleep matching on "bed"
+  if (
+    /(set|create|add|make|schedule).*(remind|alarm|notif)/i.test(t)
+    || /phone-?down/i.test(t)
+    || (/remind|alarm/i.test(t) && /phone|bed/i.test(t))
+  ) {
+    return [
+      {
+        title: "Set a Phone down reminder (step by step)",
+        url: searchUrl("how to set a repeating reminder or alarm on iPhone or Android"),
+        steps: [
+          "Open Clock (Alarm) or the Reminders app on your phone",
+          "Tap Add Alarm / New Reminder",
+          "Choose a time 30 minutes before your usual bedtime",
+          "Turn on Repeat for every night (or weekdays)",
+          "Name it Phone down, then Save",
+        ],
+      },
+      {
+        title: "Apple: Create a repeating reminder",
+        url: "https://support.apple.com/guide/iphone/get-started-with-reminders-iph2f43d3267/ios",
+      },
+      {
+        title: "Android: Set a repeating alarm",
+        url: searchUrl("set repeating alarm Android Clock app Google"),
+      },
+    ];
+  }
+
+  if (/cancel .+ (subscription|software|account)|unsubscribe/i.test(t)) {
+    return [
+      {
+        title: `Cancel this subscription: ${label}`,
+        url: searchUrl(`${label} how to cancel subscription confirmation email`),
+        steps: [
+          "Search your email for the signup or billing confirmation",
+          "Open the cancellation or manage-subscription link",
+          "Confirm cancel and screenshot the confirmation page",
+        ],
+      },
+    ];
+  }
+
+  if (/call .+|phone the |denied claim|insurance/i.test(t)) {
+    return [
+      {
+        title: "Prepare then make the call",
+        url: searchUrl(`${label} what to say phone script`),
+        steps: [
+          "Find the claim or account number on the latest notice",
+          "Write the denial reason and two questions to ask",
+          "Call during your available window with notes in front of you",
+        ],
+      },
+    ];
+  }
+
+  if (/organiz|documents? needed|tax appointment|sort .+ (document|bill)/i.test(t)) {
+    return [
+      {
+        title: "Document folder workflow",
+        url: searchUrl(`${label} checklist documents needed`),
+        steps: [
+          "Get the required-document list from your preparer or portal",
+          "Create one folder (digital or paper) for this appointment",
+          "Add documents you already have; list what is still missing",
+        ],
+      },
+    ];
+  }
+
   if (/hydrat|water|drink/.test(t)) {
     return [
       {
@@ -54,7 +125,7 @@ export function ruleBasedResources(taskLabel: string, goalTitle?: string): TaskR
       },
     ];
   }
-  if (/sleep|bed|wind.?down/.test(t)) {
+  if (/^(sleep|go to bed|wind.?down|get (more )?sleep)/i.test(t) || (/sleep|wind.?down/.test(t) && !/remind|alarm|phone-?down/.test(t))) {
     return [
       {
         title: "Better wind-down checklist",
@@ -67,8 +138,12 @@ export function ruleBasedResources(taskLabel: string, goalTitle?: string): TaskR
   return [
     {
       title: `How to get this done${context}`,
-      url: searchUrl(`how to ${label}`),
-      steps: ["Define the first 5-minute action", "Gather only what you need to start", "Finish one small, visible win"],
+      url: searchUrl(`how to ${label} step by step`),
+      steps: [
+        `Start the first concrete action for: ${label.slice(0, 40)}`,
+        "Use only the app or tool needed for that action",
+        "Finish that one action before adding more work",
+      ],
     },
     { title: "Step-by-step search", url: searchUrl(`${label} step by step guide`) },
   ];

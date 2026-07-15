@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Modal, Input, Button } from 'antd';
 import { C } from '../data/colors';
-import { simplifyTaskFromEdge, type SimplifyTaskResult } from '../data/aiTaskCreation';
+import { simplifyTaskFromEdge, isGoalRelevantToTask, type SimplifyTaskResult } from '../data/aiTaskCreation';
 import { ACCENT_MODAL_STYLES, ModalAccentBar } from '../styles/modalChrome';
 
 const { TextArea } = Input;
@@ -24,6 +24,7 @@ interface Props {
 function friendlySimplifyError(reason?: string): string {
   if (reason === 'network_error') return 'Could not reach the server. Check your connection and try again.';
   if (reason === 'input_too_short') return 'Add a bit more about what makes this hard, then try again.';
+  if (reason === 'no_suggestions') return "Couldn't build smaller steps for this task. Try adding a bit more detail, then retry.";
   return "Couldn't simplify. Try again.";
 }
 
@@ -36,6 +37,11 @@ export function SimplifyTaskModal({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SimplifyTaskResult | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const requestSeq = useRef(0);
+  const openTaskRef = useRef(taskLabel);
+
+  const relevantGoal = goalTitle && isGoalRelevantToTask(taskLabel, goalTitle) ? goalTitle : undefined;
+  const relevantGoalWhy = relevantGoal ? goalWhy : undefined;
 
   const reset = () => {
     setStep(0);
@@ -47,10 +53,17 @@ export function SimplifyTaskModal({
   };
 
   useEffect(() => {
-    if (!open) reset();
-  }, [open]);
+    if (!open) {
+      requestSeq.current += 1; // invalidate in-flight responses
+      reset();
+      return;
+    }
+    openTaskRef.current = taskLabel;
+    reset();
+  }, [open, taskLabel]);
 
   const handleClose = () => {
+    requestSeq.current += 1;
     reset();
     onClose();
   };
@@ -63,17 +76,21 @@ export function SimplifyTaskModal({
       setStep(s => s + 1);
       return;
     }
+    const seq = ++requestSeq.current;
+    const boundTask = taskLabel;
     setLoading(true);
     setError(null);
     try {
       const res = await simplifyTaskFromEdge({
-        taskLabel,
-        goalTitle,
-        goalWhy,
+        taskLabel: boundTask,
+        goalTitle: relevantGoal,
+        goalWhy: relevantGoalWhy,
         blocker: answers[0] ?? '',
         motivation: answers[1] ?? '',
         constraint: answers[2] ?? '',
       });
+      // Ignore stale responses from a prior task / closed modal
+      if (seq !== requestSeq.current || openTaskRef.current !== boundTask) return;
       if (!res.ok || res.tasks.length === 0) {
         setError(friendlySimplifyError(res.reason));
         return;
@@ -82,7 +99,7 @@ export function SimplifyTaskModal({
       setSelected(new Set(res.tasks.map((_, i) => i)));
       setStep(QUESTIONS.length);
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) setLoading(false);
     }
   };
 
@@ -128,8 +145,8 @@ export function SimplifyTaskModal({
         </h3>
         {!reviewing && (
           <p style={{ margin: '0 0 14px', fontSize: 12, color: C.body, lineHeight: 1.45 }}>
-            Your answers shape how we break this into tiny steps for: <strong>{taskLabel}</strong>
-            {goalTitle && <> (goal: {goalTitle})</>}
+            Your answers help us break this exact task into smaller steps: <strong>{taskLabel}</strong>
+            {relevantGoal && <> (related goal: {relevantGoal})</>}
           </p>
         )}
 
@@ -184,14 +201,14 @@ export function SimplifyTaskModal({
                 Simplifying this task
               </div>
               <div style={{ fontSize: 13, fontWeight: 600, color: C.headline, overflowWrap: 'anywhere' }}>{taskLabel}</div>
-              {goalTitle && (
+              {relevantGoal && (
                 <div style={{ fontSize: 11, color: C.body, marginTop: 4 }}>
-                  Related goal: {goalTitle}
+                  Related goal: {relevantGoal}
                 </div>
               )}
             </div>
             <p style={{ margin: '0 0 14px', fontSize: 12, color: C.body }}>
-              Choose 2–5 tiny actions that replace the original. Uncheck any you don&apos;t want.
+              Choose the tiny actions that replace the original. Uncheck any you don&apos;t want.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
               {result.tasks.map((t, i) => (
