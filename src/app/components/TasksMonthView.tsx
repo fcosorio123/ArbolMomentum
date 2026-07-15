@@ -242,7 +242,7 @@ export function TasksMonthView({ profileId, onManageTask, onGoAllTasks }: Props)
                     style={{ color: C.primary, fontWeight: 700 }}
                     title={`Potential Value: ${getDisplayPotentialValue(task.potentialValue).label}`}
                   >
-                    PV: {getDisplayPotentialValue(task.potentialValue).label}
+                    Potential Value: {getDisplayPotentialValue(task.potentialValue).label}
                   </span>
                 </div>
               </button>

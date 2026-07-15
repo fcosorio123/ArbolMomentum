@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from 'antd';
 import {
-  FireOutlined, DownloadOutlined, ArrowRightOutlined, BellOutlined,
+  FireOutlined, DownloadOutlined, ArrowRightOutlined,
 } from '@ant-design/icons';
 import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile } from './AppTour';
 import type { Profile } from '../data/profiles';
@@ -139,7 +139,7 @@ function DashboardSkeleton() {
 
 export function Dashboard({
   profile, installPrompt, onInstall, onCoachMark,
-  onNavigateTasks, onNavigateGoals, onNavigateMonth, onNavigateReminders, onShowSummary, onShowFeedback, onGoals: _onGoals, onStartCheckIn,
+  onNavigateTasks, onNavigateGoals, onNavigateMonth, onNavigateReminders: _onNavigateReminders, onShowSummary, onShowFeedback, onGoals: _onGoals, onStartCheckIn,
   isActive = true,
   canStartPageTours = true,
 }: Props) {
@@ -304,13 +304,6 @@ export function Dashboard({
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          {onNavigateReminders && (
-            <button onClick={onNavigateReminders} aria-label="Alerts and reminders" style={{
-              background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 10,
-              padding: '6px 10px', cursor: 'pointer', color: C.primary, fontSize: 13,
-              display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600,
-            }}><BellOutlined /> Alerts</button>
-          )}
           {onShowSummary && (
             <button onClick={onShowSummary} style={{
               background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 10,

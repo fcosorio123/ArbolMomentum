@@ -6,6 +6,11 @@ import { getPrimaryGoalIdForTask, getTaskGoalLinks, saveTaskGoalLinks } from './
 
 export type GoalTaskBreakdown = { done: number; inprogress: number; notStarted: number; total: number };
 
+function dayNameFromDateKey(dateKey: string): string {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(y, m - 1, d).getDay()];
+}
+
 function countTaskStatus(
   profileId: string,
   taskId: string,
@@ -22,7 +27,8 @@ function countTaskStatus(
 
 /** Single source of truth for goal ↔ task membership (user links override category defaults). */
 export function getGoalTaskBreakdown(profileId: string, goalId: string, dateKey: string): GoalTaskBreakdown {
-  const categories = getTaskCategoriesForProfile(profileId);
+  // Must use the weekday for dateKey — not always "today" — or weekly/history progress stays wrong.
+  const categories = getTaskCategoriesForProfile(profileId, dayNameFromDateKey(dateKey));
   const userTasks = getUserTasks(profileId);
   const tallies = { done: 0, inprogress: 0, notStarted: 0 };
 
@@ -53,7 +59,7 @@ export function getTasksForGoal(
   dateKey: string,
 ): Array<{ id: string; label: string }> {
   const out: Array<{ id: string; label: string }> = [];
-  const categories = getTaskCategoriesForProfile(profileId);
+  const categories = getTaskCategoriesForProfile(profileId, dayNameFromDateKey(dateKey));
 
   categories.forEach(cat => {
     cat.tasks.forEach(t => {

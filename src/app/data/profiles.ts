@@ -681,6 +681,7 @@ const JOHN_CATEGORIES: TaskCategory[] = [
     label: 'Top Priorities',
     icon: '⭐',
     color: '#094067',
+    goalId: 'john-priorities',
     tasks: [
       { id: 'john-1', label: 'Cook Carbonara for girlfriend & family',              timeOfDay: 'morning', type: 'goal',     category: 'j-priorities' },
       { id: 'john-2', label: "Help girlfriend with IMS before her demo",             timeOfDay: 'morning', type: 'priority', category: 'j-priorities' },
@@ -692,6 +693,7 @@ const JOHN_CATEGORIES: TaskCategory[] = [
     label: 'Career',
     icon: '🚀',
     color: '#3da9fc',
+    goalId: 'john-career',
     tasks: [
       { id: 'john-3', label: 'Job hunting (part-time)',                             timeOfDay: 'morning', type: 'goal',     category: 'j-career' },
       { id: 'john-6', label: 'Video editing - finish by Monday',                   timeOfDay: 'morning', type: 'priority', category: 'j-career' },
@@ -703,6 +705,7 @@ const JOHN_CATEGORIES: TaskCategory[] = [
     label: 'Healthy Living',
     icon: '🧘',
     color: '#90b4ce',
+    goalId: 'john-wellness',
     tasks: [
       { id: 'john-4', label: 'Get a haircut',                                      timeOfDay: 'morning', type: 'goal',     category: 'j-wellness' },
     ],
@@ -716,6 +719,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
   Mon: [
     {
       id: 'j-morning-mon', label: 'Healthy Living', icon: '🌅', color: '#90b4ce',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-mon-1', label: 'Wake up & light stretching', timeOfDay: 'morning', type: 'routine', category: 'j-morning-mon' },
         { id: 'jude-mon-2', label: 'Morning hygiene', timeOfDay: 'morning', type: 'routine', category: 'j-morning-mon' },
@@ -724,6 +728,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-work-mon', label: 'Finance', icon: '💼', color: '#094067',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-mon-4', label: 'Drink water consistently', timeOfDay: 'morning', type: 'routine', category: 'j-work-mon' },
         { id: 'jude-mon-5', label: '5-min breathing/stretch break', timeOfDay: 'morning', type: 'routine', category: 'j-work-mon' },
@@ -732,6 +737,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-fitness-mon', label: 'Fitness & Health', icon: '🏋️', color: '#ef4565',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-mon-7', label: 'Complete workout (3:30-5PM)', timeOfDay: 'evening', type: 'priority', category: 'j-fitness-mon', valueType: 'health', estimatedValue: 300, valueUnit: 'cal' },
         { id: 'jude-mon-8', label: 'Cool down after workout', timeOfDay: 'evening', type: 'routine', category: 'j-fitness-mon' },
@@ -739,6 +745,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-evening-mon', label: 'Daily Reset', icon: '🌙', color: '#3da9fc',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-mon-9', label: 'Proper recovery meal', timeOfDay: 'evening', type: 'routine', category: 'j-evening-mon' },
         { id: 'jude-mon-10', label: 'Clean house / organize room', timeOfDay: 'evening', type: 'routine', category: 'j-evening-mon' },
@@ -750,6 +757,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
   Tue: [
     {
       id: 'j-morning-tue', label: 'Healthy Living', icon: '🌅', color: '#90b4ce',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-tue-1', label: 'Wake up & light stretching', timeOfDay: 'morning', type: 'routine', category: 'j-morning-tue' },
         { id: 'jude-tue-2', label: 'Morning hygiene', timeOfDay: 'morning', type: 'routine', category: 'j-morning-tue' },
@@ -758,6 +766,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-work-tue', label: 'Finance', icon: '💼', color: '#094067',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-tue-4', label: 'Drink water consistently', timeOfDay: 'morning', type: 'routine', category: 'j-work-tue' },
         { id: 'jude-tue-5', label: '5-min breathing/stretch break', timeOfDay: 'morning', type: 'routine', category: 'j-work-tue' },
@@ -766,6 +775,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-fitness-tue', label: 'Fitness & Health', icon: '🏋️', color: '#ef4565',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-tue-7', label: 'Complete workout (3:30-5PM)', timeOfDay: 'evening', type: 'priority', category: 'j-fitness-tue', valueType: 'health', estimatedValue: 300, valueUnit: 'cal' },
         { id: 'jude-tue-8', label: 'Cool down after workout', timeOfDay: 'evening', type: 'routine', category: 'j-fitness-tue' },
@@ -773,6 +783,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-evening-tue', label: 'Daily Reset', icon: '🌙', color: '#3da9fc',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-tue-9', label: 'Proper recovery meal', timeOfDay: 'evening', type: 'routine', category: 'j-evening-tue' },
         { id: 'jude-tue-10', label: 'Clean house / organize room', timeOfDay: 'evening', type: 'routine', category: 'j-evening-tue' },
@@ -784,6 +795,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
   Wed: [
     {
       id: 'j-morning-wed', label: 'Healthy Living', icon: '🌅', color: '#90b4ce',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-wed-1', label: 'Wake up & light stretching', timeOfDay: 'morning', type: 'routine', category: 'j-morning-wed' },
         { id: 'jude-wed-2', label: 'Morning hygiene', timeOfDay: 'morning', type: 'routine', category: 'j-morning-wed' },
@@ -792,6 +804,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-work-wed', label: 'Finance', icon: '💼', color: '#094067',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-wed-4', label: 'Drink water consistently', timeOfDay: 'morning', type: 'routine', category: 'j-work-wed' },
         { id: 'jude-wed-5', label: '5-min breathing/stretch break', timeOfDay: 'morning', type: 'routine', category: 'j-work-wed' },
@@ -801,6 +814,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-fitness-wed', label: 'Fitness & Health', icon: '🏋️', color: '#ef4565',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-wed-8', label: 'Complete workout (3:30-5PM)', timeOfDay: 'evening', type: 'priority', category: 'j-fitness-wed', valueType: 'health', estimatedValue: 300, valueUnit: 'cal' },
         { id: 'jude-wed-9', label: 'Cool down after workout', timeOfDay: 'evening', type: 'routine', category: 'j-fitness-wed' },
@@ -808,6 +822,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-evening-wed', label: 'Daily Reset', icon: '🌙', color: '#3da9fc',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-wed-10', label: 'Proper recovery meal', timeOfDay: 'evening', type: 'routine', category: 'j-evening-wed' },
         { id: 'jude-wed-11', label: 'Clean house / organize room', timeOfDay: 'evening', type: 'routine', category: 'j-evening-wed' },
@@ -819,6 +834,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
   Thu: [
     {
       id: 'j-morning-thu', label: 'Healthy Living', icon: '🌅', color: '#90b4ce',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-thu-1', label: 'Wake up & light stretching', timeOfDay: 'morning', type: 'routine', category: 'j-morning-thu' },
         { id: 'jude-thu-2', label: 'Morning hygiene', timeOfDay: 'morning', type: 'routine', category: 'j-morning-thu' },
@@ -827,6 +843,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-work-thu', label: 'Finance', icon: '💼', color: '#094067',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-thu-4', label: 'Drink water consistently', timeOfDay: 'morning', type: 'routine', category: 'j-work-thu' },
         { id: 'jude-thu-5', label: '5-min breathing/stretch break', timeOfDay: 'morning', type: 'routine', category: 'j-work-thu' },
@@ -835,6 +852,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-fitness-thu', label: 'Fitness & Health', icon: '🏋️', color: '#ef4565',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-thu-7', label: 'Complete workout (3:30-5PM)', timeOfDay: 'evening', type: 'priority', category: 'j-fitness-thu', valueType: 'health', estimatedValue: 300, valueUnit: 'cal' },
         { id: 'jude-thu-8', label: 'Cool down after workout', timeOfDay: 'evening', type: 'routine', category: 'j-fitness-thu' },
@@ -842,6 +860,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-evening-thu', label: 'Daily Reset', icon: '🌙', color: '#3da9fc',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-thu-9', label: 'Proper recovery meal', timeOfDay: 'evening', type: 'routine', category: 'j-evening-thu' },
         { id: 'jude-thu-10', label: 'Clean house / organize room', timeOfDay: 'evening', type: 'routine', category: 'j-evening-thu' },
@@ -853,6 +872,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
   Fri: [
     {
       id: 'j-morning-fri', label: 'Healthy Living', icon: '🌅', color: '#90b4ce',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-fri-1', label: 'Wake up & light stretching', timeOfDay: 'morning', type: 'routine', category: 'j-morning-fri' },
         { id: 'jude-fri-2', label: 'Morning hygiene', timeOfDay: 'morning', type: 'routine', category: 'j-morning-fri' },
@@ -861,6 +881,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-work-fri', label: 'Finance', icon: '💼', color: '#094067',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-fri-4', label: 'Drink water consistently', timeOfDay: 'morning', type: 'routine', category: 'j-work-fri' },
         { id: 'jude-fri-5', label: '5-min breathing/stretch break', timeOfDay: 'morning', type: 'routine', category: 'j-work-fri' },
@@ -870,6 +891,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-fitness-fri', label: 'Fitness & Health', icon: '🏋️', color: '#ef4565',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-fri-8', label: 'Complete workout (3:30-5PM)', timeOfDay: 'evening', type: 'priority', category: 'j-fitness-fri', valueType: 'health', estimatedValue: 300, valueUnit: 'cal' },
         { id: 'jude-fri-9', label: 'Cool down after workout', timeOfDay: 'evening', type: 'routine', category: 'j-fitness-fri' },
@@ -877,6 +899,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-evening-fri', label: 'Daily Reset', icon: '🌙', color: '#3da9fc',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-fri-10', label: 'Proper recovery meal', timeOfDay: 'evening', type: 'routine', category: 'j-evening-fri' },
         { id: 'jude-fri-11', label: 'Clean house / organize room', timeOfDay: 'evening', type: 'routine', category: 'j-evening-fri' },
@@ -888,6 +911,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
   Sat: [
     {
       id: 'j-morning-sat', label: 'Fitness & Health', icon: '🚶', color: '#90b4ce',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-sat-1', label: 'Morning walk at 5:30 AM', timeOfDay: 'morning', type: 'priority', category: 'j-morning-sat' },
         { id: 'jude-sat-2', label: 'Relaxing / reflective time', timeOfDay: 'morning', type: 'routine', category: 'j-morning-sat' },
@@ -895,6 +919,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-weekend-sat', label: 'Finance', icon: '🏠', color: '#3da9fc',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-sat-3', label: 'Light house cleaning', timeOfDay: 'morning', type: 'routine', category: 'j-weekend-sat' },
         { id: 'jude-sat-4', label: 'Budget tracking', timeOfDay: 'morning', type: 'goal', category: 'j-weekend-sat' },
@@ -903,6 +928,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-evening-sat', label: 'Healthy Living', icon: '🌙', color: '#ef4565',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-sat-6', label: 'Watch travel budgeting content', timeOfDay: 'evening', type: 'routine', category: 'j-evening-sat' },
         { id: 'jude-sat-7', label: 'Rest and recharge', timeOfDay: 'evening', type: 'routine', category: 'j-evening-sat' },
@@ -912,6 +938,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
   Sun: [
     {
       id: 'j-morning-sun', label: 'Fitness & Health', icon: '🚶', color: '#90b4ce',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-sun-1', label: 'Morning walk at 5:30 AM', timeOfDay: 'morning', type: 'priority', category: 'j-morning-sun' },
         { id: 'jude-sun-2', label: 'Relaxing / reflective time', timeOfDay: 'morning', type: 'routine', category: 'j-morning-sun' },
@@ -919,6 +946,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-weekend-sun', label: 'Planning', icon: '📋', color: '#094067',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-sun-3', label: 'Review weekly savings progress', timeOfDay: 'morning', type: 'goal', category: 'j-weekend-sun' },
         { id: 'jude-sun-4', label: 'Plan next week routine', timeOfDay: 'morning', type: 'priority', category: 'j-weekend-sun' },
@@ -927,6 +955,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
     },
     {
       id: 'j-evening-sun', label: 'Healthy Living', icon: '🌙', color: '#3da9fc',
+      goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-sun-6', label: 'Light house cleaning', timeOfDay: 'evening', type: 'routine', category: 'j-evening-sun' },
         { id: 'jude-sun-7', label: 'Prepare for Monday', timeOfDay: 'evening', type: 'priority', category: 'j-evening-sun' },

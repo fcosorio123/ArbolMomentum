@@ -90,11 +90,16 @@ export function buildSmartNudgeCopy(
   const taskWord = pending === 1 ? 'task' : 'tasks';
   const taskLines = formatTaskLines(topTasks);
   const taskSuffix = taskLines ? `\n\n${taskLines}` : '';
+  const hour = new Date().getHours();
+  const timeGreeting =
+    hour < 12 ? `Good morning, ${firstName}! ☀️`
+      : hour < 17 ? `Good afternoon, ${firstName}!`
+      : `Good evening, ${firstName}!`;
 
   if (tag === 'daily-morning') {
     if (pending <= 0) return null;
     return {
-      title: `Good morning, ${firstName}! ☀️`,
+      title: timeGreeting,
       body: `You have ${pending} key ${taskWord} today. Open your check-in and update your progress.${taskSuffix}`,
     };
   }

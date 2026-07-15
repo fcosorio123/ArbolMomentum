@@ -15,9 +15,11 @@ interface Props {
 
 export function ActiveGoalsList({ profileId, onNavigateGoals }: Props) {
   const [goals, setGoals] = useState<PersonalGoal[]>(() => getPersonalGoals(profileId));
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const loadGoals = useCallback(() => {
     setGoals(getPersonalGoals(profileId));
+    setRefreshTick(n => n + 1);
   }, [profileId]);
 
   useEffect(() => {
@@ -36,7 +38,7 @@ export function ActiveGoalsList({ profileId, onNavigateGoals }: Props) {
     pct: getGoalProgressPercent(profileId, goal),
     accent: getGoalAccentColor(goal.id),
     emoji: getGoalEmoji(goal),
-  })), [goals, profileId]);
+  })), [goals, profileId, refreshTick]);
 
   const header = (
     <div

@@ -138,16 +138,22 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
   const [pendingSuggestionGoal, setPendingSuggestionGoal] = useState<PersonalGoal | null>(null);
   const [contextAssistOpen, setContextAssistOpen] = useState(false);
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const loadGoals = useCallback(() => {
     setGoals(getPersonalGoals(profile.id));
+    setRefreshTick(n => n + 1);
   }, [profile.id]);
 
   useEffect(() => {
     loadGoals();
     const handler = () => loadGoals();
     window.addEventListener('arbol-goals-updated', handler);
-    return () => window.removeEventListener('arbol-goals-updated', handler);
+    window.addEventListener('arbol-tasks-updated', handler);
+    return () => {
+      window.removeEventListener('arbol-goals-updated', handler);
+      window.removeEventListener('arbol-tasks-updated', handler);
+    };
   }, [loadGoals]);
 
   // Auto-start goals tour on first visit to this page
@@ -349,6 +355,7 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
                   key={goal.id}
                   goal={goal}
                   profileId={profile.id}
+                  refreshTick={refreshTick}
                   isFirst={idx === 0}
                   onEdit={() => { setEditingGoal(goal); setManageGoalOpen(true); }}
                   onDelete={() => { setGoalDeleteTaskMode('detach'); setDeleteTarget(goal); }}
@@ -640,13 +647,14 @@ function BreakdownPills({ b, accent }: { b: TaskBreakdown; accent: string }) {
 }
 
 function GoalCard({
-  goal, profileId, onEdit, onDelete, isFirst,
+  goal, profileId, onEdit, onDelete, isFirst, refreshTick: _refreshTick,
 }: {
   goal: PersonalGoal;
   profileId: string;
   onEdit: () => void;
   onDelete: () => void;
   isFirst?: boolean;
+  refreshTick?: number;
 }) {
   const [weekOpen, setWeekOpen] = useState(false);
   const [openDays, setOpenDays] = useState<Set<string>>(new Set([getTodayKey()]));

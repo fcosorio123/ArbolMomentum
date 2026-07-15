@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { App, Button, Progress } from 'antd';
-import { DeleteOutlined, CheckCircleFilled, PlayCircleOutlined, EditOutlined, PlusOutlined, CloseOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { DeleteOutlined, CheckCircleFilled, PlayCircleOutlined, EditOutlined, PlusOutlined, CloseOutlined } from '@ant-design/icons';
 import {
   type Profile, type Task, type TaskStatus,
   getTaskCategoriesForProfile, getTaskStatus,
@@ -158,6 +158,7 @@ function TaskItem({
   const showRemark = shouldShowRemark(status, remarkText);
   const scheduleText = task.scheduleLabel
     || (task.recurrence ? recurrenceLabel(task.recurrence) : null);
+  const pv = getDisplayPotentialValue(task.potentialValue);
 
   const handleActivate = () => {
     if (selectionMode) {
@@ -171,6 +172,18 @@ function TaskItem({
     onOpenUpdate();
   };
 
+  const actionBtnStyle: import('react').CSSProperties = {
+    ...touchIconButton,
+    minWidth: 36,
+    minHeight: 36,
+    padding: '6px 8px',
+    background: C.bgAlt,
+    border: `1px solid ${C.border}`,
+    borderRadius: 8,
+    color: C.secondary,
+    fontSize: 13,
+  };
+
   return (
     <div
       role="button"
@@ -178,7 +191,7 @@ function TaskItem({
       onClick={handleActivate}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleActivate(); } }}
       style={{
-        display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px',
+        display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 14px',
         background: isSkipped ? display.bg : display.bg,
         borderRadius: 14,
         border: `1.5px solid ${isSkipped ? `${C.tertiary}25` : status ? display.color + '35' : C.border}`,
@@ -187,114 +200,132 @@ function TaskItem({
         opacity: isSkipped ? 0.58 : 1,
       }}
     >
-      {selectionMode && (
-        <input
-          type="checkbox"
-          checked={!!selected}
-          onChange={onToggleSelect}
-          onClick={e => e.stopPropagation()}
-          style={{ width: 18, height: 18, flexShrink: 0, cursor: 'pointer' }}
-        />
-      )}
-      <div style={{
-        width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-        background: isSkipped ? C.bgAlt : status === 'done' ? display.color : status === 'inprogress' ? display.color : '#fff',
-        border: isSkipped ? `2px solid ${C.border}` : status ? 'none' : `2px solid ${C.borderStrong}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        {isSkipped
-          ? <CloseOutlined style={{ color: C.secondary, fontSize: 14 }} />
-          : status === 'done'
-          ? <CheckCircleFilled style={{ color: '#fff', fontSize: 18 }} />
-          : status === 'inprogress'
-          ? <PlayCircleOutlined style={{ color: '#fff', fontSize: 16 }} />
-          : null
-        }
-      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        {selectionMode && (
+          <input
+            type="checkbox"
+            checked={!!selected}
+            onChange={onToggleSelect}
+            onClick={e => e.stopPropagation()}
+            style={{ width: 18, height: 18, flexShrink: 0, cursor: 'pointer', marginTop: 2 }}
+          />
+        )}
+        <div style={{
+          width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+          background: isSkipped ? C.bgAlt : status === 'done' ? display.color : status === 'inprogress' ? display.color : '#fff',
+          border: isSkipped ? `2px solid ${C.border}` : status ? 'none' : `2px solid ${C.borderStrong}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {isSkipped
+            ? <CloseOutlined style={{ color: C.secondary, fontSize: 14 }} />
+            : status === 'done'
+            ? <CheckCircleFilled style={{ color: '#fff', fontSize: 18 }} />
+            : status === 'inprogress'
+            ? <PlayCircleOutlined style={{ color: '#fff', fontSize: 16 }} />
+            : null
+          }
+        </div>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontSize: 9, fontWeight: 800, letterSpacing: 0.45, textTransform: 'uppercase',
-          color: catColor, marginBottom: 2,
-        }}>
-          Task
-        </div>
-        <div style={{
-          fontSize: 14, fontWeight: 600,
-          color: isSkipped ? C.secondary : status === 'done' ? C.secondary : C.headline,
-          textDecoration: status === 'done' ? 'line-through' : 'none',
-          lineHeight: 1.3,
-          overflowWrap: 'anywhere',
-        }}>
-          {task.label}
-        </div>
-        <div style={{ fontSize: 11, color: C.secondary, marginTop: 3, lineHeight: 1.4 }}>
-          {taskDurationLabel(task)}
-          {scheduleText && (
-            <span style={{ marginLeft: 8 }}>· {scheduleText}</span>
-          )}
-          {(() => {
-            const pv = getDisplayPotentialValue(task.potentialValue);
-            return (
-              <span
-                style={{
-                  marginLeft: 8, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 5,
-                  background: `${C.primary}15`, color: C.primary,
-                }}
-                title={`Potential Value: ${pv.label}`}
-                aria-label={`Potential Value: ${pv.label}`}
-              >
-                PV: {pv.label}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: 9, fontWeight: 800, letterSpacing: 0.45, textTransform: 'uppercase',
+            color: catColor, marginBottom: 2,
+          }}>
+            Task
+          </div>
+          <div style={{
+            fontSize: 15, fontWeight: 600,
+            color: isSkipped ? C.secondary : status === 'done' ? C.secondary : C.headline,
+            textDecoration: status === 'done' ? 'line-through' : 'none',
+            lineHeight: 1.35,
+            overflowWrap: 'anywhere',
+          }}>
+            {task.label}
+          </div>
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8, alignItems: 'center',
+          }}>
+            <span style={{
+              fontSize: 11, fontWeight: 600, color: C.body,
+              background: C.bgAlt, borderRadius: 6, padding: '3px 8px',
+            }}>
+              {taskDurationLabel(task)}
+            </span>
+            {scheduleText && (
+              <span style={{
+                fontSize: 11, fontWeight: 600, color: C.body,
+                background: C.bgAlt, borderRadius: 6, padding: '3px 8px',
+              }}>
+                {scheduleText}
               </span>
-            );
-          })()}
+            )}
+            <span
+              style={{
+                fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6,
+                background: `${C.primary}15`, color: C.primary,
+              }}
+              title={`Potential Value: ${pv.label}`}
+              aria-label={`Potential Value: ${pv.label}`}
+            >
+              Potential Value: {pv.label}
+            </span>
+          </div>
+          {statusLocked && (
+            <div style={{ fontSize: 10, color: C.tertiary, marginTop: 6, fontWeight: 600 }}>
+              Assign to a goal to update status
+            </div>
+          )}
+          {!statusLocked && (
+            <div style={{
+              fontSize: 12, fontWeight: 700, marginTop: 6,
+              color: display.color,
+            }}>
+              {statusHint ?? display.label}
+            </div>
+          )}
+          {showRemark && (
+            <div style={{
+              fontSize: 11, color: C.secondary, marginTop: 4, lineHeight: 1.35,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {remarkText}
+            </div>
+          )}
         </div>
-        {statusLocked && (
-          <div style={{ fontSize: 10, color: C.tertiary, marginTop: 4, fontWeight: 600 }}>
-            Assign to a goal to update status
-          </div>
-        )}
-        {!statusLocked && (
-          <div style={{
-            fontSize: 11, fontWeight: 700, marginTop: 4,
-            color: display.color,
+
+        {isSkipped && (
+          <span style={{
+            fontSize: 10, background: SKIPPED_BADGE.bg, color: SKIPPED_BADGE.color,
+            borderRadius: 5, padding: '2px 7px', fontWeight: 600, flexShrink: 0,
           }}>
-            {statusHint ?? display.label}
-          </div>
-        )}
-        {showRemark && (
-          <div style={{
-            fontSize: 11, color: C.secondary, marginTop: 4, lineHeight: 1.35,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {remarkText}
-          </div>
+            {SKIPPED_BADGE.label}
+          </span>
         )}
       </div>
 
-      {isSkipped && (
-        <span style={{
-          fontSize: 10, background: SKIPPED_BADGE.bg, color: SKIPPED_BADGE.color,
-          borderRadius: 5, padding: '2px 7px', fontWeight: 600, flexShrink: 0,
-        }}>
-          {SKIPPED_BADGE.label}
-        </span>
-      )}
-
-      <div style={{ display: 'flex', gap: 2, flexShrink: 0, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+      <div
+        style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', paddingLeft: selectionMode ? 30 : 48 }}
+        onClick={e => e.stopPropagation()}
+      >
         {!isSkipped && status !== 'done' && onSimplify && (
           <button
             onClick={onSimplify}
             type="button"
-            title="Simplify for me!"
+            title="Break this into smaller steps"
+            aria-label="Simplify for me"
             style={{
-              ...touchIconButton,
-              background: 'none', border: 'none', color: '#7c3aed', fontSize: 14,
+              ...actionBtnStyle,
+              minWidth: 'auto',
+              padding: '6px 10px',
+              color: '#6d28d9',
+              background: '#7c3aed12',
+              borderColor: '#7c3aed35',
+              fontSize: 12,
+              fontWeight: 700,
+              gap: 4,
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#7c3aed12'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
           >
-            <ThunderboltOutlined />
+            Simplify
           </button>
         )}
         {!isSkipped && status !== 'done' && (
@@ -308,12 +339,14 @@ function TaskItem({
           />
         )}
         {onEdit && (
-          <button onClick={onEdit} type="button" style={{
-            ...touchIconButton,
-            background: 'none', border: 'none', color: C.secondary, fontSize: 13,
-          }}
+          <button
+            onClick={onEdit}
+            type="button"
+            title="Edit task"
+            aria-label="Edit task"
+            style={actionBtnStyle}
             onMouseEnter={e => { e.currentTarget.style.color = C.primary; e.currentTarget.style.background = `${C.primary}12`; }}
-            onMouseLeave={e => { e.currentTarget.style.color = C.secondary; e.currentTarget.style.background = 'none'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = C.secondary; e.currentTarget.style.background = C.bgAlt; }}
           >
             <EditOutlined />
           </button>
@@ -324,8 +357,11 @@ function TaskItem({
             type="button"
             title="Restore"
             style={{
-              ...touchIconButton,
-              background: 'none', border: 'none', color: C.primary, fontSize: 11, fontWeight: 700,
+              ...actionBtnStyle,
+              color: C.primary,
+              fontSize: 11,
+              fontWeight: 700,
+              minWidth: 'auto',
             }}
           >
             Restore
@@ -337,19 +373,23 @@ function TaskItem({
             type="button"
             title="Archive"
             style={{
-              ...touchIconButton,
-              background: 'none', border: 'none', color: C.secondary, fontSize: 11, fontWeight: 700,
+              ...actionBtnStyle,
+              fontSize: 11,
+              fontWeight: 700,
+              minWidth: 'auto',
             }}
           >
             Archive
           </button>
         )}
-        <button onClick={onDelete} type="button" style={{
-          ...touchIconButton,
-          background: 'none', border: 'none', color: C.secondary, fontSize: 15,
-        }}
+        <button
+          onClick={onDelete}
+          type="button"
+          title="Delete task"
+          aria-label="Delete task"
+          style={actionBtnStyle}
           onMouseEnter={e => { e.currentTarget.style.color = C.tertiary; e.currentTarget.style.background = `${C.tertiary}12`; }}
-          onMouseLeave={e => { e.currentTarget.style.color = C.secondary; e.currentTarget.style.background = 'none'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = C.secondary; e.currentTarget.style.background = C.bgAlt; }}
         >
           <DeleteOutlined />
         </button>

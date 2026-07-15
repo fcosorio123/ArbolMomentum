@@ -123,10 +123,25 @@ function formatTaskLines(tasks: Array<{ label: string; goalTitle?: string }>): s
     .join("\n");
 }
 
+function greetingForHour(hour: number, firstName: string): string {
+  if (hour < 12) return `Good morning, ${firstName}! ☀️`;
+  if (hour < 17) return `Good afternoon, ${firstName}!`;
+  return `Good evening, ${firstName}!`;
+}
+
+/** Normalize to Date.getTimezoneOffset()-style minutes (positive west of UTC). */
+function normalizeTzOffsetMinutes(offset: number): number {
+  if (!Number.isFinite(offset)) return 300; // US Eastern fallback
+  // Older backups accidentally stored ISO-style negatives (e.g. -300 for Eastern).
+  if (offset < 0) return -offset;
+  return offset;
+}
+
 function buildNudgeCopy(
   tag: string,
   snapshot: NudgeSnapshot | null,
   profileName: string,
+  localHour: number,
 ): { title: string; body: string } | null {
   const firstName = profileName.split(" ")[0] || "there";
   const pending = snapshot?.pending ?? 0;
@@ -137,11 +152,12 @@ function buildNudgeCopy(
   const taskSuffix = formatTaskLines(topTasks);
   const taskLines = taskSuffix ? `\n\n${taskSuffix}` : "";
   const taskWord = pending === 1 ? "task" : "tasks";
+  const timeGreeting = greetingForHour(localHour, firstName);
 
   if (tag === "daily-morning") {
     if (pending <= 0 && snapshot) return null;
     return {
-      title: `Good morning, ${firstName}! ☀️`,
+      title: timeGreeting,
       body: pending > 0
         ? `You have ${pending} key ${taskWord} today. Open your check-in and update your progress.${taskLines}`
         : `Open Arbol Momentum to review today's goal-linked tasks.`,
@@ -316,7 +332,9 @@ export async function runScheduledEmailNudges(): Promise<{
       continue;
     }
 
-    const tzOffset = typeof backup?.tzOffset === "number" ? backup.tzOffset : 300; // default US Eastern
+    const tzOffset = normalizeTzOffsetMinutes(
+      typeof backup?.tzOffset === "number" ? backup.tzOffset : 300,
+    );
     const local = localDateTimeForProfile(tzOffset);
     const slots = effectiveSlots(settings, prefs);
     const snapshot = backup?.nudgeSnapshot ?? null;
@@ -328,7 +346,7 @@ export async function runScheduledEmailNudges(): Promise<{
       const tag = SLOT_TAGS[key];
       if (!isSlotDueNow(slot, local.totalMinutes)) continue;
 
-      const copy = buildNudgeCopy(tag, snapshotFresh, profileName);
+      const copy = buildNudgeCopy(tag, snapshotFresh, profileName, local.hour);
       if (!copy) {
         skipped++;
         const skipReason = !snapshotFresh ? "no_snapshot" : "no_copy";
