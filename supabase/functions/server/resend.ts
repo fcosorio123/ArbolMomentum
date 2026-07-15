@@ -16,12 +16,19 @@ export function getEmailConfig() {
   };
 }
 
+/** Resend sandbox FROM — can only deliver to the Resend account owner, not each profile. */
+export function isResendSandboxFrom(fromAddress: string): boolean {
+  return /onboarding@resend\.dev/i.test((fromAddress ?? "").trim());
+}
+
 export async function sendViaResend(opts: {
   to: string;
   subject: string;
   html: string;
   text: string;
   replyTo?: string;
+  /** When true, allow sandbox FROM (admin/test probes only). */
+  allowSandbox?: boolean;
 }): Promise<ResendSendResult> {
   const cfg = getEmailConfig();
   if (!cfg.apiKey) {
@@ -29,6 +36,17 @@ export async function sendViaResend(opts: {
   }
   if (!cfg.fromAddress) {
     return { ok: false, error: "EMAIL_FROM_ADDRESS not configured" };
+  }
+
+  // Hard stop: sandbox FROM makes every non-owner profile appear "broken" (only Favio receives).
+  if (isResendSandboxFrom(cfg.fromAddress) && !opts.allowSandbox) {
+    return {
+      ok: false,
+      error:
+        "EMAIL_FROM_ADDRESS is still onboarding@resend.dev (Resend sandbox). "
+        + "Verify a domain in Resend and set EMAIL_FROM_ADDRESS to an address on that domain, "
+        + "then redeploy edge secrets. Until then only the Resend account owner can receive mail.",
+    };
   }
 
   const from = cfg.fromName

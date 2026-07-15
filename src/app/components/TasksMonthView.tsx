@@ -16,6 +16,8 @@ interface Props {
   profileId: string;
   onManageTask: (task: InventoryTask) => void;
   onGoAllTasks: () => void;
+  /** Cap listed day tasks (Home month overview). */
+  previewLimit?: number;
 }
 
 function pad2(n: number) {
@@ -26,7 +28,7 @@ function dateKeyFrom(y: number, m0: number, d: number) {
   return `${y}-${pad2(m0 + 1)}-${pad2(d)}`;
 }
 
-export function TasksMonthView({ profileId, onManageTask, onGoAllTasks }: Props) {
+export function TasksMonthView({ profileId, onManageTask, onGoAllTasks, previewLimit }: Props) {
   const todayKey = getTodayKey();
   const [cursor, setCursor] = useState(() => {
     const [y, m] = todayKey.split('-').map(Number);
@@ -206,48 +208,66 @@ export function TasksMonthView({ profileId, onManageTask, onGoAllTasks }: Props)
             No scheduled user tasks this day. Seed/routine tasks appear under All Tasks and Today.
           </p>
         ) : (
-          dayTasks.map(task => {
-            const status = getTaskStatus(profileId, task.id, selectedDay) as TaskStatus | null;
-            const display = status ? TASK_STATUS_DISPLAY[status] : TASK_STATUS_DISPLAY.null;
-            const goalTitle = task.goalId
-              ? goals.find(g => g.id === task.goalId)?.title
-              : undefined;
-            return (
-              <button
-                key={task.id}
-                type="button"
-                onClick={() => onManageTask(task)}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  textAlign: 'left',
-                  background: C.bgAlt,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 10,
-                  padding: '10px 12px',
-                  marginBottom: 8,
-                  cursor: 'pointer',
-                  minHeight: MIN_TOUCH,
-                }}
-              >
-                <div style={{ fontSize: 14, fontWeight: 600, color: C.headline }}>{task.label}</div>
-                <div style={{ fontSize: 11, color: C.secondary, marginTop: 4 }}>
-                  {task.timeOfDay === 'morning' ? '☀️ Morning' : '🌙 Evening'}
-                  {goalTitle ? ` · ${goalTitle}` : ' · Unassigned'}
-                  {task.scheduleLabel ? ` · ${task.scheduleLabel}` : ''}
-                  {' · '}
-                  <span style={{ color: display.color, fontWeight: 700 }}>{display.label}</span>
-                  {' · '}
-                  <span
-                    style={{ color: C.primary, fontWeight: 700 }}
-                    title={`Potential Value: ${getDisplayPotentialValue(task.potentialValue).label}`}
-                  >
-                    Potential Value: {getDisplayPotentialValue(task.potentialValue).label}
-                  </span>
-                </div>
-              </button>
-            );
-          })
+          <>
+            {(previewLimit ? dayTasks.slice(0, previewLimit) : dayTasks).map(task => {
+              const status = getTaskStatus(profileId, task.id, selectedDay) as TaskStatus | null;
+              const display = status ? TASK_STATUS_DISPLAY[status] : TASK_STATUS_DISPLAY.null;
+              const goalTitle = task.goalId
+                ? goals.find(g => g.id === task.goalId)?.title
+                : undefined;
+              return (
+                <button
+                  key={task.id}
+                  type="button"
+                  onClick={() => onManageTask(task)}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    textAlign: 'left',
+                    background: C.bgAlt,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 10,
+                    padding: '10px 12px',
+                    marginBottom: 8,
+                    cursor: 'pointer',
+                    minHeight: MIN_TOUCH,
+                  }}
+                >
+                  <div style={{ fontSize: 14, fontWeight: 600, color: C.headline }}>{task.label}</div>
+                  <div style={{ fontSize: 11, color: C.secondary, marginTop: 4 }}>
+                    {task.timeOfDay === 'morning' ? '☀️ Morning' : '🌙 Evening'}
+                    {goalTitle ? ` · ${goalTitle}` : ' · Unassigned'}
+                    {task.scheduleLabel ? ` · ${task.scheduleLabel}` : ''}
+                    {' · '}
+                    <span style={{ color: display.color, fontWeight: 700 }}>{display.label}</span>
+                    {' · '}
+                    <span
+                      style={{ color: C.primary, fontWeight: 700 }}
+                      title={`Potential Value: ${getDisplayPotentialValue(task.potentialValue).label}`}
+                    >
+                      Potential Value: {getDisplayPotentialValue(task.potentialValue).label}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+            {previewLimit != null && dayTasks.length > previewLimit && (
+              <p style={{ margin: '4px 0 0', fontSize: 12, color: C.body, lineHeight: 1.45 }}>
+                +{dayTasks.length - previewLimit} more today.{' '}
+                <button
+                  type="button"
+                  onClick={onGoAllTasks}
+                  style={{
+                    border: 'none', background: 'none', padding: 0,
+                    color: C.primary, fontWeight: 700, cursor: 'pointer', fontSize: 12,
+                  }}
+                >
+                  Tap Manage in All Tasks
+                </button>
+                {' '}to see everything.
+              </p>
+            )}
+          </>
         )}
       </div>
     </div>

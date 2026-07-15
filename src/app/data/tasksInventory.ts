@@ -18,6 +18,7 @@ import { getPrimaryGoalIdForTask } from './taskGoalLinks';
 import { getPersonalGoals, type PersonalGoal } from './personalGoals';
 import { mergeSeedForProfile } from './seedOverrides';
 import { getDisplayPotentialValue } from './potentialValue';
+import { resourcesForDisplay } from './taskResources';
 
 export type InventoryTask = Task & {
   isUserCreated?: boolean;
@@ -27,6 +28,7 @@ export type InventoryTask = Task & {
   archivedAt?: number;
   goalId?: string;
   scheduleLabel?: string;
+  resources?: UserTask['resources'];
 };
 
 export type TaskStatusFilter = 'active' | 'completed' | 'overdue' | 'archived';
@@ -111,6 +113,11 @@ export function buildAllTasksInventory(profileId: string): TasksInventory {
             potentialValue: getDisplayPotentialValue(merged.potentialValue),
             goalId: effectiveGoalId,
             scheduleLabel: 'Daily',
+            resources: resourcesForDisplay(
+              merged.label,
+              undefined,
+              effectiveGoalId ? goals.find(g => g.id === effectiveGoalId)?.title : undefined,
+            ),
           },
         });
       });
@@ -128,6 +135,7 @@ export function buildAllTasksInventory(profileId: string): TasksInventory {
   }
 
   userTasks.forEach(ut => {
+    const goalTitle = ut.goalId ? goals.find(g => g.id === ut.goalId)?.title : undefined;
     const taskObj: InventoryTask = {
       id: ut.id,
       label: ut.label,
@@ -140,6 +148,7 @@ export function buildAllTasksInventory(profileId: string): TasksInventory {
       archivedAt: ut.archivedAt,
       goalId: ut.goalId,
       scheduleLabel: recurrenceLabel(ut.recurrence),
+      resources: resourcesForDisplay(ut.label, ut.resources, goalTitle),
     };
     place(taskObj, ut.goalId);
   });

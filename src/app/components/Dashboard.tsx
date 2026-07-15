@@ -540,6 +540,7 @@ export function Dashboard({
         </div>
         <TasksMonthView
           profileId={profile.id}
+          previewLimit={3}
           onManageTask={() => onNavigateTasks?.()}
           onGoAllTasks={() => onNavigateTasks?.()}
         />
@@ -740,7 +741,7 @@ export function Dashboard({
         steps={[
           {
             title: '🔴 Goal Check-In',
-            description: 'Quickly update your goal progress. Track Done, In Progress, or Skipped — takes under a minute.',
+            description: 'Quickly update your goal progress. Track Done, In Progress, or Skipped. Takes under a minute.',
             targetId: 'home-banner',
             placement: 'bottom',
           },

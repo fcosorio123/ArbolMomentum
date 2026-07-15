@@ -3,7 +3,6 @@ import {
   HomeOutlined,
   CheckSquareOutlined,
   CalendarOutlined,
-  ScheduleOutlined,
   UserOutlined,
   TrophyOutlined,
   BellOutlined,
@@ -13,10 +12,9 @@ import { C } from '../data/colors';
 type Tab = 'home' | 'goals' | 'tasks' | 'week' | 'month' | 'calendar' | 'reminders' | 'profile';
 
 const TABS: { key: Tab; icon: ReactNode; label: string }[] = [
-  { key: 'home',      icon: <HomeOutlined />,        label: 'My Crib' },
+  { key: 'home',      icon: <HomeOutlined />,        label: 'Home' },
   { key: 'goals',     icon: <TrophyOutlined />,      label: 'Goals' },
   { key: 'tasks',     icon: <CheckSquareOutlined />, label: 'Tasks' },
-  { key: 'month',     icon: <ScheduleOutlined />,    label: 'Month' },
   { key: 'calendar',  icon: <CalendarOutlined />,    label: 'Calendar' },
   { key: 'reminders', icon: <BellOutlined />,        label: 'Alerts' },
   { key: 'profile',   icon: <UserOutlined />,        label: 'Profile' },

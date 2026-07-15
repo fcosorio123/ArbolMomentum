@@ -7,9 +7,9 @@ import { ACCENT_MODAL_STYLES, ModalAccentBar } from '../styles/modalChrome';
 const { TextArea } = Input;
 
 const QUESTIONS = [
-  'What makes this task feel hard, vague, or overwhelming?',
-  'What would make you feel motivated to take the next step today?',
-  'Any constraints? (time, energy, tools, dependencies)',
+  "What's making it hard to start this task?",
+  'What would help you take the first small step?',
+  'Anything we should work around (time, energy, tools)?',
 ] as const;
 
 interface Props {
@@ -23,8 +23,8 @@ interface Props {
 
 function friendlySimplifyError(reason?: string): string {
   if (reason === 'network_error') return 'Could not reach the server. Check your connection and try again.';
-  if (reason === 'input_too_short') return 'Add a bit more about what makes this hard — then try again.';
-  return 'Couldn’t simplify — try again.';
+  if (reason === 'input_too_short') return 'Add a bit more about what makes this hard, then try again.';
+  return "Couldn't simplify. Try again.";
 }
 
 export function SimplifyTaskModal({
@@ -128,8 +128,8 @@ export function SimplifyTaskModal({
         </h3>
         {!reviewing && (
           <p style={{ margin: '0 0 14px', fontSize: 12, color: C.body, lineHeight: 1.45 }}>
-            Creating easier versions of: <strong>{taskLabel}</strong>
-            {goalTitle && <> · goal: {goalTitle}</>}
+            Learning more so we can simplify: <strong>{taskLabel}</strong>
+            {goalTitle && <> (supports goal: {goalTitle})</>}
           </p>
         )}
 
@@ -142,7 +142,7 @@ export function SimplifyTaskModal({
                 next[step] = e.target.value;
                 setAnswers(next);
               }}
-              placeholder={step === 0 ? 'e.g. Too big, not sure where to start...' : 'Optional — press Next to skip'}
+              placeholder={step === 0 ? 'e.g. Too big, not sure where to start...' : 'Optional. Press Next to skip'}
               rows={4}
               style={{ marginBottom: 12, borderRadius: 12 }}
               autoFocus
@@ -186,7 +186,7 @@ export function SimplifyTaskModal({
               <div style={{ fontSize: 13, fontWeight: 600, color: C.headline, overflowWrap: 'anywhere' }}>{taskLabel}</div>
               {goalTitle && (
                 <div style={{ fontSize: 11, color: C.body, marginTop: 4 }}>
-                  Goal · {goalTitle}
+                  Related goal: {goalTitle}
                 </div>
               )}
             </div>

@@ -38,6 +38,14 @@ export interface UserTask {
   potentialValue?: import('./potentialValue').PotentialValue;
   /** Soft-archive timestamp; archived tasks are hidden from Active filters */
   archivedAt?: number;
+  /** How-to links / steps suggested when the task was created */
+  resources?: TaskResource[];
+}
+
+export interface TaskResource {
+  title: string;
+  url?: string;
+  steps?: string[];
 }
 
 // ── Scheduling helpers ────────────────────────────────────────────────

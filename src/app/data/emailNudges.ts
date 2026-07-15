@@ -4,6 +4,7 @@
 
 import { supabase } from '/utils/supabase/client';
 import { getEmailSettings } from './emailSettings';
+import { getProfileEmail } from './profileContact';
 
 const FN = 'make-server-5d90ddf5';
 
@@ -38,14 +39,27 @@ function todayKey(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/**
+ * Fire-and-forget email for ONE profile. Always attaches that profile's saved email
+ * so the server never falls back to a shared test inbox.
+ */
 export function requestEmailSend(payload: EmailSendPayload): void {
   const settings = getEmailSettings();
   if (!settings.enabled && !payload.force) return;
 
+  const recipient = (payload.recipient?.trim() || getProfileEmail(payload.profileId) || '').trim();
+
   const body = {
     ...payload,
     date: payload.date ?? todayKey(),
+    recipient: recipient || undefined,
   };
+
+  // Do not send if we have no address for this profile — avoids silent mis-routing.
+  if (!body.recipient) {
+    console.warn('[EmailNudges] Skip send: no email for profile', payload.profileId);
+    return;
+  }
 
   supabase.functions.invoke(`${FN}/send-email`, {
     method: 'POST',

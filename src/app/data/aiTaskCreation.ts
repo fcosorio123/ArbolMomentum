@@ -168,7 +168,7 @@ export function ruleBasedSimplifyClient(input: SimplifyTaskInput): SimplifiedTas
       ? 'Take 5 sips of water before your next focused block'
       : 'Drink a glass of water with (or instead of) your next snack craving');
     steps.push('Set a phone reminder in 90 minutes: drink water');
-    steps.push('Log glasses today — add one more before evening');
+    steps.push('Log glasses today and add one more before evening');
   } else if (domain === 'eating') {
     if (/protein|chicken|egg|eggs|tofu|turkey|meat|whey|fish|salmon|tuna|beans?|lentil|greek\s*yogurt|cottage\s*cheese/.test(labelL)
       || /protein|chicken|egg|eggs|tofu|turkey|meat|whey|fish|salmon|tuna/.test(t)) {
@@ -210,20 +210,20 @@ export function ruleBasedSimplifyClient(input: SimplifyTaskInput): SimplifiedTas
   } else if (domain === 'exercise') {
     steps.push(tightTime ? 'Walk for 10 minutes today' : 'Walk for 20 minutes today');
     steps.push('Do 5 minutes of stretching after you wake up or before bed');
-    steps.push('Put on workout clothes — no pressure to finish a full session');
+    steps.push('Put on workout clothes with no pressure to finish a full session');
     steps.push('Do one set of a movement you already know');
   } else if (domain === 'sleep') {
     steps.push('Set a phone-down reminder 30 minutes before bed');
     steps.push('Lights low and screens off for the last 15 minutes tonight');
-    steps.push('Write tomorrow’s top 1 task so your brain can settle');
-    steps.push('Get in bed at a set time tonight (even if you aren’t sleepy yet)');
+    steps.push("Write tomorrow's top 1 task so your brain can settle");
+    steps.push("Get in bed at a set time tonight (even if you aren't sleepy yet)");
   } else if (domain === 'study') {
     steps.push(tightTime ? 'Study the hardest topic for 10 focused minutes' : 'Study for one 25-minute block');
     steps.push('Open the material and complete only the first page or section');
     steps.push('Write three bullet notes from what you just covered');
-    steps.push('Schedule tomorrow’s short study block on your calendar');
+    steps.push("Schedule tomorrow's short study block on your calendar");
   } else if (domain === 'money') {
-    steps.push('Open your account and check today’s balance');
+    steps.push("Open your account and check today's balance");
     steps.push('Write down every purchase from the last 24 hours');
     steps.push('Move a tiny amount (even $5) into savings once');
     steps.push('Pick one upcoming bill and confirm the due date');
@@ -246,6 +246,88 @@ export function ruleBasedSimplifyClient(input: SimplifyTaskInput): SimplifiedTas
       : `Repeat that small win once more today`);
   }
 
+  const answerBlob = `${answers.blocker} ${answers.motivation} ${answers.constraint}`.toLowerCase();
+  const shortTask = label.slice(0, 42) || 'this task';
+  const hasAnswers = !!(answers.blocker || answers.motivation || answers.constraint);
+
+  // ALWAYS reshape from answers when present — users must see their input change the HOW.
+  if (hasAnswers) {
+    const shaped: string[] = [];
+    const mins =
+      answers.blocker.match(/(\d+)\s*-?\s*min/i)?.[1]
+      ?? answers.constraint.match(/(\d+)\s*-?\s*min/i)?.[1];
+    const budget = mins ? Math.min(30, Math.max(2, Number(mins))) : tightTime ? 5 : 10;
+
+    shaped.push(`Start ${shortTask}: the smallest piece that takes ~${budget} minutes`);
+
+    if (answers.blocker) {
+      if (/tired|energy|exhaust|fatigue|low energy/i.test(answers.blocker)) {
+        shaped.push(`Do a seated or low-effort version of ${shortTask} first`);
+      } else if (/time|busy|rush|overwhelm|too much|complicated|vague|don't know|dont know/i.test(answers.blocker)) {
+        shaped.push(`Ignore the full version: finish one obvious next move for ${shortTask}`);
+      } else if (/money|cost|expensive|broke|budget/i.test(answers.blocker)) {
+        shaped.push(`Use only free tools or things you already have for ${shortTask}`);
+      } else {
+        const bite = answers.blocker.replace(/\s+/g, ' ').trim().slice(0, 48);
+        shaped.push(`Work around "${bite}" by doing the easiest slice of ${shortTask}`);
+      }
+    }
+
+    if (answers.motivation) {
+      if (/family|kids|wife|husband|partner|child/i.test(answers.motivation)) {
+        shaped.push(`Do ${shortTask} as a gift to the people you named: start now`);
+      } else if (/taste|tasty|enjoy|like|delicious|fun/i.test(answers.motivation)) {
+        shaped.push(`Pick the version of ${shortTask} you will actually enjoy`);
+      } else if (/health|strong|sharp|energy|focus/i.test(answers.motivation)) {
+        shaped.push(`Link ${shortTask} to feeling stronger today: complete one action`);
+      } else {
+        const why = answers.motivation.replace(/\s+/g, ' ').trim().slice(0, 48);
+        shaped.push(`Keep "${why}" in mind, then complete one piece of ${shortTask}`);
+      }
+    }
+
+    if (answers.constraint) {
+      if (/no (gym|equipment)|home only|at home|apartment/i.test(answers.constraint)) {
+        shaped.push(`Keep ${shortTask} fully at-home with zero special gear`);
+      } else if (/morning|am\b|before work|after wake/i.test(answers.constraint)) {
+        shaped.push(`Schedule ${shortTask} in the morning before other demands`);
+      } else if (/evening|night|pm\b|after work|before bed/i.test(answers.constraint)) {
+        shaped.push(`Park ${shortTask} for evening when you have a clearer window`);
+      } else if (/alone|solo|by myself/i.test(answers.constraint)) {
+        shaped.push(`Do ${shortTask} solo so you never wait on anyone`);
+      } else {
+        const limit = answers.constraint.replace(/\s+/g, ' ').trim().slice(0, 48);
+        shaped.push(`Respect "${limit}" while finishing a tiny win on ${shortTask}`);
+      }
+    }
+
+    // Prefer shaped steps; fill remaining slots from domain defaults
+    steps.splice(0, steps.length, ...shaped, ...steps);
+  } else {
+    if (/no (time|energy)|tired|exhausted|overwhelm|too big|vague|don't know where/.test(answerBlob)) {
+      steps.unshift('Start with a 2-minute version only');
+    }
+  }
+  if (/money|budget|cheap|free|cost|broke/.test(answerBlob)) {
+    steps.push('Use only free or already-available options');
+  }
+  if (/alone|by myself|solo|no one/.test(answerBlob)) {
+    steps.push("Do this solo so you don't wait on anyone");
+  }
+  if (/remind|alarm|notif|phone|calendar/.test(answerBlob)) {
+    steps.push('Set one phone reminder with a clear time');
+  }
+  if (/accountab|partner|friend|wife|husband|coach/.test(answerBlob)) {
+    steps.push('Text one person your plan before you start');
+  }
+
+  const preferEvening = /evening|night|pm\b|before bed|after work/i.test(
+    `${answers.constraint} ${answers.motivation} ${answers.blocker}`,
+  );
+  const preferMorning = /morning|am\b|before work|after wake|breakfast/i.test(
+    `${answers.constraint} ${answers.motivation} ${answers.blocker}`,
+  );
+
   const seen = new Set<string>();
   const unique = steps
     .map(s => s.replace(/\s+/g, ' ').trim().slice(0, MAX_SIMPLIFY_LABEL))
@@ -260,12 +342,16 @@ export function ruleBasedSimplifyClient(input: SimplifyTaskInput): SimplifiedTas
     });
 
   while (unique.length < 2) {
-    unique.push('Take one tiny action toward your goal in the next 10 minutes');
+    unique.push('Take one tiny action on this task in the next 10 minutes');
   }
 
   return unique.slice(0, 5).map((s, i) => ({
     label: s,
-    timeOfDay: (i % 2 === 0 ? 'morning' : 'evening') as 'morning' | 'evening',
+    timeOfDay: (preferEvening
+      ? (i % 2 === 0 ? 'evening' : 'morning')
+      : preferMorning
+        ? (i % 2 === 0 ? 'morning' : 'evening')
+        : (i % 2 === 0 ? 'morning' : 'evening')) as 'morning' | 'evening',
   }));
 }
 

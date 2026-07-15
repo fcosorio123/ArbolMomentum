@@ -28,6 +28,67 @@ export function getGoalProgressPercent(profileId: string, goal: PersonalGoal, da
   return 0;
 }
 
+function pad2(n: number) {
+  return String(n).padStart(2, '0');
+}
+
+/** Monday through today (local calendar), inclusive. */
+export function getWeekDateKeysThroughToday(todayKey = getTodayKey()): string[] {
+  const [y, m, d] = todayKey.split('-').map(Number);
+  const today = new Date(y, m - 1, d);
+  const dow = today.getDay(); // Sun=0
+  const mondayOffset = dow === 0 ? -6 : 1 - dow;
+  const keys: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const dt = new Date(y, m - 1, d + mondayOffset + i);
+    const key = `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+    if (key > todayKey) break;
+    keys.push(key);
+  }
+  return keys;
+}
+
+/**
+ * Week-to-date goal progress: sum of done/total for linked tasks Mon→today.
+ * Falls back to monetary % when a goal has no linked tasks this week.
+ */
+export function getGoalWeekProgressPercent(
+  profileId: string,
+  goal: PersonalGoal,
+  todayKey = getTodayKey(),
+): number {
+  let done = 0;
+  let total = 0;
+  for (const dk of getWeekDateKeysThroughToday(todayKey)) {
+    const b = getGoalTaskBreakdown(profileId, goal.id, dk);
+    done += b.done;
+    total += b.total;
+  }
+  if (total > 0) return Math.round((done / total) * 100);
+  if (isMonetaryGoal(goal) && goal.targetValue > 0) {
+    return Math.min(100, Math.round((goal.currentValue / goal.targetValue) * 100));
+  }
+  return 0;
+}
+
+export function getGoalWeekBreakdown(
+  profileId: string,
+  goalId: string,
+  todayKey = getTodayKey(),
+): GoalTaskBreakdown {
+  const tallies = { done: 0, inprogress: 0, notStarted: 0 };
+  for (const dk of getWeekDateKeysThroughToday(todayKey)) {
+    const b = getGoalTaskBreakdown(profileId, goalId, dk);
+    tallies.done += b.done;
+    tallies.inprogress += b.inprogress;
+    tallies.notStarted += b.notStarted;
+  }
+  return {
+    ...tallies,
+    total: tallies.done + tallies.inprogress + tallies.notStarted,
+  };
+}
+
 export function getGoalEmoji(goal: PersonalGoal): string {
   const text = `${goal.title} ${goal.deepWhy ?? ''}`.toLowerCase();
   if (/sleep|rest|recover/.test(text)) return '😴';

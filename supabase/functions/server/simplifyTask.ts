@@ -117,7 +117,7 @@ export function ruleBasedSimplify(input: SimplifyTaskInput): SimplifiedTask[] {
       ? "Take 5 sips of water before your next focused block"
       : "Drink a glass of water with (or instead of) your next snack craving");
     steps.push("Set a phone reminder in 90 minutes: drink water");
-    steps.push("Log glasses today — add one more before evening");
+    steps.push("Log glasses today and add one more before evening");
   } else if (domain === "eating") {
     // Anchor to original task keywords first (protein > fruit > veg > generic)
     if (mention(label, /protein|chicken|egg|eggs|tofu|turkey|meat|whey|fish|salmon|tuna|beans?|lentil|greek\s*yogurt|cottage\s*cheese/)
@@ -160,20 +160,20 @@ export function ruleBasedSimplify(input: SimplifyTaskInput): SimplifiedTask[] {
   } else if (domain === "exercise") {
     steps.push(tightTime ? "Walk for 10 minutes today" : "Walk for 20 minutes today");
     steps.push("Do 5 minutes of stretching after you wake up or before bed");
-    steps.push("Put on workout clothes — no pressure to finish a full session");
+    steps.push("Put on workout clothes with no pressure to finish a full session");
     steps.push("Do one set of a movement you already know");
   } else if (domain === "sleep") {
     steps.push("Set a phone-down reminder 30 minutes before bed");
     steps.push("Lights low and screens off for the last 15 minutes tonight");
-    steps.push("Write tomorrow’s top 1 task so your brain can settle");
-    steps.push("Get in bed at a set time tonight (even if you aren’t sleepy yet)");
+    steps.push("Write tomorrow's top 1 task so your brain can settle");
+    steps.push("Get in bed at a set time tonight (even if you aren't sleepy yet)");
   } else if (domain === "study") {
     steps.push(tightTime ? "Study the hardest topic for 10 focused minutes" : "Study for one 25-minute block");
     steps.push("Open the material and complete only the first page or section");
     steps.push("Write three bullet notes from what you just covered");
-    steps.push("Schedule tomorrow’s short study block on your calendar");
+    steps.push("Schedule tomorrow's short study block on your calendar");
   } else if (domain === "money") {
-    steps.push("Open your account and check today’s balance");
+    steps.push("Open your account and check today's balance");
     steps.push("Write down every purchase from the last 24 hours");
     steps.push("Move a tiny amount (even $5) into savings once");
     steps.push("Pick one upcoming bill and confirm the due date");
@@ -199,6 +199,85 @@ export function ruleBasedSimplify(input: SimplifyTaskInput): SimplifiedTask[] {
     }
   }
 
+  // Fold user answers into HOW (never paste answer text into labels)
+  const answerBlob = `${answers.blocker} ${answers.motivation} ${answers.constraint}`.toLowerCase();
+  const shortTask = label.slice(0, 42) || "this task";
+  const hasAnswers = !!(answers.blocker || answers.motivation || answers.constraint);
+
+  if (hasAnswers) {
+    const shaped: string[] = [];
+    const mins =
+      answers.blocker.match(/(\d+)\s*-?\s*min/i)?.[1]
+      ?? answers.constraint.match(/(\d+)\s*-?\s*min/i)?.[1];
+    const budget = mins ? Math.min(30, Math.max(2, Number(mins))) : tightTime ? 5 : 10;
+
+    shaped.push(`Start ${shortTask}: the smallest piece that takes ~${budget} minutes`);
+
+    if (answers.blocker) {
+      if (/tired|energy|exhaust|fatigue|low energy/i.test(answers.blocker)) {
+        shaped.push(`Do a seated or low-effort version of ${shortTask} first`);
+      } else if (/time|busy|rush|overwhelm|too much|complicated|vague|don't know|dont know/i.test(answers.blocker)) {
+        shaped.push(`Ignore the full version: finish one obvious next move for ${shortTask}`);
+      } else if (/money|cost|expensive|broke|budget/i.test(answers.blocker)) {
+        shaped.push(`Use only free tools or things you already have for ${shortTask}`);
+      } else {
+        const bite = answers.blocker.replace(/\s+/g, " ").trim().slice(0, 48);
+        shaped.push(`Work around "${bite}" by doing the easiest slice of ${shortTask}`);
+      }
+    }
+
+    if (answers.motivation) {
+      if (/family|kids|wife|husband|partner|child/i.test(answers.motivation)) {
+        shaped.push(`Do ${shortTask} as a gift to the people you named: start now`);
+      } else if (/taste|tasty|enjoy|like|delicious|fun/i.test(answers.motivation)) {
+        shaped.push(`Pick the version of ${shortTask} you will actually enjoy`);
+      } else if (/health|strong|sharp|energy|focus/i.test(answers.motivation)) {
+        shaped.push(`Link ${shortTask} to feeling stronger today: complete one action`);
+      } else {
+        const why = answers.motivation.replace(/\s+/g, " ").trim().slice(0, 48);
+        shaped.push(`Keep "${why}" in mind, then complete one piece of ${shortTask}`);
+      }
+    }
+
+    if (answers.constraint) {
+      if (/no (gym|equipment)|home only|at home|apartment/i.test(answers.constraint)) {
+        shaped.push(`Keep ${shortTask} fully at-home with zero special gear`);
+      } else if (/morning|am\b|before work|after wake/i.test(answers.constraint)) {
+        shaped.push(`Schedule ${shortTask} in the morning before other demands`);
+      } else if (/evening|night|pm\b|after work|before bed/i.test(answers.constraint)) {
+        shaped.push(`Park ${shortTask} for evening when you have a clearer window`);
+      } else if (/alone|solo|by myself/i.test(answers.constraint)) {
+        shaped.push(`Do ${shortTask} solo so you never wait on anyone`);
+      } else {
+        const limit = answers.constraint.replace(/\s+/g, " ").trim().slice(0, 48);
+        shaped.push(`Respect "${limit}" while finishing a tiny win on ${shortTask}`);
+      }
+    }
+
+    steps.splice(0, steps.length, ...shaped, ...steps);
+  } else if (/no (time|energy)|tired|exhausted|overwhelm|too big|vague|don't know where/.test(answerBlob)) {
+    steps.unshift("Start with a 2-minute version only");
+  }
+  if (/money|budget|cheap|free|cost|broke/.test(answerBlob)) {
+    steps.push("Use only free or already-available options");
+  }
+  if (/alone|by myself|solo|no one/.test(answerBlob)) {
+    steps.push("Do this solo so you don't wait on anyone");
+  }
+  if (/remind|alarm|notif|phone|calendar/.test(answerBlob)) {
+    steps.push("Set one phone reminder with a clear time");
+  }
+  if (/accountab|partner|friend|wife|husband|coach/.test(answerBlob)) {
+    steps.push("Text one person your plan before you start");
+  }
+
+  const preferEvening = /evening|night|pm\b|before bed|after work/i.test(
+    `${answers.constraint} ${answers.motivation} ${answers.blocker}`,
+  );
+  const preferMorning = /morning|am\b|before work|after wake|breakfast/i.test(
+    `${answers.constraint} ${answers.motivation} ${answers.blocker}`,
+  );
+
   const seen = new Set<string>();
   const unique = steps
     .map((s) => s.replace(/\s+/g, " ").trim().slice(0, MAX_LABEL_CHARS))
@@ -214,12 +293,16 @@ export function ruleBasedSimplify(input: SimplifyTaskInput): SimplifiedTask[] {
     });
 
   while (unique.length < 2) {
-    unique.push("Take one tiny action toward your goal in the next 10 minutes");
+    unique.push("Take one tiny action on this task in the next 10 minutes");
   }
 
   return unique.slice(0, 5).map((s, i) => ({
     label: s,
-    timeOfDay: (i % 2 === 0 ? "morning" : "evening") as "morning" | "evening",
+    timeOfDay: (preferEvening
+      ? (i % 2 === 0 ? "evening" : "morning")
+      : preferMorning
+        ? (i % 2 === 0 ? "morning" : "evening")
+        : (i % 2 === 0 ? "morning" : "evening")) as "morning" | "evening",
   }));
 }
 
@@ -242,12 +325,12 @@ async function callOpenAi(input: SimplifyTaskInput): Promise<SimplifiedTask[] | 
   const answers = normalizeSimplifyAnswers(input);
 
   const context = [
-    input.goalTitle ? `Goal: ${input.goalTitle}` : "",
-    input.goalWhy ? `Why: ${input.goalWhy}` : "",
-    `Overwhelming task: ${input.taskLabel}`,
+    `Task to simplify (primary): ${input.taskLabel}`,
     `What's hard: ${answers.blocker || "(none)"}`,
-    `What would motivate them: ${answers.motivation || "(none)"}`,
-    `Constraints: ${answers.constraint || "(none)"}`,
+    `What would help them start: ${answers.motivation || "(none)"}`,
+    `Constraints to respect: ${answers.constraint || "(none)"}`,
+    input.goalTitle ? `Related goal (secondary context only): ${input.goalTitle}` : "",
+    input.goalWhy ? `Goal why (secondary): ${input.goalWhy}` : "",
   ].filter(Boolean).join("\n");
 
   try {
@@ -265,11 +348,16 @@ async function callOpenAi(input: SimplifyTaskInput): Promise<SimplifiedTask[] | 
           {
             role: "system",
             content:
-              'Simplify an overwhelming task into 2–5 TINY, concrete checklist actions the user can do today. Return JSON only: {"tasks":[{"label":"...","timeOfDay":"morning|evening"}]}. '
-              + "Rules: (1) Labels must be real doable actions (Buy one apple, Walk 10 minutes, Drink a glass of water) — never meta wording. "
-              + "(2) NEVER output templates like \"5-min start:\", \"Easiest piece of…\", \"note win:\", \"skip:\", or paste the user's answers into the task. "
-              + "(3) Stay anchored to the ORIGINAL task keywords only — if the task is hydration/water, every suggestion must be about drinking water (never switch to food/fruit). If protein, stay on protein. Do not invent a different topic because the goal title mentions weight loss or health. "
-              + "(4) Prefer under-10-minute actions. Labels max 120 chars. Always return at least 2 tasks.",
+              'Simplify ONE overwhelming TASK into 2-5 TINY, concrete checklist actions the user can do today. Return JSON only: {"tasks":[{"label":"...","timeOfDay":"morning|evening"}]}. '
+              + "Rules: (1) You are simplifying the TASK, not the goal. Goal is optional background only. "
+              + "(2) Labels must be real doable actions (Buy one apple, Walk 10 minutes, Drink a glass of water). Never meta wording. "
+              + "(3) Never output templates like \"5-min start:\", \"Easiest piece of...\", \"note win:\", \"skip:\", and never paste the user's answers into the task label. "
+              + "(4) Stay anchored to the ORIGINAL task keywords only. If hydration/water, every suggestion is about drinking water (never switch to food). If protein, stay on protein. "
+              + "(5) CRITICAL: The three user answers MUST visibly change your suggestions. "
+              + "If they have little time, every step is shorter. If they named a motivation, bias the action toward it. "
+              + "If they named constraints (tools, energy, money, time of day), every step must fit those limits. "
+              + "Do not return generic domain tips that ignore their answers. "
+              + "(6) Prefer under-10-minute actions. Labels max 120 chars. Always return at least 2 tasks.",
           },
           { role: "user", content: context },
         ],
@@ -323,14 +411,30 @@ export async function simplifyTask(
     return { ok: tasks.length >= 2, tasks, source: "rules", reason: "rate_limited" };
   }
 
+  const answers = normalizeSimplifyAnswers(input);
+  const hasAnswers = !!(answers.blocker || answers.motivation || answers.constraint);
+  const rulesTasks = ruleBasedSimplify(input).slice(0, 5);
+
   const llmTasks = await callOpenAi(input);
   if (llmTasks && llmTasks.length >= 2) {
+    // When the user answered the form, lead with answer-shaped rules so HOW always reflects them.
+    if (hasAnswers && rulesTasks.length >= 1) {
+      const seen = new Set<string>();
+      const merged: SimplifiedTask[] = [];
+      for (const t of [...rulesTasks.slice(0, 2), ...llmTasks]) {
+        const key = t.label.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        merged.push(t);
+        if (merged.length >= 5) break;
+      }
+      return { ok: true, tasks: merged, source: "llm" };
+    }
     return { ok: true, tasks: llmTasks, source: "llm" };
   }
 
-  const tasks = ruleBasedSimplify(input);
-  if (tasks.length < 2) {
+  if (rulesTasks.length < 2) {
     return { ok: false, tasks: [], source: "rules", reason: "no_suggestions" };
   }
-  return { ok: true, tasks: tasks.slice(0, 5), source: "rules", reason: "llm_unavailable" };
+  return { ok: true, tasks: rulesTasks, source: "rules", reason: "llm_unavailable" };
 }

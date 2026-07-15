@@ -23,6 +23,8 @@ export interface TaskUpdateContext {
   goalProgressPct?: number;
   goalDoneCount?: number;
   goalTotalCount?: number;
+  /** Occurrence date for status read/write (overdue one-time uses specificDate). */
+  dateKey?: string;
 }
 
 interface Props {

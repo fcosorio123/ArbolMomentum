@@ -112,6 +112,7 @@ export default function App() {
     return false;
   });
   const [activeTab, setActiveTab] = useState<Tab>('home');
+  const [tasksInitialView, setTasksInitialView] = useState<'today' | 'all' | 'month'>('today');
   const [showAdmin, setShowAdmin] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null);
@@ -619,9 +620,15 @@ export default function App() {
           onInstall={handleInstall}
           swRegistration={swRegistration}
           onCoachMark={() => setOnboardingModal('coach')}
-          onNavigateTasks={() => setActiveTab('tasks')}
+          onNavigateTasks={() => {
+            setTasksInitialView('today');
+            setActiveTab('tasks');
+          }}
           onNavigateGoals={() => setActiveTab('goals')}
-          onNavigateMonth={() => setActiveTab('month')}
+          onNavigateMonth={() => {
+            setTasksInitialView('month');
+            setActiveTab('tasks');
+          }}
           onNavigateReminders={() => setActiveTab('reminders')}
           onShowSummary={() => {
             setSummaryDataVersion(v => v + 1);
@@ -636,13 +643,21 @@ export default function App() {
       {activeTab === 'goals' && (
         <GoalsPage
           profile={activeProfile}
-          onNavigateTasks={() => setActiveTab('tasks')}
+          onNavigateTasks={() => {
+            setTasksInitialView('today');
+            setActiveTab('tasks');
+          }}
         />
       )}
       {activeTab === 'tasks' && (
         <TaskList
+          key={`tasks-${tasksInitialView}`}
           profile={activeProfile}
-          onNavigateMonth={() => setActiveTab('month')}
+          initialTaskView={tasksInitialView}
+          onNavigateMonth={() => {
+            setTasksInitialView('month');
+            setActiveTab('tasks');
+          }}
           onPerfectDay={(newBadges) => {
             setCelebrationBadges(newBadges);
             setShowCelebration(true);
@@ -654,7 +669,10 @@ export default function App() {
       {(activeTab === 'month' || activeTab === 'week') && (
         <MonthPlan
           profile={activeProfile}
-          onGoAllTasks={() => setActiveTab('tasks')}
+          onGoAllTasks={() => {
+            setTasksInitialView('today');
+            setActiveTab('tasks');
+          }}
         />
       )}
       {activeTab === 'calendar' && (
@@ -693,7 +711,10 @@ export default function App() {
           <div style={{ display: 'flex', minHeight: '100dvh', background: C.bgAlt, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
             <BottomNav
               activeTab={activeTab}
-              onChange={(t) => setActiveTab(t as Tab)}
+              onChange={(t) => {
+                if (t === 'tasks') setTasksInitialView('today');
+                setActiveTab(t as Tab);
+              }}
               pendingCount={badgeSupported ? 0 : pendingCount}
               isDesktop={true}
             />
@@ -720,7 +741,10 @@ export default function App() {
             {tabContent}
             <BottomNav
               activeTab={activeTab}
-              onChange={(t) => setActiveTab(t as Tab)}
+              onChange={(t) => {
+                if (t === 'tasks') setTasksInitialView('today');
+                setActiveTab(t as Tab);
+              }}
               pendingCount={badgeSupported ? 0 : pendingCount}
             />
           </div>

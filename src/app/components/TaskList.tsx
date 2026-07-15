@@ -18,8 +18,9 @@ import {
   getUserTasks, createUserTask, updateUserTask, deleteUserTask,
   orphanUserTasksForGoal, isTaskScheduledForDate, skipTaskOccurrence,
   recurrenceLabel, isOverdueUserTask, archiveUserTask, restoreUserTask,
-  type UserTask, type Recurrence,
+  type UserTask, type Recurrence, type TaskResource,
 } from '../data/userTasks';
+import { attachResourcesToNewTask, resourcesForDisplay, seedMissingTaskResources } from '../data/taskResources';
 import {
   buildAllTasksInventory,
   filterInventoryTasks,
@@ -65,14 +66,6 @@ import {
   clearUserGoalLinksForTask,
 } from '../data/taskGoalLinks';
 
-interface Props {
-  profile: Profile;
-  onNavigateWeek?: () => void;
-  onNavigateMonth?: () => void;
-  onPerfectDay?: (newBadges: Badge[]) => void;
-  onTasksChange?: (pending: number) => void;
-}
-
 type StatusMap = Record<string, TaskStatus | null>;
 type NotesMap = Record<string, string>;
 type UserTask_ = Task & {
@@ -83,18 +76,19 @@ type UserTask_ = Task & {
   archivedAt?: number;
   scheduleLabel?: string;
   goalId?: string;
+  resources?: UserTask['resources'];
 };
 
 type TaskViewMode = 'all' | 'today' | 'month';
 
-function taskViewStorageKey(profileId: string) {
-  return `arbol-task-view-${profileId}`;
-}
-
-function loadTaskView(profileId: string): TaskViewMode {
-  const v = localStorage.getItem(taskViewStorageKey(profileId));
-  if (v === 'all' || v === 'today' || v === 'month') return v;
-  return 'all';
+interface Props {
+  profile: Profile;
+  onNavigateWeek?: () => void;
+  onNavigateMonth?: () => void;
+  onPerfectDay?: (newBadges: Badge[]) => void;
+  onTasksChange?: (pending: number) => void;
+  /** When set (e.g. from Home "Open Month"), open that Tasks tab on mount. */
+  initialTaskView?: TaskViewMode;
 }
 
 function isRecurringUT(task: UserTask): boolean {
@@ -159,6 +153,8 @@ function TaskItem({
   const scheduleText = task.scheduleLabel
     || (task.recurrence ? recurrenceLabel(task.recurrence) : null);
   const pv = getDisplayPotentialValue(task.potentialValue);
+  const [resourcesOpen, setResourcesOpen] = useState(false);
+  const resources = task.resources?.filter(r => r.title?.trim()) ?? [];
 
   const handleActivate = () => {
     if (selectionMode) {
@@ -291,6 +287,50 @@ function TaskItem({
               {remarkText}
             </div>
           )}
+          {resources.length > 0 && (
+            <div style={{ marginTop: 8 }} onClick={e => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => setResourcesOpen(o => !o)}
+                style={{
+                  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                  fontSize: 11, fontWeight: 700, color: C.primary,
+                }}
+              >
+                {resourcesOpen ? 'Hide how to get this done' : 'How to get this done'}
+              </button>
+              {resourcesOpen && (
+                <div style={{
+                  marginTop: 6, padding: '8px 10px', borderRadius: 10,
+                  background: `${C.primary}08`, border: `1px solid ${C.primary}20`,
+                }}>
+                  {resources.map((r: TaskResource, i) => (
+                    <div key={i} style={{ marginBottom: i < resources.length - 1 ? 8 : 0 }}>
+                      {r.url ? (
+                        <a
+                          href={r.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ fontSize: 12, fontWeight: 700, color: C.primary }}
+                        >
+                          {r.title}
+                        </a>
+                      ) : (
+                        <div style={{ fontSize: 12, fontWeight: 700, color: C.headline }}>{r.title}</div>
+                      )}
+                      {r.steps && r.steps.length > 0 && (
+                        <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>
+                          {r.steps.map((s, si) => (
+                            <li key={si} style={{ fontSize: 11, color: C.body, lineHeight: 1.4 }}>{s}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {isSkipped && (
@@ -418,10 +458,7 @@ function OtherTasksSection({
 
   return (
     <div style={{
-      borderLeft: `1.5px solid ${accentColor}25`,
-      borderRight: `1.5px solid ${accentColor}25`,
-      borderBottom: `1.5px solid ${accentColor}25`,
-      borderBottomLeftRadius: 14, borderBottomRightRadius: 14,
+      borderTop: `1px solid ${accentColor}18`,
       background: `${accentColor}04`,
     }}>
       <button
@@ -581,18 +618,20 @@ function GoalGroup({
   const accent = allDone ? C.primary : accentColor;
 
   return (
-    <div style={{ marginBottom: 24 }}>
+    <div style={{
+      marginBottom: 24,
+      border: `1.5px solid ${accent}30`,
+      borderRadius: 16,
+      overflow: 'hidden',
+      background: C.bgCard,
+      boxShadow: C.shadow,
+    }}>
       {/* Goal header card */}
       <div
         onClick={() => setCollapsed(c => !c)}
         style={{
           display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px',
           background: `linear-gradient(135deg, ${accent}18, ${accent}06)`,
-          borderRadius: collapsed ? 16 : '16px 16px 0 0',
-          borderTop: `1.5px solid ${accent}30`,
-          borderLeft: `1.5px solid ${accent}30`,
-          borderRight: `1.5px solid ${accent}30`,
-          borderBottom: collapsed ? `1.5px solid ${accent}30` : 'none',
           cursor: 'pointer', userSelect: 'none',
         }}
       >
@@ -634,8 +673,7 @@ function GoalGroup({
         <div style={{
           padding: '9px 16px 10px',
           background: `${accent}0a`,
-          borderLeft: `1.5px solid ${accent}30`,
-          borderRight: `1.5px solid ${accent}30`,
+          borderTop: `1px solid ${accent}18`,
         }}>
           <span style={{ fontSize: 10, fontWeight: 700, color: C.secondary, textTransform: 'uppercase', letterSpacing: 0.4 }}>
             Why this matters
@@ -649,16 +687,13 @@ function GoalGroup({
       {/* Tasks under this goal */}
       {!collapsed && (
         <div style={{
-          paddingLeft: 10, paddingTop: 8,
-          borderLeft: `3px solid ${accent}25`, marginLeft: 6,
-          borderBottom: 'none',
-          borderRight: `1.5px solid ${accent}30`,
-          paddingRight: 6, paddingBottom: 4,
+          padding: '10px 12px 8px',
           background: C.bgCard,
+          borderTop: `1px solid ${accent}18`,
         }}>
           <div style={{
             fontSize: 10, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase',
-            color: C.secondary, margin: '0 0 8px 4px',
+            color: C.secondary, margin: '0 0 8px 2px',
           }}>
             Tasks · do these actions
           </div>
@@ -788,9 +823,10 @@ function suggestTasksForGoal(goal: PersonalGoal): Array<{ label: string; timeOfD
 // Main TaskList
 // ──────────────────────────────────────────────
 
-export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfectDay, onTasksChange }: Props) {
+export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfectDay, onTasksChange, initialTaskView }: Props) {
   const { message } = App.useApp();
-  const [taskView, setTaskView] = useState<TaskViewMode>(() => loadTaskView(profile.id));
+  // Land on Today by default; Home "Open Month" can request the Month tab.
+  const [taskView, setTaskView] = useState<TaskViewMode>(initialTaskView ?? 'today');
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>('active');
   const [timeFilter, setTimeFilter] = useState<'all' | 'morning' | 'evening'>('all');
   const [statuses, setStatuses] = useState<StatusMap>({});
@@ -819,13 +855,8 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
   ]);
 
   useEffect(() => {
-    setTaskView(loadTaskView(profile.id));
+    setTaskView('today');
   }, [profile.id]);
-
-  const setTaskViewPersisted = (v: TaskViewMode) => {
-    setTaskView(v);
-    localStorage.setItem(taskViewStorageKey(profile.id), v);
-  };
 
   const today = getTodayKey();
   const calendarDateKey = getEffectiveDaySyncDateKey(profile.id);
@@ -844,6 +875,11 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
   );
 
   const loadState = useCallback(() => {
+    const goalList = getPersonalGoals(profile.id);
+    const goalTitleById: Record<string, string> = {};
+    goalList.forEach(g => { goalTitleById[g.id] = g.title; });
+    seedMissingTaskResources(profile.id, goalTitleById);
+
     const s: StatusMap = {};
     const n: NotesMap = {};
     allTasks.forEach(task => {
@@ -857,7 +893,7 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
     });
     setStatuses(s);
     setNotes(n);
-    setGoals(getPersonalGoals(profile.id));
+    setGoals(goalList);
     setUserTasks(uts);
   }, [profile.id, today]);
 
@@ -1042,21 +1078,27 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
     } else if (editingTask) {
       const existing = userTasks.find(u => u.id === editingTask.id);
       if (!existing) {
-        createUserTask(profile.id, taskData);
+        const created = createUserTask(profile.id, taskData);
+        const gTitle = goals.find(g => g.id === taskData.goalId)?.title;
+        void attachResourcesToNewTask(profile.id, created.id, created.label, gTitle);
       } else if (!existing.goalId && taskData.goalId) {
         // Full move from Routines → Goal (never leave a copy in Routines)
         updateUserTask(profile.id, editingTask.id, taskData);
       } else if (applyTo === 'this' && isRecurringUT(existing)) {
-        createUserTask(profile.id, {
+        const created = createUserTask(profile.id, {
           ...taskData,
           recurrence: { type: 'one-time', specificDate: today },
         });
         skipTaskOccurrence(profile.id, editingTask.id, today);
+        const gTitle = goals.find(g => g.id === taskData.goalId)?.title;
+        void attachResourcesToNewTask(profile.id, created.id, created.label, gTitle);
       } else {
         updateUserTask(profile.id, editingTask.id, taskData);
       }
     } else {
-      createUserTask(profile.id, taskData);
+      const created = createUserTask(profile.id, taskData);
+      const gTitle = goals.find(g => g.id === taskData.goalId)?.title;
+      void attachResourcesToNewTask(profile.id, created.id, created.label, gTitle);
     }
     setManageTaskOpen(false);
     setEditingTask(null);
@@ -1115,13 +1157,14 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
       if (!goal) return;
       group.tasks.forEach(task => {
         if (task.label.trim().toLowerCase() === goal!.title.trim().toLowerCase()) return;
-        createUserTask(profile.id, {
+        const created = createUserTask(profile.id, {
           label: task.label,
           timeOfDay: task.timeOfDay,
           type: task.type,
           goalId: goal!.id,
           recurrence: task.recurrence.type === 'daily' ? undefined : task.recurrence,
         });
+        void attachResourcesToNewTask(profile.id, created.id, created.label, goal!.title);
       });
     });
     loadState();
@@ -1157,7 +1200,7 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
     }
 
     replacements.forEach(rep => {
-      createUserTask(profile.id, {
+      const created = createUserTask(profile.id, {
         label: rep.label,
         timeOfDay: rep.timeOfDay,
         type: goal ? 'goal' : existing!.type,
@@ -1165,6 +1208,7 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
         potentialValue: getDisplayPotentialValue(existing!.potentialValue),
         sourceSimplifiedFrom: existing!.id,
       });
+      void attachResourcesToNewTask(profile.id, created.id, created.label, goal?.title);
     });
     deleteUserTask(profile.id, existing.id);
     setSimplifyTarget(null);
@@ -1193,12 +1237,14 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
       if (shouldSkipSeedTask(t.id)) return;
       if (userTaskIds.has(t.id)) return;
       const merged = mergeSeedForProfile(profile.id, t);
+      const effectiveGoalId = getPrimaryGoalIdForTask(profile.id, t.id, cat.goalId);
+      const goalTitle = goals.find(g => g.id === effectiveGoalId)?.title;
       const taskObj: UserTask_ = {
         ...merged,
         potentialValue: getDisplayPotentialValue(merged.potentialValue),
         scheduleLabel: merged.recurrence ? recurrenceLabel(merged.recurrence) : 'Daily',
+        resources: resourcesForDisplay(merged.label, undefined, goalTitle),
       };
-      const effectiveGoalId = getPrimaryGoalIdForTask(profile.id, t.id, cat.goalId);
       if (effectiveGoalId && goalTaskMap[effectiveGoalId] !== undefined) {
         goalTaskMap[effectiveGoalId].push(taskObj);
       } else {
@@ -1209,12 +1255,14 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
 
   // User tasks scheduled for today (exclude archived)
   activeUserTasks.filter(ut => isTaskScheduledForDate(ut, today)).forEach(ut => {
+    const gTitle = ut.goalId ? goals.find(g => g.id === ut.goalId)?.title : undefined;
     const taskObj: UserTask_ = {
       id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, type: ut.type,
       category: 'user', isUserCreated: true, recurrence: ut.recurrence,
       potentialValue: getDisplayPotentialValue(ut.potentialValue),
       scheduleLabel: recurrenceLabel(ut.recurrence),
       goalId: ut.goalId,
+      resources: resourcesForDisplay(ut.label, ut.resources, gTitle),
     };
     if (ut.goalId && goalTaskMap[ut.goalId] !== undefined) {
       goalTaskMap[ut.goalId].push(taskObj);
@@ -1266,6 +1314,7 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
     goal?: PersonalGoal,
     doneCount = 0,
     totalCount = 0,
+    statusDateKey?: string,
   ) => {
     captureScroll();
     setTaskUpdateContext({
@@ -1277,6 +1326,7 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
       goalProgressPct: totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : undefined,
       goalDoneCount: doneCount,
       goalTotalCount: totalCount,
+      dateKey: statusDateKey ?? today,
     });
   };
 
@@ -1284,8 +1334,9 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
     if (!taskUpdateContext) return;
     captureScroll();
     trackActivity(profile.id);
-    const { taskId, taskLabel } = taskUpdateContext;
-    const prevStatus = statuses[taskId] ?? null;
+    const { taskId, taskLabel, dateKey: ctxDate } = taskUpdateContext;
+    const statusDate = ctxDate ?? today;
+    const prevStatus = getTaskStatus(profile.id, taskId, statusDate);
 
     const entry = applyTaskStatusUpdate({
       profileId: profile.id,
@@ -1296,19 +1347,22 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
       taskLabel,
       previousStatus: prevStatus,
       liveCheckInEnabled,
+      dateKey: statusDate,
     });
 
-    const persisted = getTaskStatus(profile.id, taskId, today);
+    const persisted = getTaskStatus(profile.id, taskId, statusDate);
     const statusSaved = persisted === status || (status === null && persisted === null);
 
-    const newStatuses = { ...statuses, [taskId]: status };
+    const newStatuses = statusDate === today
+      ? { ...statuses, [taskId]: status }
+      : { ...statuses };
     setStatuses(newStatuses);
     setTaskUpdateContext(null);
     loadState();
     restoreScroll();
 
     const newPending = allTasksCombined.filter(t => {
-      const st = newStatuses[t.id] ?? null;
+      const st = (statusDate === today && t.id === taskId ? status : newStatuses[t.id]) ?? null;
       return st !== 'done' && st !== 'skipped';
     }).length;
     onTasksChange?.(newPending);
@@ -1331,6 +1385,7 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
       }
 
       const allDone = (() => {
+        if (statusDate !== today) return false;
         const tasksForDay = allTasksCombined.filter(t => {
           const st = newStatuses[t.id] ?? null;
           return st !== 'skipped';
@@ -1377,8 +1432,8 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
   };
 
   const viewTabs: Array<{ key: TaskViewMode; label: string }> = [
-    { key: 'all', label: 'All Tasks' },
     { key: 'today', label: 'Today' },
+    { key: 'all', label: 'All Tasks' },
     { key: 'month', label: 'Month' },
   ];
 
@@ -1481,8 +1536,8 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
         <PageTourButton onClick={() => setShowTour(true)} />
       </div>
       <p style={{ margin: '0 0 12px', color: C.secondary, fontSize: 13, lineHeight: 1.5 }}>
-        {taskView === 'all' && 'Every task, grouped under its Goal (outcome) — tasks are the actions.'}
-        {taskView === 'today' && 'Today’s tasks by Goal. Tap a task to update — Goal is the outcome, Tasks are the actions.'}
+        {taskView === 'all' && 'Every task, grouped under its Goal (outcome). Tasks are the actions.'}
+        {taskView === 'today' && "Today's tasks by Goal. Tap a task to update. Goal is the outcome; Tasks are the actions."}
         {taskView === 'month' && 'See timing and workload across the month.'}
       </p>
 
@@ -1514,7 +1569,7 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
             type="button"
             role="tab"
             aria-selected={taskView === key}
-            onClick={() => setTaskViewPersisted(key)}
+            onClick={() => setTaskView(key)}
             style={{
               ...touchPrimaryButton,
               flex: 1,
@@ -1567,7 +1622,7 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
         <TasksMonthView
           profileId={profile.id}
           onManageTask={handleMonthManage}
-          onGoAllTasks={() => setTaskViewPersisted('all')}
+          onGoAllTasks={() => setTaskView('all')}
         />
       ) : (
         <>
@@ -1580,15 +1635,17 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
                 Overdue ({overdueUserTasks.length})
               </div>
               {overdueUserTasks.map(ut => {
+                const statusDate = ut.recurrence?.specificDate ?? today;
+                const overdueStatus = getTaskStatus(profile.id, ut.id, statusDate);
+                const gTitle = ut.goalId ? goals.find(g => g.id === ut.goalId)?.title : undefined;
                 const taskObj: UserTask_ = {
                   id: ut.id, label: ut.label, timeOfDay: ut.timeOfDay, type: ut.type,
                   category: 'user', isUserCreated: true, recurrence: ut.recurrence,
                   potentialValue: getDisplayPotentialValue(ut.potentialValue),
                   scheduleLabel: recurrenceLabel(ut.recurrence),
                   goalId: ut.goalId,
+                  resources: resourcesForDisplay(ut.label, ut.resources, gTitle),
                 };
-                const statusDate = ut.recurrence?.specificDate ?? today;
-                const overdueStatus = getTaskStatus(profile.id, ut.id, statusDate);
                 return (
                   <TaskItem
                     key={ut.id}
@@ -1598,8 +1655,8 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
                     statusHint="Overdue"
                     profileId={profile.id}
                     profileName={profile.name}
-                    calendarDateKey={calendarDateKey}
-                    onOpenUpdate={() => openTaskUpdate(taskObj, goals.find(g => g.id === ut.goalId))}
+                    calendarDateKey={statusDate}
+                    onOpenUpdate={() => openTaskUpdate(taskObj, goals.find(g => g.id === ut.goalId), 0, 0, statusDate)}
                     onDelete={() => openDeleteTask(taskObj)}
                     onEdit={() => handleEditAnyTask(taskObj, ut.goalId)}
                     onSimplify={
@@ -1614,7 +1671,7 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
             </div>
           )}
 
-          {/* Filters: status · select · time — one compact wrap row */}
+          {/* Filters: status · select · time (one compact wrap row) */}
           <div style={{
             display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center',
           }}>
@@ -1815,8 +1872,12 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
         open={!!taskUpdateContext}
         context={taskUpdateContext}
         profileId={profile.id}
-        dateKey={today}
-        initialStatus={taskUpdateContext ? (statuses[taskUpdateContext.taskId] ?? null) : null}
+        dateKey={taskUpdateContext?.dateKey ?? today}
+        initialStatus={
+          taskUpdateContext
+            ? getTaskStatus(profile.id, taskUpdateContext.taskId, taskUpdateContext.dateKey ?? today)
+            : null
+        }
         onClose={() => { setTaskUpdateContext(null); restoreScroll(); }}
         onSubmit={handleTaskUpdateSubmit}
         onInteractionCapture={captureScroll}

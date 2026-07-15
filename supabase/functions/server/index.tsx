@@ -192,7 +192,7 @@ app.post("/run-daily-email-nudges", async (c) => {
   }
 });
 
-// AI-assisted task simplification (2–5 replacement tasks)
+// AI-assisted task simplification (2-5 replacement tasks)
 app.post("/simplify-task", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
@@ -215,6 +215,22 @@ app.post("/simplify-task", async (c) => {
   } catch (err) {
     console.log("[SimplifyTask] Error:", err);
     return c.json({ ok: false, tasks: [], source: "rules", reason: "server_error" }, 500);
+  }
+});
+
+// Recommended how-to resources for a newly created task
+app.post("/suggest-task-resources", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const taskLabel = typeof body?.taskLabel === "string" ? body.taskLabel : "";
+    const goalTitle = typeof body?.goalTitle === "string" ? body.goalTitle : undefined;
+    const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "anon";
+    const { suggestTaskResources } = await import("./suggestTaskResources.ts");
+    const result = await suggestTaskResources({ taskLabel, goalTitle }, { rateLimitKey: ip });
+    return c.json(result);
+  } catch (err) {
+    console.log("[SuggestTaskResources] Error:", err);
+    return c.json({ ok: false, resources: [], source: "rules", reason: "server_error" }, 500);
   }
 });
 

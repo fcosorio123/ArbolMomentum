@@ -4,6 +4,7 @@ import * as kv from "./kv_store.tsx";
 import {
   getEmailSettings,
   sendEmail,
+  resolveProfileRecipient,
   DEFAULT_SMART_SLOTS,
   type SmartSlotsConfig,
   type SmartSlotConfig,
@@ -315,10 +316,8 @@ export async function runScheduledEmailNudges(): Promise<{
       continue;
     }
 
-    const adminEmail = settings.profileEmails?.[profileId];
-    const email = (typeof adminEmail === "string" && isValidEmail(adminEmail))
-      ? adminEmail
-      : (typeof backup?.profileEmail === "string" ? backup.profileEmail : "");
+    const resolved = await resolveProfileRecipient(profileId, settings);
+    const email = resolved.email ?? "";
     if (!isValidEmail(email)) {
       skipped++;
       details.push({ profileId, tag: "*", status: "no_email" });
@@ -368,7 +367,7 @@ export async function runScheduledEmailNudges(): Promise<{
         tag,
         date: local.dateKey,
         profileName,
-        recipient: email,
+        // Do not pass recipient: sendEmail resolves THIS profile's SoT email.
         title: copy.title,
         body: copy.body,
         pendingCount: snapshotFresh?.pending,

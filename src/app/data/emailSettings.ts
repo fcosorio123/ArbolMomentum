@@ -187,9 +187,46 @@ export async function sendTestEmail(recipient?: string): Promise<{ ok: boolean; 
     const reason = data?.reason === 'no_test_recipient'
       ? 'Set a test recipient email above, then try again.'
       : typeof data?.reason === 'string' && data.reason.startsWith('send_failed')
-        ? `Email provider error — check RESEND_API_KEY (${data.reason})`
+        ? formatResendFailure(data.reason)
         : data?.reason || data?.error || 'unknown';
     return { ok: false, reason };
+  } catch {
+    return { ok: false, reason: 'Could not send test email.' };
+  }
+}
+
+function formatResendFailure(reason: string): string {
+  const lower = reason.toLowerCase();
+  if (lower.includes('only send testing') || lower.includes('onboarding@resend') || lower.includes('verify a domain')) {
+    return 'Resend is still in sandbox mode. Verify a sending domain and set EMAIL_FROM_ADDRESS, or emails only deliver to the Resend account owner.';
+  }
+  return `Email provider error: ${reason}`;
+}
+
+/** Send a test email to this profile's saved address (Alerts & Reminders). */
+export async function sendProfileTestEmail(
+  profileId: string,
+  recipient: string,
+): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    const { data, error } = await edgeFetch(`${FN}/send-email`, {
+      method: 'POST',
+      body: {
+        profileId,
+        type: 'test',
+        recipient: recipient.trim(),
+        force: true,
+      },
+    });
+    if (error) return { ok: false, reason: error || 'Could not reach email service.' };
+    if (data?.ok) return { ok: true };
+    if (data?.reason === 'no_valid_recipient') {
+      return { ok: false, reason: 'Add your email on Profile first, then try again.' };
+    }
+    if (typeof data?.reason === 'string' && data.reason.startsWith('send_failed')) {
+      return { ok: false, reason: formatResendFailure(data.reason) };
+    }
+    return { ok: false, reason: data?.reason || data?.error || 'unknown' };
   } catch {
     return { ok: false, reason: 'Could not send test email.' };
   }
@@ -249,6 +286,9 @@ export async function sendManualNudge(opts: {
   tag?: string;
   title?: string;
   body?: string;
+  pendingCount?: number;
+  streak?: number;
+  topTasks?: Array<{ label: string; goalTitle?: string }>;
   /** Comma/semicolon-separated or array — wins over server profile lookup */
   recipient?: string;
   recipients?: string[];
@@ -270,6 +310,9 @@ export async function sendManualNudge(opts: {
         tag: opts.tag,
         title: opts.title,
         body: opts.body,
+        pendingCount: opts.pendingCount,
+        streak: opts.streak,
+        topTasks: opts.topTasks,
         force: true,
         date: getTodayKey(),
         recipients: recipientList.length > 0 ? recipientList : undefined,
@@ -285,7 +328,7 @@ export async function sendManualNudge(opts: {
           : data?.reason === 'no_test_recipient'
             ? 'Set a test recipient email first.'
             : typeof data?.reason === 'string' && data.reason.startsWith('send_failed')
-              ? `Email provider error: ${data.reason.replace(/^send_failed:?/, '') || 'check RESEND_API_KEY'}`
+              ? formatResendFailure(data.reason.replace(/^send_failed:?/, '') || data.reason)
               : data?.reason
                 ? `Send failed (${data.reason}).`
                 : 'Send failed. Check the address and try again.';

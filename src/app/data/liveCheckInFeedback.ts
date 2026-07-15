@@ -571,11 +571,13 @@ export interface SubmitReportParams {
   status?: TaskStatus | null;
   note?: string;
   previousStatus?: TaskStatus | null;
+  /** Occurrence date (defaults to today). Required for overdue one-time tasks. */
+  dateKey?: string;
 }
 
 export function submitReportUpdate(params: SubmitReportParams): ReportEntry {
   const { profileId, taskId, taskTitle } = params;
-  const dateKey = getTodayKey();
+  const dateKey = params.dateKey ?? getTodayKey();
   const currentStatus = getTaskStatus(profileId, taskId, dateKey);
   const targetStatus = params.status !== undefined ? params.status : currentStatus;
   const statusChanged = targetStatus !== currentStatus;
@@ -583,6 +585,7 @@ export function submitReportUpdate(params: SubmitReportParams): ReportEntry {
   if (statusChanged) {
     setTaskStatus(profileId, taskId, dateKey, targetStatus);
     try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch { /* ignore */ }
+    try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch { /* ignore */ }
   }
 
   const note = (params.note ?? '').trim();

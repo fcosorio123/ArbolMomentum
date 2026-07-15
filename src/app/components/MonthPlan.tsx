@@ -91,7 +91,7 @@ export function MonthPlan({ profile, onGoAllTasks }: Props) {
     }}>
       <h2 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, color: C.headline }}>Month</h2>
       <p style={{ margin: '0 0 18px', color: C.body, fontSize: 13, lineHeight: 1.45 }}>
-        See timing and workload across the month — tap a day for its tasks.
+        See timing and workload across the month. Tap a day for its tasks.
       </p>
       <TasksMonthView
         profileId={profile.id}

@@ -1944,26 +1944,58 @@ function SettingsTab() {
       setManualResult('Enter at least one valid email address.');
       return;
     }
+
+    // Pull THIS profile's live snapshot so the email body matches that user, not a generic admin line.
+    let pendingCount: number | undefined;
+    let streak: number | undefined;
+    let topTasks: Array<{ label: string; goalTitle?: string }> | undefined;
+    let snapName = profile?.name;
+    try {
+      const backup = await fetchProfileBackupForAdmin(manualProfileId);
+      const snap = backup?.nudgeSnapshot as {
+        pending?: number;
+        streak?: number;
+        topTasks?: Array<{ label: string; goalTitle?: string }>;
+        profileName?: string;
+      } | null;
+      if (snap) {
+        pendingCount = typeof snap.pending === 'number' ? snap.pending : undefined;
+        streak = typeof snap.streak === 'number' ? snap.streak : undefined;
+        topTasks = Array.isArray(snap.topTasks) ? snap.topTasks : undefined;
+        if (typeof snap.profileName === 'string' && snap.profileName.trim()) {
+          snapName = snap.profileName.trim();
+        }
+      }
+    } catch { /* ignore */ }
+
+    const firstName = (snapName || 'there').split(' ')[0];
     const result = await sendManualNudge({
       profileId: manualProfileId,
       type: manualType,
-      profileName: profile?.name,
+      profileName: snapName,
       recipients: list,
       tag: manualType === 'smart_nudge' ? 'manual-nudge' : undefined,
-      title: manualType === 'smart_nudge' ? 'Manual nudge from admin' : undefined,
-      body: manualType === 'smart_nudge' ? 'This is a manual email nudge triggered from admin settings.' : undefined,
+      title: manualType === 'smart_nudge'
+        ? `A nudge for you, ${firstName}`
+        : undefined,
+      body: manualType === 'smart_nudge'
+        ? (pendingCount != null && pendingCount > 0
+          ? `You have ${pendingCount} open task${pendingCount === 1 ? '' : 's'} on your Arbol Momentum list. Open the app and take the next small step.`
+          : 'Open Arbol Momentum to review your goals and keep your momentum going.')
+        : undefined,
+      pendingCount,
+      streak,
+      topTasks,
     });
     setManualSending(false);
     if (result.ok) {
       const to = (result.sentTo ?? list).join(', ');
       setManualResult(`Sent to ${to} ✓`);
-      // Persist first address onto admin map + student profile SoT for next time
-      const primary = list[0];
-      updateProfileEmail(manualProfileId, primary);
-      try {
-        const { saveProfileEmail } = await import('../data/profileContact');
-        saveProfileEmail(manualProfileId, primary, { profileName: profile?.name, sendWelcome: false });
-      } catch { /* ignore */ }
+      // Update admin fallback map only — do NOT overwrite the profile's own Profile email SoT
+      // (that caused other users' addresses to be replaced with the admin test inbox).
+      if (list.length === 1) {
+        updateProfileEmail(manualProfileId, list[0]);
+      }
     } else {
       setManualResult(result.reason ?? 'Send failed');
     }
@@ -2174,7 +2206,9 @@ function SettingsTab() {
         background: `${C.primary}0d`, border: `1px solid ${C.primary}30`,
         fontSize: 12, color: C.body, lineHeight: 1.45,
       }}>
-        Production delivery to student addresses requires a verified sending domain in Resend (not onboarding@resend.dev sandbox).
+        Production delivery to each profile&apos;s inbox requires a verified Resend domain
+        and EMAIL_FROM_ADDRESS on that domain (not onboarding@resend.dev). With sandbox
+        FROM, only the Resend account owner can receive mail — other profiles will fail loudly.
       </div>
 
       <div style={cardStyle}>
@@ -2292,7 +2326,11 @@ function SettingsTab() {
       </div>
 
       <div style={cardStyle}>
-        <div style={labelStyle}>Profile emails (admin override)</div>
+        <div style={labelStyle}>Profile emails (admin fallback only)</div>
+        <div style={{ fontSize: 12, color: C.body, marginBottom: 8, lineHeight: 1.4 }}>
+          Delivery uses each profile&apos;s own email from Profile settings first.
+          These fields are a fallback if the cloud backup has no email yet — never a shared inbox for all users.
+        </div>
         {getOperativeProfiles().map(p => (
           <div key={p.id} style={{ marginTop: 10 }}>
             <div style={{ fontSize: 12, color: C.body, marginBottom: 4 }}>{p.name} ({p.id})</div>

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { App, Button, Switch, Input, Modal } from 'antd';
-import { BellOutlined, BellFilled, PlusOutlined, DeleteOutlined, CheckCircleOutlined, ExclamationCircleOutlined, SendOutlined, MobileOutlined, ReloadOutlined, CalendarOutlined, RightOutlined } from '@ant-design/icons';
+import { BellOutlined, BellFilled, PlusOutlined, DeleteOutlined, CheckCircleOutlined, ExclamationCircleOutlined, SendOutlined, MobileOutlined, ReloadOutlined, CalendarOutlined, RightOutlined, MailOutlined } from '@ant-design/icons';
 import { DEFAULT_REMINDERS, type Profile } from '../data/profiles';
 import { C } from '../data/colors';
 import { areNotificationsEnabled, fetchAppSettings } from '../data/appSettings';
-import { fetchEmailSettings } from '../data/emailSettings';
+import { fetchEmailSettings, sendProfileTestEmail } from '../data/emailSettings';
 import { getProfileEmail } from '../data/profileContact';
 import {
   getProfileAlertPrefs,
@@ -46,7 +46,9 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
   const [newTime, setNewTime] = useState('09:00');
   const [newDays, setNewDays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
   const [sending, setSending] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
   const [testFeedback, setTestFeedback] = useState<string | null>(null);
+  const [emailTestFeedback, setEmailTestFeedback] = useState<string | null>(null);
   const [enabling, setEnabling] = useState(false);
   const [notifGloballyEnabled, setNotifGloballyEnabled] = useState(() => areNotificationsEnabled());
   const [alertPrefs, setAlertPrefs] = useState<ProfileAlertPrefs>(() => getProfileAlertPrefs(profile.id));
@@ -172,6 +174,29 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
     setSending(false);
   };
 
+  const showEmailTest = async () => {
+    setEmailTestFeedback(null);
+    const email = getProfileEmail(profile.id);
+    if (!email) {
+      const msg = 'Add your email on the Profile page first, then tap Email Test.';
+      setEmailTestFeedback(msg);
+      message.warning(msg);
+      return;
+    }
+    setEmailSending(true);
+    const result = await sendProfileTestEmail(profile.id, email);
+    setEmailSending(false);
+    if (result.ok) {
+      const msg = `Test email sent to ${email}. Check inbox (and spam).`;
+      setEmailTestFeedback(msg);
+      message.success(msg);
+    } else {
+      const msg = result.reason || 'Could not send test email.';
+      setEmailTestFeedback(msg);
+      message.error(msg);
+    }
+  };
+
   const toggle = (id: string) => {
     const updated = reminders.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r);
     save(updated);
@@ -255,7 +280,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0, alignItems: 'flex-end' }}>
               <Button size="small" icon={<SendOutlined />} onClick={showTest} loading={sending}
                 style={{ background: `${C.primary}15`, border: `1px solid ${C.primary}40`, color: C.primary, borderRadius: 8, fontSize: 12 }}>
-                Test
+                Browser Test
               </Button>
               {platform.pushSupported && VAPID_PUBLIC_KEY && (
                 <Button size="small" icon={<ReloadOutlined />} onClick={retryPushSubscribe} loading={enabling}
@@ -286,6 +311,49 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
             background: C.bgAlt, fontSize: 12, color: C.body, lineHeight: 1.5,
           }}>
             💡 {platform.troubleshootingHint}
+          </div>
+        )}
+      </div>
+
+      {/* Email alerts test */}
+      <div style={{
+        background: C.bgCard, border: `1.5px solid ${C.primary}35`, borderRadius: 16,
+        padding: '14px 16px', marginBottom: 14, boxShadow: C.shadow,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+            background: `${C.primary}15`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <MailOutlined style={{ color: C.primary, fontSize: 18 }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: 14, color: C.headline }}>Email enabled</div>
+            <div style={{ color: C.body, fontSize: 12, marginTop: 2 }}>
+              {getProfileEmail(profile.id)
+                ? `Sends to ${getProfileEmail(profile.id)}`
+                : 'Add your email on Profile to receive nudges'}
+            </div>
+          </div>
+          <Button
+            size="small"
+            icon={<SendOutlined />}
+            onClick={showEmailTest}
+            loading={emailSending}
+            style={{
+              background: `${C.primary}15`, border: `1px solid ${C.primary}40`,
+              color: C.primary, borderRadius: 8, fontSize: 12, flexShrink: 0,
+            }}
+          >
+            Email Test
+          </Button>
+        </div>
+        {emailTestFeedback && (
+          <div style={{
+            marginTop: 10, fontSize: 12, lineHeight: 1.4, fontWeight: 600,
+            color: emailTestFeedback.toLowerCase().includes('sent') ? C.primary : C.tertiary,
+          }}>
+            {emailTestFeedback}
           </div>
         )}
       </div>

@@ -158,27 +158,50 @@ function sentLogKey(profileId: string, type: EmailType, dedupe: string): string 
 }
 
 /**
- * Resolve outbound email recipient for a profile.
- * Priority: explicit override → profile backup email → admin profileEmails map.
- * Never use testRecipient for non-test mail.
+ * Resolve outbound email for a profile.
+ * Source of truth: that profile's backup email (set on Profile), then admin map fallback.
+ * Never use testRecipient or another profile's address.
  */
-async function resolveRecipient(
+export async function resolveProfileRecipient(
   profileId: string,
-  settings: EmailSettings,
-  explicit?: string,
-): Promise<string | null> {
-  if (explicit && isValidEmail(explicit)) return explicit.trim();
-
+  settings?: EmailSettings,
+): Promise<{ email: string | null; source: "profile" | "admin" | "none" }> {
+  const cfg = settings ?? await getEmailSettings();
   const backup = await kv.get(`arbol-backup-${profileId}`);
-  const backupEmail = backup?.profileEmail;
-  if (typeof backupEmail === "string" && isValidEmail(backupEmail)) {
-    return backupEmail.trim();
+  const backupEmail = typeof backup?.profileEmail === "string" ? backup.profileEmail.trim() : "";
+  if (backupEmail && isValidEmail(backupEmail)) {
+    return { email: backupEmail, source: "profile" };
   }
+  const adminEmail = cfg.profileEmails?.[profileId]?.trim() ?? "";
+  if (adminEmail && isValidEmail(adminEmail)) {
+    return { email: adminEmail, source: "admin" };
+  }
+  return { email: null, source: "none" };
+}
 
-  const adminEmail = settings.profileEmails?.[profileId];
-  if (adminEmail && isValidEmail(adminEmail)) return adminEmail.trim();
-
-  return null;
+/** Enrich copy from this profile's cloud backup so content matches that user. */
+async function loadProfileEmailContext(profileId: string): Promise<{
+  profileName?: string;
+  pendingCount?: number;
+  streak?: number;
+  topTasks?: Array<{ label: string; goalTitle?: string }>;
+}> {
+  const backup = await kv.get(`arbol-backup-${profileId}`);
+  const snap = backup?.nudgeSnapshot;
+  if (!snap || typeof snap !== "object") {
+    return {
+      profileName: profileId.charAt(0).toUpperCase() + profileId.slice(1),
+    };
+  }
+  const name = typeof snap.profileName === "string" && snap.profileName.trim()
+    ? snap.profileName.trim()
+    : (profileId.charAt(0).toUpperCase() + profileId.slice(1));
+  return {
+    profileName: name,
+    pendingCount: typeof snap.pending === "number" ? snap.pending : undefined,
+    streak: typeof snap.streak === "number" ? snap.streak : undefined,
+    topTasks: Array.isArray(snap.topTasks) ? snap.topTasks : undefined,
+  };
 }
 
 function parseRecipientList(raw: unknown): string[] {
@@ -229,17 +252,22 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
 
   let targets: string[] = [];
   if (payload.type === "test") {
-    const one = settings.testRecipient?.trim() || payload.recipient?.trim() || "";
+    // Test only: explicit address, else admin testRecipient. Never another profile's mailbox.
+    const one = payload.recipient?.trim() || settings.testRecipient?.trim() || "";
     targets = one && isValidEmail(one) ? [one.trim().toLowerCase()] : [];
   } else {
     const explicitList = parseRecipientList(payload.recipients);
     if (explicitList.length > 0) {
+      // Manual multi-send: use the exact list the admin entered.
       targets = explicitList;
-    } else if (payload.recipient && isValidEmail(payload.recipient)) {
-      targets = [payload.recipient.trim().toLowerCase()];
     } else {
-      const one = await resolveRecipient(payload.profileId, settings, undefined);
-      if (one) targets = [one.toLowerCase()];
+      // Operational: always deliver to THIS profile's email (SoT), never a shared/test inbox.
+      const resolved = await resolveProfileRecipient(payload.profileId, settings);
+      if (resolved.email) {
+        targets = [resolved.email.toLowerCase()];
+      } else if (payload.recipient && isValidEmail(payload.recipient)) {
+        targets = [payload.recipient.trim().toLowerCase()];
+      }
     }
   }
 
@@ -255,17 +283,23 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
     }
   }
 
-  const firstName = payload.profileName?.split(" ")[0];
+  // Always bind copy to this profile's snapshot so content never bleeds from another user.
+  const profileCtx = await loadProfileEmailContext(payload.profileId);
+  const profileName = payload.profileName?.trim() || profileCtx.profileName;
+  const pendingCount = payload.pendingCount ?? profileCtx.pendingCount;
+  const streak = payload.streak ?? profileCtx.streak;
+  const topTasks = payload.topTasks?.length ? payload.topTasks : profileCtx.topTasks;
+  const firstName = profileName?.split(" ")[0];
   const content = buildEmailContent(payload.type, {
-    profileName: payload.profileName,
+    profileName,
     firstName,
     tag: payload.tag,
     title: payload.title,
     body: payload.body,
     taskLabel: payload.taskLabel,
-    pendingCount: payload.pendingCount,
-    streak: payload.streak,
-    topTasks: payload.topTasks,
+    pendingCount,
+    streak,
+    topTasks,
   });
 
   const replyTo = settings.replyTo?.trim() || undefined;
@@ -280,6 +314,8 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
       html: content.html,
       text: content.text,
       replyTo,
+      // Sandbox FROM may only be used for intentional admin tests — never profile nudges.
+      allowSandbox: payload.type === "test",
     });
     if (result.ok) {
       sentTo.push(to);

@@ -10,8 +10,9 @@ import {
 import {
   getTaskCategoriesForProfile, getTaskStatus, isTaskActiveForDate, getTodayKey,
 } from '../data/profiles';
-import { getGoalTaskBreakdown } from '../data/goalProgressUtils';
+import { getGoalTaskBreakdown, getGoalWeekProgressPercent, getGoalWeekBreakdown } from '../data/goalProgressUtils';
 import { getUserTasks, createUserTask, orphanUserTasksForGoal, deleteUserTask, isTaskScheduledForDate } from '../data/userTasks';
+import { attachResourcesToNewTask } from '../data/taskResources';
 import { ManageGoalModal } from './ManageGoalModal';
 import { ContextAssistModal } from './ContextAssistModal';
 import { C } from '../data/colors';
@@ -238,13 +239,14 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
       if (!goal) return;
       group.tasks.forEach(task => {
         if (task.label.trim().toLowerCase() === goal!.title.trim().toLowerCase()) return;
-        createUserTask(profile.id, {
+        const created = createUserTask(profile.id, {
           label: task.label,
           timeOfDay: task.timeOfDay,
           type: task.type,
           goalId: goal!.id,
           recurrence: task.recurrence.type === 'daily' ? undefined : task.recurrence,
         });
+        void attachResourcesToNewTask(profile.id, created.id, created.label, goal!.title);
       });
     });
     loadGoals();
@@ -551,7 +553,8 @@ export function GoalsPage({ profile, onNavigateTasks }: Props) {
                       <button
                         onClick={() => {
                           if (added) return;
-                          createUserTask(profile.id, { label: s.label, timeOfDay: s.timeOfDay, type: 'goal', goalId: suggestionGoal.id });
+                          const created = createUserTask(profile.id, { label: s.label, timeOfDay: s.timeOfDay, type: 'goal', goalId: suggestionGoal.id });
+                          void attachResourcesToNewTask(profile.id, created.id, created.label, suggestionGoal.title);
                           setAddedSuggestions(prev => new Set([...prev, s.label]));
                         }}
                         style={{
@@ -662,7 +665,8 @@ function GoalCard({
   const accentColor = goalAccent(goal.id);
   const todayKey = getTodayKey();
   const todayBreakdown = getGoalTaskBreakdown(profileId, goal.id, todayKey);
-  const todayPct = todayBreakdown.total > 0 ? Math.round((todayBreakdown.done / todayBreakdown.total) * 100) : 0;
+  const weekBreakdown = getGoalWeekBreakdown(profileId, goal.id, todayKey);
+  const weekPct = getGoalWeekProgressPercent(profileId, goal, todayKey);
   const weekDays = getWeekDays();
 
   const toggleDay = (dateKey: string) => {
@@ -736,25 +740,29 @@ function GoalCard({
           </div>
         )}
 
-        {/* Today's progress bar + status breakdown */}
+        {/* Week-to-date progress bar + today's status breakdown */}
         <div data-tour-id="goals-task-breakdown" style={{
           background: `${accentColor}06`, border: `1px solid ${accentColor}20`,
           borderRadius: 12, padding: '12px 14px', marginBottom: 12,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: C.secondary, textTransform: 'uppercase', letterSpacing: 0.4 }}>
-              Today
+              This week
             </span>
-            <span style={{ fontSize: 13, fontWeight: 800, color: accentColor }}>{todayPct}%</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: accentColor }}>{weekPct}%</span>
           </div>
           <Progress
-            percent={todayPct}
+            percent={weekPct}
             showInfo={false}
             size={['100%', 7]}
             strokeColor={{ '0%': accentColor, '100%': `${accentColor}80` }}
             railColor={C.bgAlt}
           />
+          <div style={{ marginTop: 8, fontSize: 11, color: C.secondary }}>
+            Week so far: {weekBreakdown.done}/{weekBreakdown.total || 0} task completions
+          </div>
           <div style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.secondary, marginBottom: 6 }}>Today</div>
             <BreakdownPills b={todayBreakdown} accent={accentColor} />
           </div>
         </div>

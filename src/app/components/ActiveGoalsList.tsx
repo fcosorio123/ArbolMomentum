@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowRightOutlined } from '@ant-design/icons';
 import { getPersonalGoals, type PersonalGoal } from '../data/personalGoals';
 import {
-  getGoalAccentColor, getGoalEmoji, getGoalProgressPercent,
+  getGoalAccentColor, getGoalEmoji, getGoalWeekProgressPercent,
 } from '../data/goalProgressUtils';
 import { GoalProgressCard } from './GoalProgressCard';
 import { C } from '../data/colors';
@@ -35,7 +35,7 @@ export function ActiveGoalsList({ profileId, onNavigateGoals }: Props) {
 
   const goalCards = useMemo(() => goals.map(goal => ({
     goal,
-    pct: getGoalProgressPercent(profileId, goal),
+    pct: getGoalWeekProgressPercent(profileId, goal),
     accent: getGoalAccentColor(goal.id),
     emoji: getGoalEmoji(goal),
   })), [goals, profileId, refreshTick]);

@@ -39,7 +39,7 @@ export function GoalProgressCard({ title, pct, accent, emoji, isHighlighted }: P
               background: progressActive ? accent : C.border,
               boxShadow: progressActive ? `0 0 0 3px ${accent}22` : 'none',
             }} />
-            <span style={{ fontSize: 12, fontWeight: 600, color: C.secondary }}>{pct}%</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: C.secondary }}>{pct}% this week</span>
           </div>
           <span style={{ fontSize: 16, lineHeight: 1 }} aria-hidden>{emoji}</span>
         </div>
