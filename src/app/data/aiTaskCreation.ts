@@ -390,6 +390,20 @@ export async function simplifyDetailAssistFromEdge(
         if (evaluateAnswerSufficiency(input.questionId, combined, input.taskLabel).status !== 'sufficient') {
           return null;
         }
+        const low = s.appendText.toLowerCase();
+        const task = input.taskLabel.toLowerCase();
+        if (/remind|phone.?down|bed|alarm|notif/i.test(task)
+          && !/bedtime|remind|app|distract|ignore|phone|alarm|notif|scroll/i.test(low)) {
+          return null;
+        }
+        if (/insurance|claim|denied|denial/i.test(task)
+          && !/claim|denial|letter|question|call|insurer|nervous|script/i.test(low)) {
+          return null;
+        }
+        if (/document|tax|organiz|paper|file/i.test(task)
+          && !/document|folder|checklist|paper|sort|pile|printer|minute|time|lunch|phone/i.test(low)) {
+          return null;
+        }
         return {
           id: s.id || `s${i + 1}`,
           appendText: s.appendText.trim(),

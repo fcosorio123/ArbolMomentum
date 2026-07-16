@@ -92,11 +92,21 @@ function prevalidateList(
   additions: string[],
 ): DetailSuggestion[] {
   const out: DetailSuggestion[] = [];
+  const task = taskLabel.toLowerCase();
+  const wantsReminder = /remind|phone.?down|bed|alarm|notif/i.test(task);
+  const wantsInsurance = /insurance|claim|denied|denial/i.test(task);
+  const wantsDocs = /document|tax|organiz|paper|file/i.test(task);
+
   for (const appendText of additions) {
     if (out.length >= 4) break;
     const combined = mergeAnswerWithAddition(currentAnswer, appendText);
     if (evaluateAnswerSufficiency(questionId, combined, taskLabel).status !== "sufficient") continue;
     if (combined.trim().toLowerCase() === currentAnswer.trim().toLowerCase()) continue;
+    const low = appendText.toLowerCase();
+    // Drop LLM additions that ignore the task domain.
+    if (wantsReminder && !/bedtime|remind|app|distract|ignore|phone|alarm|notif|scroll/i.test(low)) continue;
+    if (wantsInsurance && !/claim|denial|letter|question|call|insurer|nervous|script/i.test(low)) continue;
+    if (wantsDocs && !/document|folder|checklist|paper|sort|pile|printer|minute|time/i.test(low)) continue;
     const tooSimilar = out.some(s => {
       const a = s.appendText.toLowerCase();
       const b = appendText.toLowerCase();
@@ -169,5 +179,6 @@ export async function simplifyDetailAssist(
     }
   }
 
+  // Prefer grounded rules whenever LLM is empty, ungrounded, or under-filled.
   return buildPrevalidatedSuggestions(baseInput, "server_rules");
 }
