@@ -14,6 +14,8 @@ import { getGoalTaskBreakdown, getGoalWeekProgressPercent, getGoalWeekBreakdown 
 import { getUserTasks, createUserTask, orphanUserTasksForGoal, deleteUserTask, isTaskScheduledForDate } from '../data/userTasks';
 import { attachResourcesToNewTask } from '../data/taskResources';
 import { ManageGoalModal } from './ManageGoalModal';
+import { AiAssistCreationModal } from './AiAssistCreationModal';
+import { isAiAssistCreationEnabled } from '../data/environment';
 import { C } from '../data/colors';
 import type { Profile } from '../data/profiles';
 
@@ -139,6 +141,8 @@ export function GoalsPage({ profile, onNavigateTasks, onNavigateAllTasks }: Prop
   const [pendingSuggestionGoal, setPendingSuggestionGoal] = useState<PersonalGoal | null>(null);
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [aiAssistOpen, setAiAssistOpen] = useState(false);
+  const aiAssistEnabled = isAiAssistCreationEnabled();
 
   const loadGoals = useCallback(() => {
     setGoals(getPersonalGoals(profile.id));
@@ -247,17 +251,6 @@ export function GoalsPage({ profile, onNavigateTasks, onNavigateAllTasks }: Prop
 
       {goals.length > 0 && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            disabled
-            title="AI-assisted goal creation from a brain dump is coming soon. For now, add goals manually."
-            style={{
-              padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.border}`,
-              background: C.bgAlt, color: C.secondary, fontSize: 12, fontWeight: 600, cursor: 'not-allowed',
-            }}
-          >
-            ✨ AI assist · coming soon
-          </button>
           <button type="button" onClick={() => { setSelectMode(m => !m); setSelectedGoalIds(new Set()); }} style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.border}`, background: selectMode ? `${C.primary}15` : C.bgCard, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
             {selectMode ? 'Cancel select' : 'Select goals'}
           </button>
@@ -282,7 +275,7 @@ export function GoalsPage({ profile, onNavigateTasks, onNavigateAllTasks }: Prop
           <div style={{ fontSize: 48, marginBottom: 14 }}>🎯</div>
           <div style={{ fontWeight: 700, fontSize: 16, color: C.headline, marginBottom: 8 }}>No goals yet</div>
           <div style={{ color: C.body, fontSize: 13, lineHeight: 1.6, marginBottom: 20 }}>
-            Set your first goal and build daily tasks around it. Start with something meaningful. AI brain-dump assist is coming soon.
+            Set your first goal and build daily tasks around it. Start with something meaningful.
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
             <button
@@ -297,9 +290,18 @@ export function GoalsPage({ profile, onNavigateTasks, onNavigateAllTasks }: Prop
             >
               <PlusOutlined /> Add a goal
             </button>
-            <div style={{ fontSize: 12, color: C.secondary, maxWidth: 280, lineHeight: 1.45 }}>
-              Feature coming: paste a brain dump and get suggested goals and tasks.
-            </div>
+            {aiAssistEnabled && (
+              <button
+                type="button"
+                onClick={() => setAiAssistOpen(true)}
+                style={{
+                  background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 12,
+                  padding: '10px 20px', color: C.headline, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                Create with AI
+              </button>
+            )}
           </div>
         </div>
       ) : (
@@ -364,7 +366,16 @@ export function GoalsPage({ profile, onNavigateTasks, onNavigateAllTasks }: Prop
         onCancel={() => { setManageGoalOpen(false); setEditingGoal(null); }}
       />
 
-      {/* FAB — add goals manually; AI assist shown as coming soon */}
+      <AiAssistCreationModal
+        open={aiAssistOpen}
+        onClose={() => setAiAssistOpen(false)}
+        profileId={profile.id}
+        entryPage="goals"
+        goals={goals}
+        onSaved={() => loadGoals()}
+      />
+
+      {/* FAB — Add manually + Create with AI (when enabled) */}
       <>
         {fabMenuOpen && (
           <div
@@ -383,24 +394,24 @@ export function GoalsPage({ profile, onNavigateTasks, onNavigateAllTasks }: Prop
               style={{
                 padding: '10px 16px', borderRadius: 12, border: `1.5px solid ${C.border}`,
                 background: C.bgCard, fontWeight: 600, fontSize: 13, cursor: 'pointer', textAlign: 'left',
-                boxShadow: C.shadow,
+                boxShadow: C.shadow, minHeight: 44,
               }}
             >
-              Add goal
+              Create manually
             </button>
-            <div
-              title="AI brain-dump assist is coming soon. Add goals manually for now."
-              style={{
-                padding: '10px 16px', borderRadius: 12, border: `1.5px solid ${C.border}`,
-                background: C.bgAlt, color: C.secondary, fontWeight: 600, fontSize: 12, lineHeight: 1.4,
-                opacity: 0.9,
-              }}
-            >
-              ✨ AI assist · feature coming
-              <div style={{ fontSize: 11, fontWeight: 500, marginTop: 4 }}>
-                Paste a brain dump and get suggested goals. Not available yet.
-              </div>
-            </div>
+            {aiAssistEnabled ? (
+              <button
+                type="button"
+                onClick={() => { setFabMenuOpen(false); setAiAssistOpen(true); }}
+                style={{
+                  padding: '10px 16px', borderRadius: 12, border: `1.5px solid ${C.border}`,
+                  background: C.bgCard, fontWeight: 600, fontSize: 13, cursor: 'pointer', textAlign: 'left',
+                  boxShadow: C.shadow, minHeight: 44,
+                }}
+              >
+                Create with AI
+              </button>
+            ) : null}
           </div>
         )}
         <button

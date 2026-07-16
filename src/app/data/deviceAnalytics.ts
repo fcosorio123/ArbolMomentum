@@ -11,7 +11,23 @@ export type EventType =
   | 'notif_sent'
   | 'notif_received'
   | 'notif_clicked'
-  | 'badge_updated';
+  | 'badge_updated'
+  | 'ai_assist_opened'
+  | 'ai_assist_type_selected'
+  | 'ai_assist_generate_submitted'
+  | 'ai_assist_generate_succeeded'
+  | 'ai_assist_generate_failed'
+  | 'ai_assist_candidate_selected'
+  | 'ai_assist_regenerate'
+  | 'ai_assist_draft_edited'
+  | 'ai_assist_goal_mode'
+  | 'ai_assist_starters_generated'
+  | 'ai_assist_goal_relationship'
+  | 'ai_assist_abandoned'
+  | 'ai_assist_save_attempted'
+  | 'ai_assist_save_succeeded'
+  | 'ai_assist_save_partial'
+  | 'ai_assist_save_failed';
 
 export interface DeviceRecord {
   profileId: string;

@@ -53,6 +53,15 @@ export function isDevelopmentVersion(): boolean {
 }
 
 /**
+ * AI Assist Creation V2 gate.
+ * Enabled on non-published hosts, or when VITE_ENABLE_AI_ASSIST_CREATION=true at build time.
+ */
+export function isAiAssistCreationEnabled(): boolean {
+  if (import.meta.env.VITE_ENABLE_AI_ASSIST_CREATION === 'true') return true;
+  return isDevelopmentVersion();
+}
+
+/**
  * Get the environment name for logging/debugging
  */
 export function getEnvironment(): 'published' | 'development' {

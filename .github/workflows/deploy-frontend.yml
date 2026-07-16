@@ -34,6 +34,7 @@ jobs:
         env:
           VITE_BASE_PATH: /ArbolMomentum/
           VITE_PUBLISHED: 'true'
+          VITE_ENABLE_AI_ASSIST_CREATION: 'true'
 
       - name: Publish to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4

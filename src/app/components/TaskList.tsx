@@ -28,6 +28,8 @@ import {
 } from '../data/tasksInventory';
 import { ManageTaskModal } from './ManageTaskModal';
 import { SimplifyTaskModal } from './SimplifyTaskModal';
+import { AiAssistCreationModal } from './AiAssistCreationModal';
+import { isAiAssistCreationEnabled } from '../data/environment';
 import { DeleteTaskModal, type DeleteTaskChoice } from './DeleteTaskModal';
 import { TasksMonthView } from './TasksMonthView';
 import { C } from '../data/colors';
@@ -845,6 +847,8 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
   const [momentumEntry, setMomentumEntry] = useState<ReportEntry | null>(null);
   const [taskUpdateContext, setTaskUpdateContext] = useState<TaskUpdateContext | null>(null);
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
+  const [aiAssistOpen, setAiAssistOpen] = useState(false);
+  const aiAssistEnabled = isAiAssistCreationEnabled();
   const [simplifyTarget, setSimplifyTarget] = useState<{ task: UserTask_; goal?: PersonalGoal } | null>(null);
   const { capture: captureScroll, restore: restoreScroll, allowProgrammaticScroll } = useScrollPositionLock([
     statuses, notes, taskUpdateContext, momentumEntry,
@@ -1525,20 +1529,6 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
         {taskView === 'month' && 'See timing and workload across the month.'}
       </p>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          disabled
-          title="AI-assisted task creation from a brain dump is coming soon. Add tasks manually for now."
-          style={{
-            padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${C.border}`,
-            background: C.bgAlt, color: C.secondary, fontSize: 12, fontWeight: 600, cursor: 'not-allowed',
-          }}
-        >
-          ✨ AI assist · coming soon
-        </button>
-      </div>
-
       {/* View segmented control */}
       <div
         role="tablist"
@@ -1778,21 +1768,21 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
               minHeight: MIN_TOUCH,
             }}
           >
-            Add manually
+            Create manually
           </button>
-          <div
-            title="AI brain-dump assist is coming soon."
-            style={{
-              display: 'block', width: '100%', padding: '12px 16px', border: 'none', background: C.bgAlt,
-              borderTop: `1px solid ${C.border}`, textAlign: 'left', fontSize: 12, fontWeight: 600,
-              color: C.secondary, minHeight: MIN_TOUCH, lineHeight: 1.4, boxSizing: 'border-box',
-            }}
-          >
-            ✨ AI assist · feature coming
-            <div style={{ fontSize: 11, fontWeight: 500, marginTop: 4 }}>
-              Not available yet. Add tasks manually for now.
-            </div>
-          </div>
+          {aiAssistEnabled && (
+            <button
+              type="button"
+              onClick={() => { setFabMenuOpen(false); setAiAssistOpen(true); }}
+              style={{
+                display: 'block', width: '100%', padding: '12px 16px', border: 'none', background: 'none',
+                borderTop: `1px solid ${C.border}`, textAlign: 'left', fontSize: 13, fontWeight: 600,
+                color: C.headline, cursor: 'pointer', minHeight: MIN_TOUCH,
+              }}
+            >
+              Create with AI
+            </button>
+          )}
         </div>
       )}
       <button
@@ -1824,6 +1814,18 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
         preserveTaskType={!!editingSeedTaskId}
         onSave={handleSaveUserTask}
         onCancel={() => { setManageTaskOpen(false); setEditingTask(null); setDefaultTaskGoalId(undefined); setEditingSeedTaskId(null); }}
+      />
+
+      <AiAssistCreationModal
+        open={aiAssistOpen}
+        onClose={() => setAiAssistOpen(false)}
+        profileId={profile.id}
+        entryPage="tasks"
+        goals={goals}
+        onSaved={() => {
+          setGoals(getPersonalGoals(profile.id));
+          setUserTasks(getUserTasks(profile.id));
+        }}
       />
 
       {simplifyTarget && (

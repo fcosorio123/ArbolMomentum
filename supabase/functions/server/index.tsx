@@ -262,6 +262,48 @@ app.post("/parse-context-tasks", async (c) => {
   }
 });
 
+// AI Assist Creation V2 — primary-object candidates (not SeedSuggestionGroup packages)
+app.post("/generate-assist-candidates", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "anon";
+    const { generateAssistCandidates } = await import("./generateAssistCandidates.ts");
+    const result = await generateAssistCandidates(body, { rateLimitKey: ip });
+    return c.json(result);
+  } catch (err) {
+    console.log("[GenerateAssistCandidates] Error:", err);
+    return c.json({
+      ok: false,
+      requestId: "",
+      sessionId: "",
+      creationType: "goal",
+      source: "server_rules",
+      reason: "network_error",
+      candidates: [],
+    }, 500);
+  }
+});
+
+app.post("/generate-assist-starters", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "anon";
+    const { generateAssistStarters } = await import("./generateAssistCandidates.ts");
+    const result = await generateAssistStarters(body, { rateLimitKey: ip });
+    return c.json(result);
+  } catch (err) {
+    console.log("[GenerateAssistStarters] Error:", err);
+    return c.json({
+      ok: false,
+      requestId: "",
+      sessionId: "",
+      source: "server_rules",
+      reason: "network_error",
+      tasks: [],
+    }, 500);
+  }
+});
+
 // Admin: last cron run summary (observability)
 app.get("/cron-last-run", async (c) => {
   try {

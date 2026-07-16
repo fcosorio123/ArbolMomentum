@@ -1,3 +1,9 @@
+/**
+ * LEGACY — quarantined AI Assist V1 (brain dump → SeedSuggestionGroup packages → confirm).
+ * Not imported by GoalsPage / TaskList. CreateProfile uses parse-context-tasks directly.
+ * Do not rewire this modal. AI Assist Creation V2 lives in AiAssistCreationModal.
+ * Delete only after V2 fully passes acceptance and rollback no longer needs this file.
+ */
 import { useState, useEffect } from 'react';
 import { Modal, Input, Button, Checkbox, Switch, Select } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';

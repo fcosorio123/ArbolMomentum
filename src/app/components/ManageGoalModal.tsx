@@ -4,24 +4,33 @@ import { C } from '../data/colors';
 import type { PersonalGoal } from '../data/personalGoals';
 import { ACCENT_MODAL_STYLES, ModalAccentBar } from '../styles/modalChrome';
 
+export interface GoalDraftValues {
+  title?: string;
+  deepWhy?: string;
+}
+
 interface Props {
   open: boolean;
   goal?: PersonalGoal | null;
+  /** Create-mode prefill (AI Assist). Ignored when `goal` is set (edit). */
+  draft?: GoalDraftValues | null;
+  /** Override primary button label (e.g. Continue for AI draft capture). */
+  confirmLabel?: string;
   onSave: (data: { title: string; deepWhy: string }) => void;
   onCancel: () => void;
 }
 
-export function ManageGoalModal({ open, goal, onSave, onCancel }: Props) {
+export function ManageGoalModal({ open, goal, draft, confirmLabel, onSave, onCancel }: Props) {
   const isEdit = !!goal;
   const [title, setTitle] = useState('');
   const [deepWhy, setDeepWhy] = useState('');
 
   useEffect(() => {
     if (open) {
-      setTitle(goal?.title ?? '');
-      setDeepWhy(goal?.deepWhy ?? '');
+      setTitle(goal?.title ?? draft?.title ?? '');
+      setDeepWhy(goal?.deepWhy ?? draft?.deepWhy ?? '');
     }
-  }, [open, goal]);
+  }, [open, goal, draft]);
 
   const valid = title.trim().length > 0;
 
@@ -41,20 +50,6 @@ export function ManageGoalModal({ open, goal, onSave, onCancel }: Props) {
         <h3 style={{ margin: '0 0 18px', fontSize: 17, fontWeight: 800, color: C.headline }}>
           {isEdit ? 'Edit Goal' : 'Add Goal'}
         </h3>
-
-        {!isEdit && (
-          <div style={{
-            marginBottom: 16, padding: '10px 12px', borderRadius: 12,
-            border: `1.5px solid ${C.border}`, background: C.bgAlt,
-          }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: C.secondary }}>
-              ✨ AI assist · feature coming
-            </div>
-            <div style={{ fontSize: 11, color: C.body, marginTop: 4, lineHeight: 1.4 }}>
-              Soon you will be able to paste a brain dump and get suggested goals and starter tasks. For now, add goals manually.
-            </div>
-          </div>
-        )}
 
         <div style={{ marginBottom: 14 }}>
           <label style={{ fontSize: 12, fontWeight: 700, color: C.secondary, display: 'block', marginBottom: 6 }}>
@@ -101,7 +96,7 @@ export function ManageGoalModal({ open, goal, onSave, onCancel }: Props) {
               background: valid ? `linear-gradient(135deg, ${C.primary}, #1a6da8)` : undefined,
             }}
           >
-            {isEdit ? 'Save' : 'Add goal'}
+            {confirmLabel ?? (isEdit ? 'Save' : 'Add goal')}
           </Button>
         </div>
       </div>

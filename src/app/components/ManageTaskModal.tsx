@@ -16,17 +16,35 @@ interface SaveData extends Omit<UserTask, 'id' | 'profileId' | 'createdAt'> {
   applyTo?: ApplyTo;
 }
 
+/** Create-mode prefill for AI Assist (does not imply an existing saved task). */
+export interface TaskDraftValues {
+  label?: string;
+  description?: string;
+  timeOfDay?: 'morning' | 'evening';
+  goalId?: string;
+  potentialValue?: PotentialValue;
+  recurrence?: Recurrence;
+}
+
+export const AI_NEW_GOAL_OPTION = '__ai_new_goal__';
+
 interface Props {
   open: boolean;
   profileId: string;
   task?: UserTask | null;
+  /** Create-mode AI prefill. Used when `task` is absent. */
+  draft?: TaskDraftValues | null;
   defaultGoalId?: string;
   goals: PersonalGoal[];
+  /** Unsaved new-goal draft from AI Assist — shown as a selectable option. */
+  pendingNewGoal?: { title: string } | null;
+  onRequestCreateGoal?: () => void;
+  confirmLabel?: string;
   /** currentDate is the YYYY-MM-DD occurrence date; needed for "This task only" edits */
   currentDate?: string;
   /** When editing a seed, keep its type (e.g. priority) instead of remapping to goal/routine. */
   preserveTaskType?: boolean;
-  onSave: (data: SaveData) => void;
+  onSave: (data: SaveData & { pendingNewGoal?: boolean }) => void;
   onCancel: () => void;
 }
 
@@ -95,9 +113,11 @@ function isRecurring(rec?: Recurrence): boolean {
 
 // ── Main modal ────────────────────────────────────────────────────────
 export function ManageTaskModal({
-  open, profileId, task, defaultGoalId, goals, currentDate, preserveTaskType, onSave, onCancel,
+  open, profileId, task, draft, defaultGoalId, goals, currentDate, preserveTaskType,
+  pendingNewGoal, onRequestCreateGoal, confirmLabel, onSave, onCancel,
 }: Props) {
-  const isEdit = !!task;
+  // Real edit only when task has a persisted id (empty-id stubs stay create).
+  const isEdit = !!(task && task.id);
 
   const [label, setLabel] = useState('');
   const [description, setDescription] = useState('');
@@ -117,21 +137,29 @@ export function ManageTaskModal({
 
   useEffect(() => {
     if (open) {
-      setLabel(task?.label ?? '');
-      setDescription(task?.description ?? '');
-      setTimeOfDay(task?.timeOfDay ?? 'morning');
-      setGoalId(task?.goalId ?? (!task ? defaultGoalId : undefined));
+      const src = task ?? null;
+      setLabel(src?.label ?? draft?.label ?? '');
+      setDescription(src?.description ?? draft?.description ?? '');
+      setTimeOfDay(src?.timeOfDay ?? draft?.timeOfDay ?? 'morning');
+      const initialGoal = src?.goalId
+        ?? draft?.goalId
+        ?? (pendingNewGoal ? AI_NEW_GOAL_OPTION : undefined)
+        ?? (!src ? defaultGoalId : undefined);
+      setGoalId(initialGoal);
       setRecommendedGoalId(undefined);
-      setPotentialValue(normalizePotentialValue(task?.potentialValue) ?? defaultPotentialValue('manual'));
+      setPotentialValue(
+        normalizePotentialValue(src?.potentialValue ?? draft?.potentialValue)
+          ?? defaultPotentialValue('manual'),
+      );
       setApplyTo('all');
 
-      const rec = task?.recurrence;
+      const rec = src?.recurrence ?? draft?.recurrence;
       setRecType(rec?.type ?? 'daily');
       setWeekdays(rec?.weekdays ?? []);
       setMonthDates(rec?.monthDates ?? []);
       setSpecificDate(rec?.specificDate ?? currentDate ?? '');
     }
-  }, [open, task, defaultGoalId, currentDate]);
+  }, [open, task, draft, defaultGoalId, currentDate, pendingNewGoal]);
 
   const handleLabelBlur = () => {
     if (!label.trim() || goalId) return;
@@ -169,19 +197,21 @@ export function ManageTaskModal({
 
   const handleSave = () => {
     const recurrence = buildRecurrence();
+    const usingPending = goalId === AI_NEW_GOAL_OPTION;
+    const resolvedGoalId = usingPending ? undefined : (goalId || undefined);
     const resolvedType = preserveTaskType && task?.type
       ? task.type
-      : (goalId ? 'goal' : 'routine');
+      : (resolvedGoalId || usingPending ? 'goal' : 'routine');
     onSave({
       label: label.trim(),
       description: description.trim() || undefined,
       timeOfDay,
       type: resolvedType,
-      goalId: goalId || undefined,
+      goalId: resolvedGoalId,
       recurrence,
       potentialValue,
-      // Pass applyTo only when editing a recurring task
       applyTo: isEdit && isRecurring(task?.recurrence) ? applyTo : undefined,
+      pendingNewGoal: usingPending || undefined,
     });
   };
 
@@ -296,7 +326,7 @@ export function ManageTaskModal({
         </div>
 
         {/* Goal */}
-        {goals.length > 0 && (
+        {(goals.length > 0 || pendingNewGoal || onRequestCreateGoal) && (
           <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 12, fontWeight: 700, color: C.secondary, display: 'block', marginBottom: 6 }}>
               Connected goal <span style={{ fontSize: 11, fontStyle: 'italic', fontWeight: 400 }}>optional</span>
@@ -308,8 +338,25 @@ export function ManageTaskModal({
               placeholder="Which goal does this support?"
               style={{ width: '100%' }}
               size="large"
-              options={goals.map(g => ({ value: g.id, label: g.title }))}
+              options={[
+                ...goals.map(g => ({ value: g.id, label: g.title })),
+                ...(pendingNewGoal
+                  ? [{ value: AI_NEW_GOAL_OPTION, label: `New: ${pendingNewGoal.title}` }]
+                  : []),
+              ]}
             />
+            {onRequestCreateGoal && (
+              <button
+                type="button"
+                onClick={onRequestCreateGoal}
+                style={{
+                  marginTop: 8, border: 'none', background: 'none', padding: 0,
+                  color: C.primary, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                + Create a new goal for this task
+              </button>
+            )}
           </div>
         )}
 
@@ -441,7 +488,7 @@ export function ManageTaskModal({
               background: valid ? `linear-gradient(135deg, #ef4565, #f5a623)` : undefined,
               border: 'none', fontWeight: 700,
             }}>
-            {isEdit ? 'Save Changes' : 'Save Task'}
+            {confirmLabel ?? (isEdit ? 'Save Changes' : 'Save Task')}
           </Button>
         </div>
       </div>
