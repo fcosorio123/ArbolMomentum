@@ -39,7 +39,15 @@ export type EventType =
   | 'onboarding_tour_skipped'
   | 'coaching_mark_viewed'
   | 'coaching_mark_completed'
-  | 'coaching_mark_skipped';
+  | 'coaching_mark_skipped'
+  | 'simplify_detail_assist_shown'
+  | 'simplify_detail_suggestions_loaded'
+  | 'simplify_detail_suggestion_selected'
+  | 'simplify_detail_suggestions_refreshed'
+  | 'simplify_detail_custom_text_used'
+  | 'simplify_detail_assist_failed'
+  | 'simplify_detail_validation_passed'
+  | 'simplify_detail_validation_mismatch';
 
 export interface DeviceRecord {
   profileId: string;

@@ -192,6 +192,40 @@ app.post("/run-daily-email-nudges", async (c) => {
   }
 });
 
+// Simplify detail-assist: prevalidated clarification additions for short answers
+app.post("/simplify-detail-assist", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const taskLabel = typeof body?.taskLabel === "string" ? body.taskLabel : "";
+    const taskId = typeof body?.taskId === "string" ? body.taskId : undefined;
+    const requestId = typeof body?.requestId === "string" ? body.requestId : undefined;
+    const questionId = typeof body?.questionId === "string" ? body.questionId : "hard_part";
+    const currentAnswer = typeof body?.currentAnswer === "string" ? body.currentAnswer : "";
+    const refreshNonce = typeof body?.refreshNonce === "number" ? body.refreshNonce : undefined;
+    const { simplifyDetailAssist } = await import("./simplifyDetailAssistHandler.ts");
+    const result = await simplifyDetailAssist({
+      taskLabel,
+      taskId,
+      requestId,
+      questionId: questionId as "hard_part" | "what_would_help" | "constraints",
+      currentAnswer,
+      refreshNonce,
+    });
+    return c.json(result);
+  } catch (err) {
+    console.log("[SimplifyDetailAssist] Error:", err);
+    return c.json({
+      requestId: "",
+      taskId: "",
+      questionId: "hard_part",
+      status: "needs_detail",
+      suggestions: [],
+      source: "server_rules",
+      reason: "server_error",
+    }, 500);
+  }
+});
+
 // AI-assisted task simplification (answer-aware replacement tasks)
 app.post("/simplify-task", async (c) => {
   try {

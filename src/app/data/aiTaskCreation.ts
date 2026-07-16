@@ -13,6 +13,14 @@ import {
   type SimplifyAnswers,
   type AnswerReviewItem,
 } from './simplifyTaskCore';
+import {
+  buildPrevalidatedSuggestions,
+  evaluateAnswerSufficiency,
+  mergeAnswerWithAddition,
+  type DetailAssistInput,
+  type DetailAssistResult,
+  type SimplifyQuestionId,
+} from './simplifyDetailAssist';
 
 const FN = 'make-server-5d90ddf5';
 const FN_BASE = `https://${projectId}.supabase.co/functions/v1`;
@@ -332,3 +340,93 @@ export async function simplifyTaskFromEdge(input: SimplifyTaskInput): Promise<Si
 
 export { isGoalRelevantToTask, buildSimplifyPackage };
 export type { AnswerReviewItem };
+export type { DetailAssistInput, DetailAssistResult, SimplifyQuestionId };
+
+// ──────────────────────────────────────────────
+// Simplify detail-assist (clarification suggestions)
+// ──────────────────────────────────────────────
+
+export async function simplifyDetailAssistFromEdge(
+  input: DetailAssistInput,
+): Promise<DetailAssistResult> {
+  const requestId =
+    (input.requestId && input.requestId.trim())
+    || `det_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const taskId = (input.taskId && input.taskId.trim()) || '';
+  const payload = {
+    taskLabel: input.taskLabel,
+    taskId,
+    requestId,
+    questionId: input.questionId,
+    currentAnswer: input.currentAnswer,
+    refreshNonce: input.refreshNonce ?? 0,
+  };
+
+  const localFallback = (reason: string): DetailAssistResult => ({
+    ...buildPrevalidatedSuggestions(
+      { ...payload, requestId, taskId },
+      'client_fallback',
+    ),
+    reason,
+  });
+
+  try {
+    const { data, error } = await edgePost(`${FN}/simplify-detail-assist`, payload, {
+      timeoutMs: 10_000,
+    });
+    if (error) {
+      return localFallback(error === 'timeout' ? 'timeout_fallback' : 'client_fallback');
+    }
+    const result = data as DetailAssistResult | null;
+    if (!result || !Array.isArray(result.suggestions)) {
+      return localFallback('empty_edge');
+    }
+
+    // Re-validate every combined answer locally before UI render.
+    const edgeValid = result.suggestions
+      .filter(s => typeof s?.appendText === 'string' && typeof s?.validatedCombinedAnswer === 'string')
+      .map((s, i) => {
+        const combined = mergeAnswerWithAddition(input.currentAnswer, s.appendText);
+        if (evaluateAnswerSufficiency(input.questionId, combined, input.taskLabel).status !== 'sufficient') {
+          return null;
+        }
+        return {
+          id: s.id || `s${i + 1}`,
+          appendText: s.appendText.trim(),
+          validatedCombinedAnswer: combined,
+        };
+      })
+      .filter((s): s is NonNullable<typeof s> => !!s)
+      .slice(0, 4);
+
+    if (result.status === 'sufficient' || result.status === 'empty' || result.status === 'irrelevant') {
+      return {
+        requestId: result.requestId || requestId,
+        taskId: result.taskId || taskId,
+        questionId: input.questionId,
+        status: result.status,
+        suggestions: [],
+        source: result.source === 'llm' ? 'llm' : 'server_rules',
+        reason: result.reason,
+        missingDetailType: result.missingDetailType,
+      };
+    }
+
+    if (edgeValid.length >= 2) {
+      return {
+        requestId: result.requestId || requestId,
+        taskId: result.taskId || taskId,
+        questionId: input.questionId,
+        status: 'needs_detail',
+        missingDetailType: result.missingDetailType,
+        suggestions: edgeValid,
+        source: result.source === 'llm' ? 'llm' : 'server_rules',
+        reason: result.reason || 'edge',
+      };
+    }
+
+    return localFallback(result.reason || 'edge_unvalidated');
+  } catch {
+    return localFallback('network_error');
+  }
+}

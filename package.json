@@ -16,7 +16,8 @@
     "test:c8": "node scripts/verify-c8-go-live.mjs",
     "test:post-push": "node scripts/verify-post-push.mjs",
     "test:ai-assist": "npx tsx scripts/test-ai-assist-contracts.ts && node scripts/test-ai-assist-persist.mjs",
-    "test:onboarding": "npx tsx scripts/test-product-onboarding.ts"
+    "test:onboarding": "npx tsx scripts/test-product-onboarding.ts",
+    "test:simplify-detail": "npx tsx scripts/test-simplify-detail-assist.ts"
   },
   "dependencies": {
     "@ant-design/colors": "^8.0.1",

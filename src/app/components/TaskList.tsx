@@ -1910,6 +1910,7 @@ export function TaskList({
           taskLabel={simplifyTarget.task.label}
           goalTitle={simplifyTarget.goal?.title}
           goalWhy={simplifyTarget.goal?.deepWhy}
+          profileId={profile.id}
           onConfirm={handleSimplifyConfirm}
         />
       )}

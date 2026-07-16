@@ -3,10 +3,21 @@ import { Modal, Input, Button } from 'antd';
 import { C } from '../data/colors';
 import {
   simplifyTaskFromEdge,
+  simplifyDetailAssistFromEdge,
   isGoalRelevantToTask,
   type SimplifyTaskResult,
   type SimplifiedTaskSuggestion,
+  type DetailAssistResult,
+  type DetailSuggestion,
 } from '../data/aiTaskCreation';
+import {
+  evaluateAnswerSufficiency,
+  mergeAnswerWithAddition,
+  questionIdForStep,
+  type SimplifyQuestionId,
+} from '../data/simplifyDetailAssist';
+import { trackEvent } from '../data/deviceAnalytics';
+import { classifyTaskComplexity } from '../data/simplifyTaskCore';
 import { ACCENT_MODAL_STYLES, ModalAccentBar } from '../styles/modalChrome';
 
 const { TextArea } = Input;
@@ -27,6 +38,7 @@ interface Props {
   taskLabel: string;
   goalTitle?: string;
   goalWhy?: string;
+  profileId?: string;
   onConfirm: (replacements: SimplifiedTaskSuggestion[]) => void;
 }
 
@@ -37,12 +49,12 @@ function friendlySimplifyError(reason?: string): string {
   return "Couldn't simplify. Try again.";
 }
 
-function newRequestId(): string {
-  return `simp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+function newRequestId(prefix = 'simp'): string {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function SimplifyTaskModal({
-  open, onClose, taskId, taskLabel, goalTitle, goalWhy, onConfirm,
+  open, onClose, taskId, taskLabel, goalTitle, goalWhy, profileId, onConfirm,
 }: Props) {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<string[]>(['', '', '']);
@@ -51,6 +63,22 @@ export function SimplifyTaskModal({
   const [result, setResult] = useState<SimplifyTaskResult | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [expandedHowTo, setExpandedHowTo] = useState<Set<number>>(new Set());
+
+  // Detail-assist state
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [detailAssist, setDetailAssist] = useState<DetailAssistResult | null>(null);
+  const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(null);
+  const [baseAnswerBeforeAssist, setBaseAnswerBeforeAssist] = useState<string>('');
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  /** Questions accepted via a prevalidated system suggestion — skip re-assist. */
+  const acceptedViaSuggestion = useRef<Set<SimplifyQuestionId>>(new Set());
+  /** Questions that already showed assist once (custom text still validates). */
+  const assistShownFor = useRef<Set<SimplifyQuestionId>>(new Set());
+  const answerVersion = useRef(0);
+  const detailRequestSeq = useRef(0);
+  const activeDetailRequestId = useRef<string | null>(null);
+
   const requestSeq = useRef(0);
   const activeRequestId = useRef<string | null>(null);
   const openTaskIdRef = useRef(taskId);
@@ -58,6 +86,16 @@ export function SimplifyTaskModal({
 
   const relevantGoal = goalTitle && isGoalRelevantToTask(taskLabel, goalTitle) ? goalTitle : undefined;
   const relevantGoalWhy = relevantGoal ? goalWhy : undefined;
+  const analyticsId = profileId || 'anon';
+
+  const clearDetailAssist = () => {
+    setDetailLoading(false);
+    setDetailError(null);
+    setDetailAssist(null);
+    setSelectedSuggestionId(null);
+    setBaseAnswerBeforeAssist('');
+    activeDetailRequestId.current = null;
+  };
 
   const resetSoft = () => {
     setLoading(false);
@@ -66,43 +104,180 @@ export function SimplifyTaskModal({
     setSelected(new Set());
     setExpandedHowTo(new Set());
     activeRequestId.current = null;
+    clearDetailAssist();
   };
 
   const resetFull = () => {
     setStep(0);
     setAnswers(['', '', '']);
+    setRefreshNonce(0);
+    acceptedViaSuggestion.current = new Set();
+    assistShownFor.current = new Set();
+    answerVersion.current = 0;
+    detailRequestSeq.current += 1;
     resetSoft();
   };
 
   useEffect(() => {
     if (!open) {
       requestSeq.current += 1;
+      detailRequestSeq.current += 1;
       resetFull();
       return;
     }
-    // New task open: wipe prior answers/results
     openTaskIdRef.current = taskId;
     openTaskLabelRef.current = taskLabel;
     requestSeq.current += 1;
+    detailRequestSeq.current += 1;
     resetFull();
   }, [open, taskId, taskLabel]);
 
   const handleClose = () => {
     requestSeq.current += 1;
+    detailRequestSeq.current += 1;
     resetFull();
     onClose();
+  };
+
+  const updateAnswer = (value: string) => {
+    answerVersion.current += 1;
+    const next = [...answers];
+    next[step] = value;
+    setAnswers(next);
+    // Editing after a selection clears the chip selection but keeps base for re-merge.
+    if (selectedSuggestionId) {
+      setSelectedSuggestionId(null);
+    }
+  };
+
+  const loadDetailAssist = async (opts?: { refresh?: boolean }) => {
+    const qId = questionIdForStep(step);
+    const current = (answers[step] ?? '').trim();
+    const seq = ++detailRequestSeq.current;
+    const reqId = newRequestId('det');
+    const boundTaskId = taskId;
+    const boundTaskLabel = taskLabel;
+    const boundAnswerVersion = answerVersion.current;
+    const boundStep = step;
+    activeDetailRequestId.current = reqId;
+    setDetailLoading(true);
+    setDetailError(null);
+    if (!opts?.refresh) {
+      setDetailAssist(null);
+      setSelectedSuggestionId(null);
+      setBaseAnswerBeforeAssist(current);
+    }
+    const nonce = opts?.refresh ? refreshNonce + 1 : refreshNonce;
+    if (opts?.refresh) setRefreshNonce(nonce);
+
+    trackEvent(analyticsId, opts?.refresh ? 'simplify_detail_suggestions_refreshed' : 'simplify_detail_assist_shown', {
+      questionId: qId,
+      taskComplexity: classifyTaskComplexity(taskLabel),
+      attempt: assistShownFor.current.has(qId) ? 2 : 1,
+    });
+
+    try {
+      const res = await simplifyDetailAssistFromEdge({
+        taskLabel: boundTaskLabel,
+        taskId: boundTaskId,
+        requestId: reqId,
+        questionId: qId,
+        currentAnswer: current,
+        refreshNonce: nonce,
+      });
+
+      // Stale guard
+      if (
+        seq !== detailRequestSeq.current
+        || openTaskIdRef.current !== boundTaskId
+        || openTaskLabelRef.current !== boundTaskLabel
+        || activeDetailRequestId.current !== reqId
+        || answerVersion.current !== boundAnswerVersion
+        || step !== boundStep
+        || (res.requestId && res.requestId !== reqId)
+        || (res.taskId && res.taskId !== boundTaskId)
+        || res.questionId !== qId
+      ) {
+        return;
+      }
+
+      if (res.status === 'sufficient') {
+        clearDetailAssist();
+        trackEvent(analyticsId, 'simplify_detail_validation_passed', { questionId: qId });
+        return;
+      }
+
+      assistShownFor.current.add(qId);
+      setDetailAssist(res);
+      if (!res.suggestions.length) {
+        setDetailError('We couldn’t create suggestions right now. You can add one more detail in your own words.');
+        trackEvent(analyticsId, 'simplify_detail_assist_failed', {
+          questionId: qId,
+          suggestionCount: 0,
+          generationSource: res.source,
+        });
+      } else {
+        trackEvent(analyticsId, 'simplify_detail_suggestions_loaded', {
+          questionId: qId,
+          suggestionCount: res.suggestions.length,
+          generationSource: res.source,
+        });
+      }
+    } catch {
+      if (seq === detailRequestSeq.current) {
+        setDetailError('We couldn’t create suggestions right now. You can add one more detail in your own words.');
+        trackEvent(analyticsId, 'simplify_detail_assist_failed', { questionId: qId });
+      }
+    } finally {
+      if (seq === detailRequestSeq.current) setDetailLoading(false);
+    }
+  };
+
+  const selectSuggestion = (s: DetailSuggestion) => {
+    const qId = questionIdForStep(step);
+    const base = baseAnswerBeforeAssist || (answers[step] ?? '');
+    const combined = s.validatedCombinedAnswer || mergeAnswerWithAddition(base, s.appendText);
+    const check = evaluateAnswerSufficiency(qId, combined, taskLabel);
+    if (check.status !== 'sufficient') {
+      // Prevalidated mismatch — do not block; accept enriched answer.
+      trackEvent(analyticsId, 'simplify_detail_validation_mismatch', { questionId: qId });
+    } else {
+      trackEvent(analyticsId, 'simplify_detail_validation_passed', { questionId: qId });
+    }
+    answerVersion.current += 1;
+    const next = [...answers];
+    next[step] = combined;
+    setAnswers(next);
+    setSelectedSuggestionId(s.id);
+    acceptedViaSuggestion.current.add(qId);
+    trackEvent(analyticsId, 'simplify_detail_suggestion_selected', {
+      questionId: qId,
+      suggestionCount: detailAssist?.suggestions.length ?? 0,
+      generationSource: detailAssist?.source ?? 'server_rules',
+    });
+  };
+
+  const deselectSuggestion = () => {
+    if (!selectedSuggestionId) return;
+    answerVersion.current += 1;
+    const next = [...answers];
+    next[step] = baseAnswerBeforeAssist;
+    setAnswers(next);
+    setSelectedSuggestionId(null);
+    acceptedViaSuggestion.current.delete(questionIdForStep(step));
   };
 
   const canNext = step === 0 ? answers[0].trim().length >= 3 : true;
   const isLastQuestion = step >= QUESTIONS.length - 1;
 
-  const handleNext = async () => {
+  const advanceOrSubmit = async () => {
     if (!isLastQuestion) {
+      clearDetailAssist();
       setStep(s => s + 1);
       return;
     }
     const seq = ++requestSeq.current;
-    const reqId = newRequestId();
+    const reqId = newRequestId('simp');
     activeRequestId.current = reqId;
     const boundTaskId = taskId;
     const boundTaskLabel = taskLabel;
@@ -120,7 +295,6 @@ export function SimplifyTaskModal({
         motivation: answers[1] ?? '',
         constraint: answers[2] ?? '',
       });
-      // Stale: different request, task, or modal closed/replaced
       if (
         seq !== requestSeq.current
         || openTaskIdRef.current !== boundTaskId
@@ -150,9 +324,61 @@ export function SimplifyTaskModal({
       setResult({ ...res, answers: mergedAnswers });
       setSelected(new Set(res.tasks.map((_, i) => i)));
       setStep(QUESTIONS.length);
+      clearDetailAssist();
     } finally {
       if (seq === requestSeq.current) setLoading(false);
     }
+  };
+
+  const handleNext = async () => {
+    const qId = questionIdForStep(step);
+    const current = (answers[step] ?? '').trim();
+
+    // Optional blank → skip without assist
+    if (step > 0 && !current) {
+      await advanceOrSubmit();
+      return;
+    }
+
+    // System suggestion already accepted for this question → one cycle done
+    if (acceptedViaSuggestion.current.has(qId)) {
+      await advanceOrSubmit();
+      return;
+    }
+
+    const evaluation = evaluateAnswerSufficiency(qId, current, taskLabel);
+
+    if (evaluation.status === 'sufficient') {
+      if (assistShownFor.current.has(qId) && !selectedSuggestionId) {
+        trackEvent(analyticsId, 'simplify_detail_custom_text_used', { questionId: qId });
+      }
+      await advanceOrSubmit();
+      return;
+    }
+
+    if (evaluation.status === 'irrelevant') {
+      setDetailError('That answer does not seem related to this task. Add a detail about this task, or pick a suggestion.');
+      if (!assistShownFor.current.has(qId) || !detailAssist) {
+        await loadDetailAssist();
+      }
+      return;
+    }
+
+    // needs_detail
+    if (detailAssist && selectedSuggestionId) {
+      // Should already be marked accepted; safety continue
+      acceptedViaSuggestion.current.add(qId);
+      await advanceOrSubmit();
+      return;
+    }
+
+    if (detailAssist && assistShownFor.current.has(qId)) {
+      // Assist already visible — keep helping, do not generic-block
+      setDetailError(null);
+      return;
+    }
+
+    await loadDetailAssist();
   };
 
   const handleConfirm = () => {
@@ -187,6 +413,8 @@ export function SimplifyTaskModal({
     ? result.answers.filter(a => a.rawAnswer.trim().length > 0)
     : [];
 
+  const showAssistPanel = !reviewing && (detailLoading || !!detailAssist || !!detailError);
+
   return (
     <Modal
       open={open}
@@ -199,7 +427,7 @@ export function SimplifyTaskModal({
       styles={ACCENT_MODAL_STYLES}
     >
       <ModalAccentBar gradient="linear-gradient(90deg, #7c3aed, #3da9fc)" />
-      <div style={{ padding: '16px 24px 24px' }}>
+      <div style={{ padding: '16px 24px 24px', maxHeight: 'min(80vh, 720px)', overflowY: 'auto' }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
           Simplify for me
         </div>
@@ -217,33 +445,113 @@ export function SimplifyTaskModal({
           <>
             <TextArea
               value={answers[step]}
-              onChange={e => {
-                const next = [...answers];
-                next[step] = e.target.value;
-                setAnswers(next);
-              }}
+              onChange={e => updateAnswer(e.target.value)}
               placeholder={step === 0 ? 'e.g. Too big, not sure where to start...' : 'Optional. Press Next to skip'}
               rows={4}
               style={{ marginBottom: 12, borderRadius: 12 }}
               autoFocus
             />
-            <div style={{ fontSize: 11, color: C.secondary, marginBottom: 14 }}>
+            <div style={{ fontSize: 11, color: C.secondary, marginBottom: showAssistPanel ? 10 : 14 }}>
               Question {step + 1} of {QUESTIONS.length}
               {step > 0 && ' · optional'}
             </div>
+
+            {showAssistPanel && (
+              <div
+                style={{
+                  marginBottom: 14,
+                  padding: '12px 12px',
+                  borderRadius: 12,
+                  background: '#f8f7fc',
+                  border: `1px solid ${C.border}`,
+                }}
+                data-testid="simplify-detail-assist"
+              >
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.headline, marginBottom: 4 }}>
+                  A little more detail will help us personalize this.
+                </div>
+                <div style={{ fontSize: 12, color: C.body, marginBottom: 10 }}>
+                  Choose one that fits, or add your own.
+                </div>
+
+                {detailLoading && (
+                  <div style={{ fontSize: 12, color: C.secondary, marginBottom: 8 }}>
+                    Finding a few details that may fit…
+                  </div>
+                )}
+
+                {detailError && (
+                  <p style={{ margin: '0 0 8px', fontSize: 12, color: '#c0392b' }}>{detailError}</p>
+                )}
+
+                {detailAssist && detailAssist.suggestions.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                    {detailAssist.suggestions.map(s => {
+                      const active = selectedSuggestionId === s.id;
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => (active ? deselectSuggestion() : selectSuggestion(s))}
+                          style={{
+                            textAlign: 'left',
+                            padding: '10px 12px',
+                            borderRadius: 10,
+                            border: `1.5px solid ${active ? '#7c3aed' : C.border}`,
+                            background: active ? '#7c3aed12' : '#fff',
+                            cursor: 'pointer',
+                            fontSize: 13,
+                            color: C.headline,
+                            lineHeight: 1.4,
+                            minHeight: 44,
+                          }}
+                        >
+                          {s.appendText}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => loadDetailAssist({ refresh: true })}
+                  disabled={detailLoading}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: detailLoading ? 'default' : 'pointer',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: C.primary,
+                  }}
+                >
+                  Show different suggestions
+                </button>
+              </div>
+            )}
+
             {error && (
               <p style={{ margin: '0 0 12px', fontSize: 12, color: '#c0392b' }}>{error}</p>
             )}
             <div style={{ display: 'flex', gap: 10 }}>
               {step > 0 && (
-                <Button block onClick={() => setStep(s => s - 1)} style={{ borderRadius: 12, height: 46 }}>
+                <Button
+                  block
+                  onClick={() => {
+                    clearDetailAssist();
+                    setStep(s => s - 1);
+                  }}
+                  style={{ borderRadius: 12, height: 46 }}
+                >
                   Back
                 </Button>
               )}
               <Button
                 block
                 type="primary"
-                loading={loading}
+                loading={loading || detailLoading}
                 disabled={!canNext && step === 0}
                 onClick={handleNext}
                 style={{ borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none', background: '#7c3aed' }}
@@ -271,7 +579,6 @@ export function SimplifyTaskModal({
               )}
             </div>
 
-            {/* Answer review — exact user text */}
             <div style={{
               marginBottom: 14, padding: '10px 12px', borderRadius: 10,
               background: '#f8f7fc', border: `1px solid ${C.border}`,
