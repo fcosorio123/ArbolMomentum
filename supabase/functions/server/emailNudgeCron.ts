@@ -11,6 +11,11 @@ import {
   type EmailSettings,
 } from "./emailSend.ts";
 import { isValidEmail } from "./resend.ts";
+import {
+  localDateTimeForScheduleClock,
+  resolveEmailScheduleClock,
+  type LocalDateTimeParts,
+} from "./emailScheduleTime.ts";
 
 const BACKUP_PREFIX = "arbol-backup-";
 /** Wider window so GitHub Actions UTC schedule drift is less likely to miss a slot (C1 evidence). */
@@ -32,6 +37,13 @@ export interface EmailAttemptLogEntry {
   status: string;
   skipReason?: string;
   resendId?: string;
+  scheduleSource?: string;
+  scheduleReason?: string;
+  intendedLocalDate?: string;
+  intendedLocalTime?: string;
+  timezone?: string;
+  tzOffset?: number;
+  timingDeltaSeconds?: number;
 }
 
 export interface NudgeSnapshot {
@@ -54,6 +66,7 @@ interface BackupPayload {
   profileEmail?: string | null;
   alertPrefs?: ProfileAlertPrefs | null;
   nudgeSnapshot?: NudgeSnapshot | null;
+  timezone?: string;
   tzOffset?: number;
   profileArchived?: boolean;
 }
@@ -91,28 +104,12 @@ function isEmailEnabledForProfile(prefs?: ProfileAlertPrefs | null): boolean {
   return prefs?.emailEnabled !== false;
 }
 
-/** Local calendar parts for a profile timezone (tzOffset = Date.getTimezoneOffset() minutes). */
-export function localDateTimeForProfile(tzOffset: number): {
-  dateKey: string;
-  hour: number;
-  minute: number;
-  totalMinutes: number;
-} {
-  const offset = normalizeTzOffsetMinutes(tzOffset);
-  // getTimezoneOffset convention: minutes to add to local → UTC, so local = UTC − offset.
-  // Do not also add the server's getTimezoneOffset() — Date.now() is already UTC epoch ms.
-  const local = new Date(Date.now() - offset * 60_000);
-  const y = local.getUTCFullYear();
-  const m = local.getUTCMonth() + 1;
-  const d = local.getUTCDate();
-  const hour = local.getUTCHours();
-  const minute = local.getUTCMinutes();
-  return {
-    dateKey: `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`,
-    hour,
-    minute,
-    totalMinutes: hour * 60 + minute,
-  };
+/** Local calendar parts for a profile schedule. Prefer IANA timezone, keep tzOffset fallback. */
+export function localDateTimeForProfile(input: {
+  timezone?: unknown;
+  tzOffset?: unknown;
+}): LocalDateTimeParts {
+  return localDateTimeForScheduleClock(resolveEmailScheduleClock(input));
 }
 
 function isSlotDueNow(slot: SmartSlotConfig, localTotalMinutes: number, slotKey?: SlotKey): boolean {
@@ -147,14 +144,6 @@ function periodOfDay(hour: number): "morning" | "afternoon" | "evening" {
   if (hour < 12) return "morning";
   if (hour < 17) return "afternoon";
   return "evening";
-}
-
-/** Normalize to Date.getTimezoneOffset()-style minutes (positive west of UTC). */
-function normalizeTzOffsetMinutes(offset: number): number {
-  if (!Number.isFinite(offset)) return 300; // US Eastern fallback
-  // Older backups accidentally stored ISO-style negatives (e.g. -300 for Eastern).
-  if (offset < 0) return -offset;
-  return offset;
 }
 
 function buildNudgeCopy(
@@ -266,6 +255,17 @@ function truncateRecipient(email?: string): string | undefined {
   return `${user.slice(0, 2)}***@${domain}`;
 }
 
+function scheduleSourceForSlot(
+  key: SlotKey,
+  prefs?: ProfileAlertPrefs | null,
+): "user_selected" | "system_default" {
+  return prefs?.smartSlots?.[key] ? "user_selected" : "system_default";
+}
+
+function intendedLocalTime(slot: SmartSlotConfig): string {
+  return `${String(slot.hour).padStart(2, "0")}:${String(slot.minute).padStart(2, "0")}`;
+}
+
 async function logEmailAttempt(entry: EmailAttemptLogEntry): Promise<void> {
   const raw = await kv.get(CRON_ATTEMPT_LOG_KEY);
   const log: EmailAttemptLogEntry[] = Array.isArray(raw) ? raw as EmailAttemptLogEntry[] : [];
@@ -359,10 +359,11 @@ export async function runScheduledEmailNudges(): Promise<{
       continue;
     }
 
-    const tzOffset = normalizeTzOffsetMinutes(
-      typeof backup?.tzOffset === "number" ? backup.tzOffset : 300,
-    );
-    const local = localDateTimeForProfile(tzOffset);
+    const clock = resolveEmailScheduleClock({
+      timezone: backup?.timezone,
+      tzOffset: backup?.tzOffset,
+    });
+    const local = localDateTimeForScheduleClock(clock);
     const slots = effectiveSlots(settings, prefs);
     const snapshot = backup?.nudgeSnapshot ?? null;
     const snapshotFresh = snapshot?.dateKey === local.dateKey ? snapshot : null;
@@ -372,6 +373,12 @@ export async function runScheduledEmailNudges(): Promise<{
       const slot = slots[key];
       const tag = SLOT_TAGS[key];
       if (!isSlotDueNow(slot, local.totalMinutes, key)) continue;
+      const localTime = intendedLocalTime(slot);
+      const scheduleSource = scheduleSourceForSlot(key, prefs);
+      const timingDeltaSeconds = Math.max(
+        0,
+        Math.round((local.totalMinutes - (slot.hour * 60 + slot.minute)) * 60),
+      );
 
       const copy = buildNudgeCopy(tag, snapshotFresh, profileName, local.hour);
       if (!copy) {
@@ -385,6 +392,13 @@ export async function runScheduledEmailNudges(): Promise<{
           attemptAt: Date.now(),
           status: "suppressed",
           skipReason,
+          scheduleSource,
+          scheduleReason: clock.reason,
+          intendedLocalDate: local.dateKey,
+          intendedLocalTime: localTime,
+          timezone: clock.timezone,
+          tzOffset: clock.tzOffset,
+          timingDeltaSeconds,
         });
         continue;
       }
@@ -414,6 +428,13 @@ export async function runScheduledEmailNudges(): Promise<{
           attemptAt: Date.now(),
           status: "provider_accepted",
           resendId: result.resendId,
+          scheduleSource,
+          scheduleReason: clock.reason,
+          intendedLocalDate: local.dateKey,
+          intendedLocalTime: localTime,
+          timezone: clock.timezone,
+          tzOffset: clock.tzOffset,
+          timingDeltaSeconds,
         });
       } else {
         skipped++;
@@ -430,6 +451,13 @@ export async function runScheduledEmailNudges(): Promise<{
           attemptAt: Date.now(),
           status: reason === "send_failed" ? "provider_rejected" : "suppressed",
           skipReason: reason,
+          scheduleSource,
+          scheduleReason: clock.reason,
+          intendedLocalDate: local.dateKey,
+          intendedLocalTime: localTime,
+          timezone: clock.timezone,
+          tzOffset: clock.tzOffset,
+          timingDeltaSeconds,
         });
       }
     }

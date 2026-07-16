@@ -34,6 +34,7 @@ const TASK_GOAL_LINKS_KEY = (profileId: string) => `arbol-task-goal-links-${prof
 const DELETED_DEFAULT_GOALS_KEY = (profileId: string) => `arbol-deleted-default-goals-${profileId}`;
 const LOCAL_CLOUD_AT_KEY = (profileId: string) => `arbol-local-cloud-at-${profileId}`;
 const TZ_OFFSET_KEY = (profileId: string) => `arbol-tz-offset-${profileId}`;
+const TIMEZONE_KEY = (profileId: string) => `arbol-timezone-${profileId}`;
 
 export function getStoredTzOffset(profileId: string): number {
   const raw = localStorage.getItem(TZ_OFFSET_KEY(profileId));
@@ -47,6 +48,31 @@ function persistTzOffset(profileId: string, offset: unknown): void {
   if (typeof offset === 'number' && Number.isFinite(offset)) {
     localStorage.setItem(TZ_OFFSET_KEY(profileId), String(normalizeTzOffsetMinutes(offset)));
   }
+}
+
+function currentBrowserTimezone(): string | null {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return typeof tz === 'string' && tz.includes('/') ? tz : null;
+  } catch {
+    return null;
+  }
+}
+
+function getStoredTimezone(profileId: string): string | null {
+  const raw = localStorage.getItem(TIMEZONE_KEY(profileId));
+  if (raw && raw.includes('/') && !/^[A-Z]{2,4}$/.test(raw)) return raw;
+  return currentBrowserTimezone();
+}
+
+function persistTimezone(profileId: string, timezone: unknown): void {
+  if (typeof timezone !== 'string') return;
+  const trimmed = timezone.trim();
+  if (!trimmed || !trimmed.includes('/') || /^[A-Z]{2,4}$/.test(trimmed)) return;
+  try {
+    Intl.DateTimeFormat('en-US', { timeZone: trimmed }).format(new Date());
+    localStorage.setItem(TIMEZONE_KEY(profileId), trimmed);
+  } catch { /* ignore invalid timezone */ }
 }
 
 function isUserCreatedGoal(profileId: string, goalId: string): boolean {
@@ -197,6 +223,7 @@ function collectLocalData(profileId: string): Record<string, unknown> {
     streakBest:     raw(`streak-best-${profileId}`),
     profileEmail:   localStorage.getItem(getStorageKey(`arbol-email-${profileId}`)) || null,
     alertPrefs:     raw(getStorageKey(`arbol-alert-prefs-${profileId}`)),
+    timezone:       getStoredTimezone(profileId),
     tzOffset:       getStoredTzOffset(profileId),
     nudgeSnapshot:  profile ? buildNudgeSnapshot(profileId, profile.name) : null,
     liveReports:    raw(`arbol-live-reports-${profileId}`),
@@ -502,6 +529,7 @@ function applyLocalData(profileId: string, data: Record<string, unknown>): void 
   if (typeof data.calendarProvider === 'string' && data.calendarProvider.trim()) {
     localStorage.setItem(CALENDAR_PROVIDER_KEY(profileId), data.calendarProvider.trim());
   }
+  persistTimezone(profileId, data.timezone);
   persistTzOffset(profileId, data.tzOffset);
 }
 
@@ -730,10 +758,13 @@ async function buildUnionPayload(profileId: string): Promise<Record<string, unkn
   const cloud = fetch.status === 'ok' ? fetch.data : null;
   if (cloud) {
     mergeCloudActivityUnion(profileId, cloud);
+    persistTimezone(profileId, cloud.timezone);
     persistTzOffset(profileId, cloud.tzOffset);
     rebuildStreakDaysFromDoneTasks(profileId);
   } else {
-    // First backup for this profile — stamp current device offset.
+    // First backup for this profile — stamp current device timezone.
+    const tz = currentBrowserTimezone();
+    if (tz) persistTimezone(profileId, tz);
     persistTzOffset(profileId, new Date().getTimezoneOffset());
     rebuildStreakDaysFromDoneTasks(profileId);
   }
@@ -786,6 +817,9 @@ async function buildUnionPayload(profileId: string): Promise<Record<string, unkn
   }
 
   // Prefer stored profile timezone (often from the first/primary device).
+  if (typeof cloud.timezone === 'string' && cloud.timezone.trim()) {
+    local.timezone = cloud.timezone.trim();
+  }
   if (typeof cloud.tzOffset === 'number') {
     local.tzOffset = cloud.tzOffset;
   }
@@ -825,6 +859,7 @@ async function saveToCloudUnlocked(profileId: string, opts?: { retryOnStale?: bo
   if (payload.streakBest != null) {
     localStorage.setItem(`streak-best-${profileId}`, JSON.stringify(payload.streakBest));
   }
+  persistTimezone(profileId, payload.timezone);
   persistTzOffset(profileId, payload.tzOffset);
 
   const { data, error } = await invokeWithRetry(`${FN}/backup/${profileId}`, {

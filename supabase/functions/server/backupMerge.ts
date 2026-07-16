@@ -165,5 +165,14 @@ export function unionMergeBackupPayload(
     merged.profileEmail = existingEmail;
   }
 
+  // Prefer a valid IANA timezone from either side; never wipe with null/empty.
+  const existingTz = typeof existing.timezone === "string" ? existing.timezone.trim() : "";
+  const incomingTz = typeof incoming.timezone === "string" ? incoming.timezone.trim() : "";
+  if (incomingTz.includes("/")) {
+    merged.timezone = incomingTz;
+  } else if (existingTz.includes("/")) {
+    merged.timezone = existingTz;
+  }
+
   return merged;
 }

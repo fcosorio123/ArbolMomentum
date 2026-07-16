@@ -17,7 +17,8 @@
     "test:post-push": "node scripts/verify-post-push.mjs",
     "test:ai-assist": "npx tsx scripts/test-ai-assist-contracts.ts && node scripts/test-ai-assist-persist.mjs",
     "test:onboarding": "npx tsx scripts/test-product-onboarding.ts",
-    "test:simplify-detail": "npx tsx scripts/test-simplify-detail-assist.ts"
+    "test:simplify-detail": "npx tsx scripts/test-simplify-detail-assist.ts",
+    "test:email-schedule": "npx tsx scripts/test-email-schedule-time.ts"
   },
   "dependencies": {
     "@ant-design/colors": "^8.0.1",
