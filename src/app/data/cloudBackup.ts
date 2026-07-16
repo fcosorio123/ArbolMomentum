@@ -320,6 +320,11 @@ function mergeTaskGoalLinksFromCloud(profileId: string, cloudLinks: unknown): bo
 }
 
 function hasLocalProfileData(profileId: string): boolean {
+  // A completed cloud read is valid local state even when the profile is
+  // intentionally empty. Without this marker, zero-state profiles are
+  // classified as needing a full restore on every mount.
+  if (localStorage.getItem(LOCAL_CLOUD_AT_KEY(profileId))) return true;
+
   // Auto-seeded default goals / empty seed-override `{}` must not block a full cloud restore.
   try {
     const ut = localStorage.getItem(`arbol-user-tasks-${profileId}`);

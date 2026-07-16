@@ -400,8 +400,10 @@ export default function App() {
           .then(async result => {
             lastSyncAt = Date.now();
             if (result === 'full-restore') {
-              window.location.reload();
-              return;
+              // applyLocalData already wrote synchronously. Refresh mounted
+              // views instead of reloading; an intentionally empty cloud
+              // profile would otherwise full-restore and reload forever.
+              notifyUi();
             }
             let hydrated = false;
             try {
