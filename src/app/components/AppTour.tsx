@@ -9,10 +9,20 @@ export const TOUR_KEYS = {
   home:     'arbol-tour-home-done',
   goals:    'arbol-tour-goals-done',
   tasks:    'arbol-tour-tasks-done',
+  /** Legacy week tour — kept for cloud backup compatibility; not required for “all dismissed”. */
   week:     'arbol-tour-week-done',
   calendar: 'arbol-tour-calendar-done',
   checkIn:  'arbol-tour-checkin-done',
 };
+
+/** Live page tours that must complete for areToursDismissedForProfile (excludes unmounted week). */
+export const ACTIVE_TOUR_KEYS = [
+  TOUR_KEYS.home,
+  TOUR_KEYS.goals,
+  TOUR_KEYS.tasks,
+  TOUR_KEYS.calendar,
+  TOUR_KEYS.checkIn,
+] as const;
 
 /** Per-profile, env-prefixed tour dismissal key. */
 export function tourStorageKey(baseKey: string, profileId: string): string {
@@ -29,13 +39,29 @@ export function allToursDismissedKey(profileId: string): string {
   return getStorageKey(`${TOURS_ALL_DISMISSED_BASE}-${profileId}`);
 }
 
-/** True when user skipped all tours or every per-page tour + coach marks are done. */
+/** True when user skipped all tours or every live per-page tour + coach marks are done. */
 export function areToursDismissedForProfile(profileId: string): boolean {
   if (localStorage.getItem(allToursDismissedKey(profileId))) return true;
   if (!localStorage.getItem(coachStorageKey(profileId))) return false;
-  return Object.values(TOUR_KEYS).every(
+  return ACTIVE_TOUR_KEYS.every(
     key => !!localStorage.getItem(tourStorageKey(key, profileId)),
   );
+}
+
+/** Clear live tour progress so auto-start / Restart can show tours again. */
+export function resetLiveToursForProfile(profileId: string): void {
+  localStorage.removeItem(allToursDismissedKey(profileId));
+  for (const base of ACTIVE_TOUR_KEYS) {
+    localStorage.removeItem(tourStorageKey(base, profileId));
+  }
+}
+
+/** Persist a single page tour as done (used when targets never appear). */
+export function markTourPageDone(storageKey: string, profileId?: string): void {
+  localStorage.setItem(storageKey, 'true');
+  if (profileId) {
+    import('../data/cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId)).catch(() => {});
+  }
 }
 
 /** Skip every coach mark and page tour for this profile (persists + cloud backup). */
@@ -543,12 +569,16 @@ export function PageTour({
         if (refreshSteps().length > 0) return;
         timers.push(setTimeout(() => {
           if (dismissed.current) return;
-          if (refreshSteps().length === 0) onClose();
+          if (refreshSteps().length === 0) {
+            // Persist so missing targets do not cause infinite auto-reopen loops.
+            markTourPageDone(storageKey, profileId);
+            onClose();
+          }
         }, 1500));
       }, 400));
       return () => timers.forEach(clearTimeout);
     }
-  }, [open, refreshSteps, onClose]);
+  }, [open, refreshSteps, onClose, storageKey, profileId]);
 
   const step = activeSteps[current] ?? null;
 

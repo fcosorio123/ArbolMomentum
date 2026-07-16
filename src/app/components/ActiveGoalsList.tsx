@@ -101,7 +101,7 @@ export function ActiveGoalsList({ profileId, onNavigateGoals }: Props) {
         }}>
           <div style={{ fontSize: 26, marginBottom: 6 }}>🎯</div>
           <div style={{ fontSize: 13, color: C.body, marginBottom: 10 }}>
-            Set a goal to track progress here
+            Set a goal or task to get started
           </div>
           {onNavigateGoals && (
             <button

@@ -1,103 +1,107 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { C } from '../data/colors';
+import { trackEvent } from '../data/deviceAnalytics';
+import { ONBOARDING_TOUR_VERSION } from '../data/productOnboarding';
 
 const STEPS = [
   {
     emoji: '🌿',
-    title: 'Welcome to Arbol Momentum!',
-    desc: 'Your personal home care companion. Build daily habits, track streaks, and get timely reminders.',
+    title: 'Welcome to Arbol Momentum',
+    desc: 'Plan outcomes as goals, take action with tasks, and keep momentum with check-ins and streaks.',
     tip: null,
     accent: C.primary,
     dark: true,
-  },
-  {
-    emoji: '✅',
-    title: 'Tasks Are Your Primary Action',
-    desc: 'Your tasks are the actions to complete. Goals define the outcome you are working toward. Categories group tasks by area of life. The Tasks tab always shows you what to do next.',
-    tip: '💡 Completing all tasks today extends your streak!',
-    accent: '#3da9fc',
-    dark: false,
+    id: 'welcome',
   },
   {
     emoji: '🎯',
-    title: 'Goals Provide the Context',
-    desc: 'Each goal is an outcome you want to achieve. Tasks are grouped by category - an area of life like Finance or Health. Each category lives under the goal it supports.',
-    tip: '💡 Tap a goal header to collapse or expand its tasks.',
+    title: 'Goals vs Tasks',
+    desc: 'Goals are outcomes you want to reach. Tasks are the concrete actions that move those outcomes forward. Use Goals to set direction and Tasks to get things done.',
+    tip: '💡 Start with either a goal or a task — you can link them later.',
     accent: '#ef4565',
     dark: false,
+    id: 'goals-vs-tasks',
   },
   {
-    emoji: '📋',
-    title: 'Complete Tasks, Make Progress',
-    desc: 'Complete these tasks to make progress toward this goal. Each task you finish moves the goal forward - the progress ring updates in real time.',
-    tip: '💡 Tap the circle button on any task to mark it in progress or done.',
-    accent: '#f5a623',
+    emoji: '✍️',
+    title: 'Create manually or with AI Assist',
+    desc: 'Manual creation gives you full control. AI Assist turns a brain dump into a few editable options — nothing is saved until you confirm in the editor.',
+    tip: '💡 You can switch between Goal and Task while using AI Assist.',
+    accent: '#3da9fc',
     dark: false,
+    id: 'create-modes',
   },
   {
-    emoji: '📖',
-    title: 'Track Progress with Goal Logs',
-    desc: 'Goal Logs show updates, progress, and what changed over time. Tap "View Goal Log" inside any goal section to see the full history.',
-    tip: '💡 Use "Log →" on monetary goals to record amounts saved or earned.',
-    accent: C.primary,
-    dark: false,
-  },
-  {
-    emoji: '🔄',
-    title: 'Tasks and Goals Always Stay in Sync',
-    desc: 'Completing a task on the Tasks page instantly updates the Goals page too - and vice versa. Both pages read from the same source, so your progress is always consistent no matter where you work.',
-    tip: '💡 The goal progress ring updates in real time as you check off tasks each day.',
+    emoji: '🔗',
+    title: 'Link tasks to goals your way',
+    desc: 'When you create a task, assign it to an existing goal, start a new goal, or leave it unassigned. Goals can be saved alone or with selected starter tasks.',
+    tip: '💡 Progress stays in sync whether you work from Goals or Tasks.',
     accent: '#22c55e',
     dark: false,
+    id: 'relationships',
   },
   {
-    emoji: '➕',
-    title: 'Add Tasks and Link Them to Goals',
-    desc: 'Use the + button on the Tasks page to create your own tasks. Assign them to a goal so they show up under that goal and count toward your daily progress on both pages.',
-    tip: '💡 Every task should have a goal - that is what gives it meaning.',
-    accent: '#ef4565',
+    emoji: '🪄',
+    title: 'Simplify for Me',
+    desc: 'Stuck on a big task? Simplify for Me breaks an existing task into smaller, actionable steps you can edit before saving.',
+    tip: '💡 Find it on a task card when you need a clearer next move.',
+    accent: '#f5a623',
     dark: false,
+    id: 'simplify',
   },
   {
     emoji: '🔥',
-    title: 'Build Your Streak',
-    desc: 'The Home tab shows your 7-day streak history. Come back every day to keep the chain alive!',
-    tip: '💡 Your streak resets if you miss a day - be consistent.',
-    accent: '#f5a623',
-    dark: false,
-  },
-  {
-    emoji: '📅',
-    title: 'Plan Your Week',
-    desc: 'The Week tab shows a 7-day planner so you can see what\'s ahead and track your overall momentum.',
-    tip: '💡 Tap any day to see and complete its tasks.',
+    title: 'Check in and keep your streak',
+    desc: 'Home shows your streak and what to do next. Complete tasks and check in regularly to keep momentum visible.',
+    tip: '💡 Tap ? anytime for a page tour or this product overview.',
     accent: C.primary,
     dark: false,
+    id: 'streak',
   },
   {
     emoji: '📱',
-    title: 'Install for the Best Experience',
-    desc: 'Add Arbol Momentum to your home screen for a native-app feel with full push notification support.',
-    tip: 'Tap "Add to Home Screen" in the Alerts tab for step-by-step instructions.',
+    title: 'Install for the best experience',
+    desc: 'Add Arbol Momentum to your home screen for a native feel and stronger notification support.',
+    tip: 'Tap “Add to Home Screen” in Alerts for step-by-step instructions.',
     accent: '#3da9fc',
     dark: false,
+    id: 'install',
   },
 ];
 
 interface Props {
   onDone: () => void;
+  profileId?: string;
 }
 
-export function CoachMarks({ onDone }: Props) {
+export function CoachMarks({ onDone, profileId }: Props) {
   const [step, setStep] = useState(0);
   const current = STEPS[step];
   const isLast = step === STEPS.length - 1;
   const isFirst = step === 0;
   const pct = Math.round(((step + 1) / STEPS.length) * 100);
 
+  useEffect(() => {
+    if (!profileId) return;
+    trackEvent(profileId, 'coaching_mark_viewed', {
+      tourVersion: ONBOARDING_TOUR_VERSION,
+      stepId: current.id,
+    });
+  }, [profileId, current.id]);
+
+  const finish = (skipped: boolean) => {
+    if (profileId) {
+      trackEvent(profileId, skipped ? 'coaching_mark_skipped' : 'coaching_mark_completed', {
+        tourVersion: ONBOARDING_TOUR_VERSION,
+        stepId: current.id,
+      });
+    }
+    onDone();
+  };
+
   return (
     <div
-      onClick={onDone}
+      onClick={() => finish(true)}
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
         background: 'rgba(5,30,55,0.72)',
@@ -106,9 +110,11 @@ export function CoachMarks({ onDone }: Props) {
         padding: 'max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom))',
       }}
     >
-      {/* Card - stop click-through */}
       <div
         onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="coach-marks-title"
         style={{
           width: '100%', maxWidth: 390,
           maxHeight: 'min(90vh, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 32px))',
@@ -119,14 +125,12 @@ export function CoachMarks({ onDone }: Props) {
           display: 'flex', flexDirection: 'column',
         }}
       >
-        {/* Coloured accent strip at top */}
         <div style={{
           height: 5,
           background: `linear-gradient(90deg, ${current.accent}, ${current.accent}88)`,
           transition: 'background 0.3s',
         }} />
 
-        {/* Header row: step counter + close */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '16px 20px 0',
@@ -135,7 +139,9 @@ export function CoachMarks({ onDone }: Props) {
             STEP {step + 1} OF {STEPS.length}
           </span>
           <button
-            onClick={onDone}
+            type="button"
+            aria-label="Close product overview"
+            onClick={() => finish(true)}
             style={{
               background: C.bgAlt, border: 'none', cursor: 'pointer',
               width: 30, height: 30, borderRadius: '50%',
@@ -147,7 +153,6 @@ export function CoachMarks({ onDone }: Props) {
           </button>
         </div>
 
-        {/* Progress bar */}
         <div style={{ margin: '12px 20px 0', height: 4, background: C.bgAlt, borderRadius: 2, overflow: 'hidden' }}>
           <div style={{
             height: '100%', borderRadius: 2,
@@ -157,13 +162,11 @@ export function CoachMarks({ onDone }: Props) {
           }} />
         </div>
 
-        {/* Main content — scrolls on small screens */}
         <div style={{
           padding: '28px 28px 0', textAlign: 'center',
           flex: 1, overflowY: 'auto', minHeight: 0,
           WebkitOverflowScrolling: 'touch',
         }}>
-          {/* Emoji in a tinted circle */}
           <div style={{
             width: 88, height: 88, borderRadius: '50%',
             background: `${current.accent}18`,
@@ -174,7 +177,7 @@ export function CoachMarks({ onDone }: Props) {
             {current.emoji}
           </div>
 
-          <h2 style={{
+          <h2 id="coach-marks-title" style={{
             margin: '0 0 12px', fontSize: 20, fontWeight: 800,
             color: C.headline, lineHeight: 1.25,
           }}>
@@ -201,7 +204,6 @@ export function CoachMarks({ onDone }: Props) {
           )}
         </div>
 
-        {/* Dot indicators */}
         <div style={{
           display: 'flex', justifyContent: 'center', gap: 7,
           padding: '22px 0 4px', flexShrink: 0,
@@ -209,6 +211,9 @@ export function CoachMarks({ onDone }: Props) {
           {STEPS.map((_, i) => (
             <button
               key={i}
+              type="button"
+              aria-label={`Go to step ${i + 1}`}
+              aria-current={i === step ? 'step' : undefined}
               onClick={() => setStep(i)}
               style={{
                 width: i === step ? 22 : 8, height: 8, borderRadius: 4,
@@ -220,7 +225,6 @@ export function CoachMarks({ onDone }: Props) {
           ))}
         </div>
 
-        {/* Action buttons — pinned at bottom */}
         <div style={{
           padding: '16px 20px calc(24px + env(safe-area-inset-bottom, 0px))',
           display: 'flex', gap: 10, flexShrink: 0,
@@ -229,6 +233,7 @@ export function CoachMarks({ onDone }: Props) {
         }}>
           {!isFirst && (
             <button
+              type="button"
               onClick={() => setStep(s => s - 1)}
               style={{
                 flex: 1, height: 50, borderRadius: 14, cursor: 'pointer',
@@ -240,7 +245,8 @@ export function CoachMarks({ onDone }: Props) {
             </button>
           )}
           <button
-            onClick={isLast ? onDone : () => setStep(s => s + 1)}
+            type="button"
+            onClick={isLast ? () => finish(false) : () => setStep(s => s + 1)}
             style={{
               flex: 2, height: 50, borderRadius: 14, cursor: 'pointer', border: 'none',
               background: current.accent,
@@ -249,19 +255,20 @@ export function CoachMarks({ onDone }: Props) {
               transition: 'background 0.3s, box-shadow 0.3s',
             }}
           >
-            {isLast ? 'Get Started 🚀' : 'Next →'}
+            {isLast ? 'Get Started' : 'Next →'}
           </button>
         </div>
 
-        {/* Skip link */}
         {!isLast && (
           <button
-            onClick={onDone}
+            type="button"
+            onClick={() => finish(true)}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
               color: C.secondary, fontSize: 12,
               paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
               width: '100%', textAlign: 'center', flexShrink: 0,
+              minHeight: 44,
             }}
           >
             Skip tour

@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Progress, Modal, Button } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, ArrowRightOutlined } from '@ant-design/icons';
-import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile } from './AppTour';
+import { PageTour, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile, resetLiveToursForProfile } from './AppTour';
+import { HelpTourMenu } from './HelpTourMenu';
 import { CongratModal } from './CongratModal';
 import {
   getPersonalGoals, createUserGoal, updateUserGoal, deleteUserGoal,
@@ -16,6 +17,8 @@ import { attachResourcesToNewTask } from '../data/taskResources';
 import { ManageGoalModal } from './ManageGoalModal';
 import { AiAssistCreationModal } from './AiAssistCreationModal';
 import { isAiAssistCreationEnabled } from '../data/environment';
+import { trackEvent } from '../data/deviceAnalytics';
+import { ONBOARDING_TOUR_VERSION } from '../data/productOnboarding';
 import { C } from '../data/colors';
 import type { Profile } from '../data/profiles';
 
@@ -43,6 +46,11 @@ interface Props {
   onNavigateTasks?: () => void;
   /** Prefer All Tasks tab (Goals "See all tasks" link). */
   onNavigateAllTasks?: () => void;
+  onProductTour?: () => void;
+  /** One-shot: open FAB create menu so user can choose Manual or AI. */
+  openCreateEntry?: boolean;
+  onCreateEntryConsumed?: () => void;
+  canStartPageTours?: boolean;
 }
 
 
@@ -125,7 +133,11 @@ function goalAccent(goalId: string) {
   return ACCENT_COLORS[Math.abs(goalId.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % ACCENT_COLORS.length];
 }
 
-export function GoalsPage({ profile, onNavigateTasks, onNavigateAllTasks }: Props) {
+export function GoalsPage({
+  profile, onNavigateTasks, onNavigateAllTasks,
+  onProductTour, openCreateEntry, onCreateEntryConsumed,
+  canStartPageTours = true,
+}: Props) {
   const [goals, setGoals] = useState<PersonalGoal[]>(() => getPersonalGoals(profile.id));
   const [manageGoalOpen, setManageGoalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<PersonalGoal | null>(null);
@@ -162,12 +174,19 @@ export function GoalsPage({ profile, onNavigateTasks, onNavigateAllTasks }: Prop
 
   // Auto-start goals tour on first visit to this page
   useEffect(() => {
+    if (!canStartPageTours) return;
     if (areToursDismissedForProfile(profile.id)) return;
     if (!localStorage.getItem(tourStorageKey(TOUR_KEYS.goals, profile.id))) {
       const t = setTimeout(() => setShowTour(true), 700);
       return () => clearTimeout(t);
     }
-  }, [profile.id]);
+  }, [profile.id, canStartPageTours]);
+
+  useEffect(() => {
+    if (!openCreateEntry) return;
+    setFabMenuOpen(true);
+    onCreateEntryConsumed?.();
+  }, [openCreateEntry, onCreateEntryConsumed]);
 
   const handleSaveGoal = (data: { title: string; deepWhy: string }) => {
     if (editingGoal) {
@@ -243,10 +262,28 @@ export function GoalsPage({ profile, onNavigateTasks, onNavigateAllTasks }: Prop
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
           </p>
         </div>
-        <PageTourButton onClick={() => setShowTour(true)} />
+        <HelpTourMenu
+          hasUnsavedWork={manageGoalOpen || aiAssistOpen}
+          onPageTour={() => {
+            trackEvent(profile.id, 'onboarding_tour_started', {
+              tourVersion: ONBOARDING_TOUR_VERSION,
+              entryPage: 'goals',
+            });
+            setShowTour(true);
+          }}
+          onProductTour={onProductTour}
+          onRestartTours={() => {
+            trackEvent(profile.id, 'onboarding_tour_restarted', {
+              tourVersion: ONBOARDING_TOUR_VERSION,
+              entryPage: 'goals',
+            });
+            resetLiveToursForProfile(profile.id);
+            setShowTour(true);
+          }}
+        />
       </div>
       <p style={{ margin: '0 0 22px', color: C.secondary, fontSize: 13, lineHeight: 1.5 }}>
-        Define where you want to go. Your tasks will follow.
+        Goals are outcomes you want to reach. Create one manually or with AI Assist — nothing saves until you confirm.
       </p>
 
       {goals.length > 0 && (
@@ -275,7 +312,7 @@ export function GoalsPage({ profile, onNavigateTasks, onNavigateAllTasks }: Prop
           <div style={{ fontSize: 48, marginBottom: 14 }}>🎯</div>
           <div style={{ fontWeight: 700, fontSize: 16, color: C.headline, marginBottom: 8 }}>No goals yet</div>
           <div style={{ color: C.body, fontSize: 13, lineHeight: 1.6, marginBottom: 20 }}>
-            Set your first goal and build daily tasks around it. Start with something meaningful.
+            A goal is an outcome you want to reach. Add one manually, or use AI Assist to turn a brain dump into editable options.
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
             <button
@@ -288,11 +325,12 @@ export function GoalsPage({ profile, onNavigateTasks, onNavigateAllTasks }: Prop
                 display: 'inline-flex', alignItems: 'center', gap: 8,
               }}
             >
-              <PlusOutlined /> Add a goal
+              <PlusOutlined /> Create manually
             </button>
             {aiAssistEnabled && (
               <button
                 type="button"
+                data-tour-id="create-with-ai"
                 onClick={() => setAiAssistOpen(true)}
                 style={{
                   background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 12,
@@ -402,6 +440,7 @@ export function GoalsPage({ profile, onNavigateTasks, onNavigateAllTasks }: Prop
             {aiAssistEnabled ? (
               <button
                 type="button"
+                data-tour-id="create-with-ai"
                 onClick={() => { setFabMenuOpen(false); setAiAssistOpen(true); }}
                 style={{
                   padding: '10px 16px', borderRadius: 12, border: `1.5px solid ${C.border}`,
@@ -564,25 +603,25 @@ export function GoalsPage({ profile, onNavigateTasks, onNavigateAllTasks }: Prop
         profileId={profile.id}
         pageLabel="Goals"
         doneEmoji="🎯"
-        doneMessage="You're ready to set and track goals. A goal without tasks is just a wish - add tasks to make it real!"
-        onInteract={() => { setEditingGoal(null); setManageGoalOpen(true); }}
-        interactLabel="Create a goal now →"
+        doneMessage="You're ready to set goals. Use Create manually or Create with AI — nothing saves until you confirm."
+        onInteract={() => { setFabMenuOpen(true); }}
+        interactLabel="Open create options →"
         steps={[
           {
-            title: '🎯 Your Goals',
-            description: 'Each goal card shows your target, today\'s progress, and task breakdown by status - done, in-progress, or not started.',
+            title: 'Your goals',
+            description: 'Each goal is an outcome. Cards show progress and linked task status.',
             targetId: 'goals-section',
             placement: 'bottom',
           },
           {
-            title: '📊 Task Progress',
-            description: 'This section shows how many tasks are done, in-progress, and not started today for this goal.',
+            title: 'Task progress',
+            description: 'See how linked tasks are doing today — done, in progress, or not started.',
             targetId: 'goals-task-breakdown',
             placement: 'bottom',
           },
           {
-            title: '✨ Add a Goal',
-            description: 'Tap the + button to create a goal. Be specific - "Save ₱50k by December" beats "save more money." Tap the button below to try it now!',
+            title: 'Create a goal',
+            description: 'Tap + to choose Create manually or Create with AI. AI turns a brain dump into editable options; nothing saves until you confirm.',
             targetId: 'goals-add-btn',
             placement: 'left',
           },

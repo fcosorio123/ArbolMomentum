@@ -3,7 +3,10 @@ import { Button } from 'antd';
 import {
   FireOutlined, DownloadOutlined, ArrowRightOutlined,
 } from '@ant-design/icons';
-import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile } from './AppTour';
+import { PageTour, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile, resetLiveToursForProfile } from './AppTour';
+import { HelpTourMenu } from './HelpTourMenu';
+import { trackEvent } from '../data/deviceAnalytics';
+import { ONBOARDING_TOUR_VERSION, getProfileContentState } from '../data/productOnboarding';
 import type { Profile } from '../data/profiles';
 import {
   getDateKey, hasActivityOnDate, getEarnedBadges, BADGES,
@@ -33,6 +36,9 @@ interface Props {
   isActive?: boolean;
   /** False while Welcome coach or Today's Summary modal is open */
   canStartPageTours?: boolean;
+  /** One-shot: start Home page tour (e.g. from getting-started). */
+  requestPageTour?: boolean;
+  onPageTourRequestConsumed?: () => void;
 }
 
 function getGreeting() {
@@ -143,11 +149,25 @@ export function Dashboard({
   onNavigateTasks, onNavigateAllTasks, onNavigateGoals, onNavigateMonth, onNavigateReminders: _onNavigateReminders, onShowSummary, onShowFeedback, onGoals: _onGoals, onStartCheckIn,
   isActive = true,
   canStartPageTours = true,
+  requestPageTour = false,
+  onPageTourRequestConsumed,
 }: Props) {
   const { snapshot, isLoading } = useDashboardRefresh(profile.id, isActive);
   const [isPwaInstalled, setIsPwaInstalled] = useState(false);
   const [showTour, setShowTour] = useState(false);
   const [showCheckInTour, setShowCheckInTour] = useState(false);
+  const contentState = getProfileContentState(profile.id);
+  const [emptyTick, setEmptyTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setEmptyTick(n => n + 1);
+    window.addEventListener('arbol-goals-updated', bump);
+    window.addEventListener('arbol-tasks-updated', bump);
+    return () => {
+      window.removeEventListener('arbol-goals-updated', bump);
+      window.removeEventListener('arbol-tasks-updated', bump);
+    };
+  }, []);
+  const liveContentState = emptyTick >= 0 ? getProfileContentState(profile.id) : contentState;
   const [streakCursor, setStreakCursor] = useState(() => {
     const n = new Date();
     return { year: n.getFullYear(), month0: n.getMonth() };
@@ -184,6 +204,12 @@ export function Dashboard({
     return () => clearTimeout(t);
   }, [isActive, canStartPageTours, isLoading, profile.id]);
 
+  useEffect(() => {
+    if (!requestPageTour || !isActive) return;
+    setShowTour(true);
+    onPageTourRequestConsumed?.();
+  }, [requestPageTour, isActive, onPageTourRequestConsumed]);
+
   // Goal Check-In tour — after Welcome, Summary, Home tour, and Tasks tour
   useEffect(() => {
     if (!isActive || !canStartPageTours || isLoading) return;
@@ -193,7 +219,7 @@ export function Dashboard({
     if (!localStorage.getItem(tourStorageKey(TOUR_KEYS.tasks, profile.id))) return;
     const t = setTimeout(() => setShowCheckInTour(true), 600);
     return () => clearTimeout(t);
-  }, [isActive, canStartPageTours, isLoading]);
+  }, [isActive, canStartPageTours, isLoading, profile.id]);
 
   const todayDate = new Date();
   const weekDots = buildWeekDots(profile.id, completionPct > 0);
@@ -318,9 +344,60 @@ export function Dashboard({
               padding: '6px 10px', cursor: 'pointer', color: C.body, fontSize: 13,
             }}>💬</button>
           )}
-          <PageTourButton onClick={() => setShowTour(true)} />
+          <HelpTourMenu
+            onPageTour={() => {
+              trackEvent(profile.id, 'onboarding_tour_started', {
+                tourVersion: ONBOARDING_TOUR_VERSION,
+                entryPage: 'home',
+              });
+              setShowTour(true);
+            }}
+            onProductTour={onCoachMark}
+            onRestartTours={() => {
+              trackEvent(profile.id, 'onboarding_tour_restarted', {
+                tourVersion: ONBOARDING_TOUR_VERSION,
+                entryPage: 'home',
+              });
+              resetLiveToursForProfile(profile.id);
+              setShowTour(true);
+            }}
+          />
         </div>
       </div>
+
+      {liveContentState.isEmpty && (
+        <div style={{
+          marginBottom: 16, padding: '14px 16px', borderRadius: 14,
+          background: `${C.primary}08`, border: `1.5px dashed ${C.primary}35`,
+        }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: C.headline, marginBottom: 4 }}>
+            Add your first goal or task to get started
+          </div>
+          <div style={{ fontSize: 12, color: C.body, marginBottom: 10, lineHeight: 1.45 }}>
+            Create manually or use AI Assist — nothing saves until you confirm.
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {onNavigateGoals && (
+              <button type="button" onClick={onNavigateGoals} style={{
+                ...touchPrimaryButton, padding: '8px 14px', borderRadius: 10, border: 'none',
+                background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`, color: '#fff',
+                fontWeight: 700, fontSize: 12, cursor: 'pointer',
+              }}>
+                Create a goal
+              </button>
+            )}
+            {onNavigateTasks && (
+              <button type="button" onClick={onNavigateTasks} style={{
+                ...touchPrimaryButton, padding: '8px 14px', borderRadius: 10,
+                border: `1.5px solid ${C.border}`, background: C.bgCard, color: C.headline,
+                fontWeight: 700, fontSize: 12, cursor: 'pointer',
+              }}>
+                Create a task
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {isLoading ? (
         <DashboardSkeleton />
@@ -710,26 +787,26 @@ export function Dashboard({
         doneMessage="You've got the Home screen down. Check your streak every day to build momentum!"
         steps={[
           {
-            title: '🔥 Your Streak',
-            description: 'Consecutive days you\'ve completed tasks. Orange dots mean you showed up this week.',
+            title: 'Your streak',
+            description: 'Track consecutive days you take action. Showing up daily builds momentum.',
             targetId: 'home-streak',
             placement: 'bottom',
           },
           {
-            title: '🏆 My Goals',
-            description: 'Swipe through your active goals, or tap this section to view, edit, and set new ones.',
+            title: 'Your goals',
+            description: 'Goals are outcomes you want to reach. Open this section to review progress or add a new goal.',
             targetId: 'home-active-goals',
             placement: 'bottom',
           },
           {
-            title: '⚡ Do This Now',
-            description: 'Your most urgent task right now, based on time of day and goal priority.',
+            title: 'Do this now',
+            description: 'Your most useful next task, based on time of day and what is still open.',
             targetId: 'home-do-now',
             placement: 'bottom',
           },
           {
-            title: '📅 Streak History',
-            description: 'A heatmap of every active day. Darker green = more tasks done.',
+            title: 'Activity calendar',
+            description: 'See which days you completed work this month so consistency stays visible.',
             targetId: 'home-heatmap',
             placement: 'top',
           },

@@ -22,11 +22,15 @@ import {
   type CalendarExportPrefs,
 } from '../data/calendarExport';
 import { useCalendarExport } from '../hooks/useCalendarExport';
-import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile } from './AppTour';
+import { PageTour, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile, resetLiveToursForProfile } from './AppTour';
+import { HelpTourMenu } from './HelpTourMenu';
+import { trackEvent } from '../data/deviceAnalytics';
+import { ONBOARDING_TOUR_VERSION } from '../data/productOnboarding';
 
 interface Props {
   profile: Profile;
   onOpenReminders?: () => void;
+  onProductTour?: () => void;
 }
 
 function formatHour(hour: number) {
@@ -35,7 +39,7 @@ function formatHour(hour: number) {
   return `${h}:00 ${suffix}`;
 }
 
-export function CalendarScreen({ profile, onOpenReminders }: Props) {
+export function CalendarScreen({ profile, onOpenReminders, onProductTour }: Props) {
   const [showTimes, setShowTimes] = useState(false);
   const [prefs, setPrefs] = useState<CalendarExportPrefs>(DEFAULT_CALENDAR_PREFS);
   const [exporting, setExporting] = useState<'week' | 'today' | null>(null);
@@ -138,7 +142,24 @@ export function CalendarScreen({ profile, onOpenReminders }: Props) {
             Put funding tasks on your real calendar - reminders even when Arbol is closed
           </p>
         </div>
-        <PageTourButton onClick={() => setShowTour(true)} />
+        <HelpTourMenu
+          onPageTour={() => {
+            trackEvent(profile.id, 'onboarding_tour_started', {
+              tourVersion: ONBOARDING_TOUR_VERSION,
+              entryPage: 'calendar',
+            });
+            setShowTour(true);
+          }}
+          onProductTour={onProductTour}
+          onRestartTours={() => {
+            trackEvent(profile.id, 'onboarding_tour_restarted', {
+              tourVersion: ONBOARDING_TOUR_VERSION,
+              entryPage: 'calendar',
+            });
+            resetLiveToursForProfile(profile.id);
+            setShowTour(true);
+          }}
+        />
       </div>
 
       {daySync.rolledForward && (

@@ -29,7 +29,7 @@ export function isPublishedVersion(): boolean {
   if (typeof window === 'undefined') return false;
 
   // Baked in at build time for GitHub Pages deploys
-  if (import.meta.env.VITE_PUBLISHED === 'true') return true;
+  if (import.meta.env?.VITE_PUBLISHED === 'true') return true;
 
   const { origin, pathname } = window.location;
 
@@ -57,7 +57,7 @@ export function isDevelopmentVersion(): boolean {
  * Enabled on non-published hosts, or when VITE_ENABLE_AI_ASSIST_CREATION=true at build time.
  */
 export function isAiAssistCreationEnabled(): boolean {
-  if (import.meta.env.VITE_ENABLE_AI_ASSIST_CREATION === 'true') return true;
+  if (import.meta.env?.VITE_ENABLE_AI_ASSIST_CREATION === 'true') return true;
   return isDevelopmentVersion();
 }
 

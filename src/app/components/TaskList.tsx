@@ -46,8 +46,11 @@ import {
 } from '../data/seedOverrides';
 import { touchIconButton, touchPrimaryButton, MIN_TOUCH } from '../styles/touchTargets';
 import { trackActivity } from '../data/feedback';
-import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile } from './AppTour';
+import { PageTour, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile, resetLiveToursForProfile } from './AppTour';
+import { HelpTourMenu } from './HelpTourMenu';
 import { CongratModal } from './CongratModal';
+import { trackEvent } from '../data/deviceAnalytics';
+import { ONBOARDING_TOUR_VERSION } from '../data/productOnboarding';
 import { MomentumUpdateModal } from './MomentumUpdateModal';
 import { TaskUpdateModal, type TaskUpdateContext } from './TaskUpdateModal';
 import { TASK_STATUS_DISPLAY } from './TaskStatusSelector';
@@ -88,6 +91,10 @@ interface Props {
   onTasksChange?: (pending: number) => void;
   /** When set (e.g. from Home "Open Month"), open that Tasks tab on mount. */
   initialTaskView?: TaskViewMode;
+  onProductTour?: () => void;
+  openCreateEntry?: boolean;
+  onCreateEntryConsumed?: () => void;
+  canStartPageTours?: boolean;
 }
 
 function isRecurringUT(task: UserTask): boolean {
@@ -822,7 +829,10 @@ function suggestTasksForGoal(goal: PersonalGoal): Array<{ label: string; timeOfD
 // Main TaskList
 // ──────────────────────────────────────────────
 
-export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfectDay, onTasksChange, initialTaskView }: Props) {
+export function TaskList({
+  profile, onNavigateMonth: _onNavigateMonth, onPerfectDay, onTasksChange, initialTaskView,
+  onProductTour, openCreateEntry, onCreateEntryConsumed, canStartPageTours = true,
+}: Props) {
   const { message } = App.useApp();
   // Land on Today by default; Home "Open Month" can request the Month tab.
   const [taskView, setTaskView] = useState<TaskViewMode>(initialTaskView ?? 'today');
@@ -928,12 +938,19 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
 
   // Auto-start tasks tour on first visit
   useEffect(() => {
+    if (!canStartPageTours) return;
     if (areToursDismissedForProfile(profile.id)) return;
     if (!localStorage.getItem(tourStorageKey(TOUR_KEYS.tasks, profile.id))) {
       const t = setTimeout(() => setShowTour(true), 700);
       return () => clearTimeout(t);
     }
-  }, [profile.id]);
+  }, [profile.id, canStartPageTours]);
+
+  useEffect(() => {
+    if (!openCreateEntry) return;
+    setFabMenuOpen(true);
+    onCreateEntryConsumed?.();
+  }, [openCreateEntry, onCreateEntryConsumed]);
 
   const confirmDelete = () => {
     if (!deleteTarget) return;
@@ -1521,11 +1538,29 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
           </p>
         </div>
-        <PageTourButton onClick={() => setShowTour(true)} />
+        <HelpTourMenu
+          hasUnsavedWork={manageTaskOpen || aiAssistOpen || !!simplifyTarget}
+          onPageTour={() => {
+            trackEvent(profile.id, 'onboarding_tour_started', {
+              tourVersion: ONBOARDING_TOUR_VERSION,
+              entryPage: 'tasks',
+            });
+            setShowTour(true);
+          }}
+          onProductTour={onProductTour}
+          onRestartTours={() => {
+            trackEvent(profile.id, 'onboarding_tour_restarted', {
+              tourVersion: ONBOARDING_TOUR_VERSION,
+              entryPage: 'tasks',
+            });
+            resetLiveToursForProfile(profile.id);
+            setShowTour(true);
+          }}
+        />
       </div>
       <p style={{ margin: '0 0 12px', color: C.secondary, fontSize: 13, lineHeight: 1.5 }}>
-        {taskView === 'all' && 'Every task, grouped under its Goal (outcome). Tasks are the actions.'}
-        {taskView === 'today' && "Today's tasks by Goal. Tap a task to update. Goal is the outcome; Tasks are the actions."}
+        {taskView === 'all' && 'Tasks are actions. Link them to a goal, create a new goal, or leave them unassigned.'}
+        {taskView === 'today' && "Today's actions by goal. Create manually or with AI Assist — nothing saves until you confirm."}
         {taskView === 'month' && 'See timing and workload across the month.'}
       </p>
 
@@ -1724,10 +1759,39 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
           </div>
 
           {isEmpty ? (
-            <div style={{ textAlign: 'center', padding: '32px 16px' }}>
+            <div data-tour-id="tasks-list" style={{ textAlign: 'center', padding: '32px 16px' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>📅</div>
               <div style={{ fontWeight: 600, fontSize: 16, color: C.headline, marginBottom: 8 }}>No tasks yet</div>
-              <div style={{ color: C.body, fontSize: 13 }}>Tap + to add your first task.</div>
+              <div style={{ color: C.body, fontSize: 13, lineHeight: 1.55, marginBottom: 18 }}>
+                A task is something you need to get done. Create one manually or use AI Assist to turn ideas into editable options.
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => { setEditingTask(null); setEditingSeedTaskId(null); setDefaultTaskGoalId(undefined); setManageTaskOpen(true); }}
+                  style={{
+                    background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
+                    border: 'none', borderRadius: 12, padding: '12px 24px',
+                    color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', minHeight: MIN_TOUCH,
+                  }}
+                >
+                  Create manually
+                </button>
+                {aiAssistEnabled && (
+                  <button
+                    type="button"
+                    data-tour-id="create-with-ai"
+                    onClick={() => setAiAssistOpen(true)}
+                    style={{
+                      background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 12,
+                      padding: '10px 20px', color: C.headline, fontSize: 13, fontWeight: 700,
+                      cursor: 'pointer', minHeight: MIN_TOUCH,
+                    }}
+                  >
+                    Create with AI
+                  </button>
+                )}
+              </div>
             </div>
           ) : taskView === 'all' ? (
             renderGoalLists(allGoalTaskMap, allUnassigned, {
@@ -1773,6 +1837,7 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
           {aiAssistEnabled && (
             <button
               type="button"
+              data-tour-id="create-with-ai"
               onClick={() => { setFabMenuOpen(false); setAiAssistOpen(true); }}
               style={{
                 display: 'block', width: '100%', padding: '12px 16px', border: 'none', background: 'none',
@@ -1891,31 +1956,31 @@ export function TaskList({ profile, onNavigateMonth: _onNavigateMonth, onPerfect
         profileId={profile.id}
         pageLabel="Tasks"
         doneEmoji="✅"
-        doneMessage="You know how Tasks work. Mark tasks done as you go - every checkmark builds your streak!"
-        onInteract={() => { setEditingTask(null); setEditingSeedTaskId(null); setManageTaskOpen(true); }}
-        interactLabel="Add a task now →"
+        doneMessage="You know how Tasks work. Create manually or with AI, update progress, and use Simplify for Me when a task feels too big."
+        onInteract={() => { setFabMenuOpen(true); }}
+        interactLabel="Open create options →"
         steps={[
           {
-            title: '📊 Overall Progress',
-            description: 'See how many tasks you\'ve completed today at a glance.',
+            title: 'Today’s progress',
+            description: 'See how many tasks you’ve completed today at a glance.',
             targetId: 'tasks-list',
             placement: 'bottom',
           },
           {
-            title: '💬 Your Progress Coach',
-            description: 'This updates as you complete tasks and goals. Use it to understand your momentum and what to focus on next.',
+            title: 'Progress coach',
+            description: 'Live check-in feedback updates as you complete work — use it to decide what to focus on next.',
             targetId: 'tasks-live-checkin',
             placement: 'bottom',
           },
           {
-            title: '🏆 Goal Groups',
-            description: 'Tasks are grouped by goal. Tap a group header to expand or collapse.',
+            title: 'Goal groups',
+            description: 'Tasks are grouped by goal. You can also keep tasks unassigned.',
             targetId: 'tasks-goal-group',
             placement: 'bottom',
           },
           {
-            title: '➕ Add a Task',
-            description: 'Create daily, weekly, or one-time tasks and link them to a goal.',
+            title: 'Create a task',
+            description: 'Tap + for Create manually or Create with AI. Assign to an existing goal, create a new goal, or leave unassigned. Nothing saves until you confirm.',
             targetId: 'tasks-add-btn',
             placement: 'left',
           },

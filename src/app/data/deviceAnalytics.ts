@@ -27,7 +27,19 @@ export type EventType =
   | 'ai_assist_save_attempted'
   | 'ai_assist_save_succeeded'
   | 'ai_assist_save_partial'
-  | 'ai_assist_save_failed';
+  | 'ai_assist_save_failed'
+  | 'onboarding_empty_state_shown'
+  | 'onboarding_empty_state_dismissed'
+  | 'onboarding_create_goal_clicked'
+  | 'onboarding_create_task_clicked'
+  | 'onboarding_tour_started'
+  | 'onboarding_tour_restarted'
+  | 'onboarding_tour_step_viewed'
+  | 'onboarding_tour_completed'
+  | 'onboarding_tour_skipped'
+  | 'coaching_mark_viewed'
+  | 'coaching_mark_completed'
+  | 'coaching_mark_skipped';
 
 export interface DeviceRecord {
   profileId: string;

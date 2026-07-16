@@ -15,6 +15,7 @@ import { SimplifyHarnessPage } from './SimplifyHarnessPage';
 
 import { BottomNav } from './components/BottomNav';
 import { CoachMarks } from './components/CoachMarks';
+import { GettingStartedModal } from './components/GettingStartedModal';
 import { AddToHomeScreen } from './components/AddToHomeScreen';
 import { CelebrationModal } from './components/CelebrationModal';
 import { DailySummaryModal, markSummaryShownToday } from './components/DailySummaryModal';
@@ -28,6 +29,7 @@ import {
   nextOnboardingAfter,
   markCoachDone,
 } from './data/onboardingQueue';
+import { shouldShowGettingStartedModal } from './data/productOnboarding';
 import {
   detectDevice, saveDeviceRecord, trackEvent,
 } from './data/deviceAnalytics';
@@ -118,6 +120,10 @@ export default function App() {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null);
   const [onboardingModal, setOnboardingModal] = useState<OnboardingModal | null>(null);
+  const [showGettingStarted, setShowGettingStarted] = useState(false);
+  /** One-shot intent: open create entry after navigating from getting-started. */
+  const [createIntent, setCreateIntent] = useState<'goals' | 'tasks' | null>(null);
+  const [requestHomeTour, setRequestHomeTour] = useState(false);
   const [showInstallTutorial, setShowInstallTutorial] = useState(false);
   const [showPostInstallNotif, setShowPostInstallNotif] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
@@ -441,11 +447,26 @@ export default function App() {
   useEffect(() => {
     if (!activeProfile) return;
     const profileId = activeProfile.id;
+    setShowGettingStarted(false);
+    setCreateIntent(null);
     const t = window.setTimeout(() => {
       setOnboardingModal(peekOnboardingModal(profileId));
     }, 400);
     return () => window.clearTimeout(t);
   }, [activeProfile?.id]);
+
+  // Getting-started empty-state modal — only after coach/summary/feedback queue is idle
+  useEffect(() => {
+    if (!activeProfile || onboardingModal) {
+      if (onboardingModal) setShowGettingStarted(false);
+      return;
+    }
+    const profileId = activeProfile.id;
+    const t = window.setTimeout(() => {
+      setShowGettingStarted(shouldShowGettingStartedModal(profileId));
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [activeProfile?.id, onboardingModal]);
 
   // ── Feedback nudge when queue is idle (streak milestone or 9 p.m. — PD-05)
   useEffect(() => {
@@ -652,7 +673,9 @@ export default function App() {
           onShowFeedback={() => setOnboardingModal('feedback')}
           onStartCheckIn={() => setShowCheckIn(true)}
           isActive={activeTab === 'home'}
-          canStartPageTours={!onboardingQueueActive}
+          canStartPageTours={!onboardingQueueActive && !showGettingStarted}
+          requestPageTour={requestHomeTour}
+          onPageTourRequestConsumed={() => setRequestHomeTour(false)}
         />
       )}
       {activeTab === 'goals' && (
@@ -666,6 +689,10 @@ export default function App() {
             setTasksInitialView('all');
             setActiveTab('tasks');
           }}
+          onProductTour={() => setOnboardingModal('coach')}
+          openCreateEntry={createIntent === 'goals'}
+          onCreateEntryConsumed={() => setCreateIntent(null)}
+          canStartPageTours={!onboardingQueueActive && !showGettingStarted}
         />
       )}
       {activeTab === 'tasks' && (
@@ -683,6 +710,10 @@ export default function App() {
             syncBadge(activeProfile.id);
           }}
           onTasksChange={() => syncBadge(activeProfile.id)}
+          onProductTour={() => setOnboardingModal('coach')}
+          openCreateEntry={createIntent === 'tasks'}
+          onCreateEntryConsumed={() => setCreateIntent(null)}
+          canStartPageTours={!onboardingQueueActive && !showGettingStarted}
         />
       )}
       {(activeTab === 'month' || activeTab === 'week') && (
@@ -698,6 +729,7 @@ export default function App() {
         <CalendarScreen
           profile={activeProfile}
           onOpenReminders={() => setActiveTab('reminders')}
+          onProductTour={() => setOnboardingModal('coach')}
         />
       )}
       {activeTab === 'reminders' && (
@@ -817,7 +849,30 @@ export default function App() {
           />
 
           {/* Coach marks */}
-          {showCoach && <CoachMarks onDone={handleCoachDone} />}
+          {showCoach && <CoachMarks onDone={handleCoachDone} profileId={activeProfile.id} />}
+
+          {/* Zero goals/tasks getting-started */}
+          <GettingStartedModal
+            open={showGettingStarted}
+            profileId={activeProfile.id}
+            onDismiss={() => setShowGettingStarted(false)}
+            onCreateGoal={() => {
+              setShowGettingStarted(false);
+              setCreateIntent('goals');
+              setActiveTab('goals');
+            }}
+            onCreateTask={() => {
+              setShowGettingStarted(false);
+              setCreateIntent('tasks');
+              setTasksInitialView('today');
+              setActiveTab('tasks');
+            }}
+            onTakeTour={() => {
+              setShowGettingStarted(false);
+              setActiveTab('home');
+              setRequestHomeTour(true);
+            }}
+          />
 
           {/* Add to Home Screen tutorial */}
           <AddToHomeScreen
