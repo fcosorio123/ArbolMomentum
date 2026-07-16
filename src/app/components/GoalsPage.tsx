@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Progress, Modal, Button } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, ArrowRightOutlined } from '@ant-design/icons';
 import { PageTour, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile, resetLiveToursForProfile } from './AppTour';
@@ -149,6 +149,7 @@ export function GoalsPage({
   const [suggestionTasks, setSuggestionTasks] = useState<Array<{ label: string; timeOfDay: 'morning' | 'evening' }>>([]);
   const [addedSuggestions, setAddedSuggestions] = useState<Set<string>>(new Set());
   const [showTour, setShowTour] = useState(false);
+  const goalsTourAutoStarted = useRef(false);
   const [congratGoal, setCongratGoal] = useState<PersonalGoal | null>(null);
   const [pendingSuggestionGoal, setPendingSuggestionGoal] = useState<PersonalGoal | null>(null);
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
@@ -174,10 +175,18 @@ export function GoalsPage({
 
   // Auto-start goals tour on first visit to this page
   useEffect(() => {
+    goalsTourAutoStarted.current = false;
+  }, [profile.id]);
+
+  useEffect(() => {
     if (!canStartPageTours) return;
+    if (goalsTourAutoStarted.current) return;
     if (areToursDismissedForProfile(profile.id)) return;
     if (!localStorage.getItem(tourStorageKey(TOUR_KEYS.goals, profile.id))) {
-      const t = setTimeout(() => setShowTour(true), 700);
+      const t = setTimeout(() => {
+        goalsTourAutoStarted.current = true;
+        setShowTour(true);
+      }, 700);
       return () => clearTimeout(t);
     }
   }, [profile.id, canStartPageTours]);

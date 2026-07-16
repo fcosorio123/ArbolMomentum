@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from 'antd';
 import {
   FireOutlined, DownloadOutlined, ArrowRightOutlined,
@@ -156,6 +156,8 @@ export function Dashboard({
   const [isPwaInstalled, setIsPwaInstalled] = useState(false);
   const [showTour, setShowTour] = useState(false);
   const [showCheckInTour, setShowCheckInTour] = useState(false);
+  const homeTourAutoStarted = useRef(false);
+  const checkInTourAutoStarted = useRef(false);
   const contentState = getProfileContentState(profile.id);
   const [emptyTick, setEmptyTick] = useState(0);
   useEffect(() => {
@@ -187,6 +189,11 @@ export function Dashboard({
   }, []);
 
   useEffect(() => {
+    homeTourAutoStarted.current = false;
+    checkInTourAutoStarted.current = false;
+  }, [profile.id]);
+
+  useEffect(() => {
     if (!isActive) return;
     const today = snapshot.dateKey;
     const vk = `visit-${profile.id}-${today}`;
@@ -198,9 +205,13 @@ export function Dashboard({
 
   useEffect(() => {
     if (!isActive || !canStartPageTours || isLoading) return;
+    if (homeTourAutoStarted.current) return;
     if (areToursDismissedForProfile(profile.id)) return;
     if (localStorage.getItem(tourStorageKey(TOUR_KEYS.home, profile.id))) return;
-    const t = setTimeout(() => setShowTour(true), 600);
+    const t = setTimeout(() => {
+      homeTourAutoStarted.current = true;
+      setShowTour(true);
+    }, 600);
     return () => clearTimeout(t);
   }, [isActive, canStartPageTours, isLoading, profile.id]);
 
@@ -213,11 +224,15 @@ export function Dashboard({
   // Goal Check-In tour — after Welcome, Summary, Home tour, and Tasks tour
   useEffect(() => {
     if (!isActive || !canStartPageTours || isLoading) return;
+    if (checkInTourAutoStarted.current) return;
     if (areToursDismissedForProfile(profile.id)) return;
     if (localStorage.getItem(tourStorageKey(TOUR_KEYS.checkIn, profile.id))) return;
     if (!localStorage.getItem(tourStorageKey(TOUR_KEYS.home, profile.id))) return;
     if (!localStorage.getItem(tourStorageKey(TOUR_KEYS.tasks, profile.id))) return;
-    const t = setTimeout(() => setShowCheckInTour(true), 600);
+    const t = setTimeout(() => {
+      checkInTourAutoStarted.current = true;
+      setShowCheckInTour(true);
+    }, 600);
     return () => clearTimeout(t);
   }, [isActive, canStartPageTours, isLoading, profile.id]);
 

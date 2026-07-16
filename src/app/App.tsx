@@ -121,6 +121,8 @@ export default function App() {
   const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null);
   const [onboardingModal, setOnboardingModal] = useState<OnboardingModal | null>(null);
   const [showGettingStarted, setShowGettingStarted] = useState(false);
+  /** False until we decide whether the empty-state modal should show (blocks page-tour race). */
+  const [gettingStartedResolved, setGettingStartedResolved] = useState(false);
   /** One-shot intent: open create entry after navigating from getting-started. */
   const [createIntent, setCreateIntent] = useState<'goals' | 'tasks' | null>(null);
   const [requestHomeTour, setRequestHomeTour] = useState(false);
@@ -448,6 +450,7 @@ export default function App() {
     if (!activeProfile) return;
     const profileId = activeProfile.id;
     setShowGettingStarted(false);
+    setGettingStartedResolved(false);
     setCreateIntent(null);
     const t = window.setTimeout(() => {
       setOnboardingModal(peekOnboardingModal(profileId));
@@ -457,13 +460,16 @@ export default function App() {
 
   // Getting-started empty-state modal — only after coach/summary/feedback queue is idle
   useEffect(() => {
-    if (!activeProfile || onboardingModal) {
-      if (onboardingModal) setShowGettingStarted(false);
+    if (!activeProfile) return;
+    if (onboardingModal) {
+      setShowGettingStarted(false);
+      setGettingStartedResolved(false);
       return;
     }
     const profileId = activeProfile.id;
     const t = window.setTimeout(() => {
       setShowGettingStarted(shouldShowGettingStartedModal(profileId));
+      setGettingStartedResolved(true);
     }, 500);
     return () => window.clearTimeout(t);
   }, [activeProfile?.id, onboardingModal]);
@@ -673,7 +679,7 @@ export default function App() {
           onShowFeedback={() => setOnboardingModal('feedback')}
           onStartCheckIn={() => setShowCheckIn(true)}
           isActive={activeTab === 'home'}
-          canStartPageTours={!onboardingQueueActive && !showGettingStarted}
+          canStartPageTours={!onboardingQueueActive && !showGettingStarted && gettingStartedResolved}
           requestPageTour={requestHomeTour}
           onPageTourRequestConsumed={() => setRequestHomeTour(false)}
         />
@@ -692,7 +698,7 @@ export default function App() {
           onProductTour={() => setOnboardingModal('coach')}
           openCreateEntry={createIntent === 'goals'}
           onCreateEntryConsumed={() => setCreateIntent(null)}
-          canStartPageTours={!onboardingQueueActive && !showGettingStarted}
+          canStartPageTours={!onboardingQueueActive && !showGettingStarted && gettingStartedResolved}
         />
       )}
       {activeTab === 'tasks' && (
@@ -713,7 +719,7 @@ export default function App() {
           onProductTour={() => setOnboardingModal('coach')}
           openCreateEntry={createIntent === 'tasks'}
           onCreateEntryConsumed={() => setCreateIntent(null)}
-          canStartPageTours={!onboardingQueueActive && !showGettingStarted}
+          canStartPageTours={!onboardingQueueActive && !showGettingStarted && gettingStartedResolved}
         />
       )}
       {(activeTab === 'month' || activeTab === 'week') && (

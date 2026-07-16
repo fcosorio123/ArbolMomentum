@@ -13,45 +13,58 @@ export function useDashboardRefresh(profileId: string, isActive: boolean) {
   const [isLoading, setIsLoading] = useState(isActive);
   const loadingTimer = useRef<number | undefined>(undefined);
   const loadStarted = useRef(0);
+  const hasLoadedOnce = useRef(false);
 
-  const refresh = useCallback(() => {
-    loadStarted.current = Date.now();
-    setIsLoading(true);
-    if (loadingTimer.current) window.clearTimeout(loadingTimer.current);
+  /**
+   * Full load shows skeleton.
+   * Soft refresh only recomputes the snapshot — avoids remounting Home and
+   * restarting auto page tours on every goals/tasks event (flash loop).
+   */
+  const refresh = useCallback((mode: 'full' | 'soft' = 'full') => {
+    if (mode === 'full' || !hasLoadedOnce.current) {
+      loadStarted.current = Date.now();
+      setIsLoading(true);
+      if (loadingTimer.current) window.clearTimeout(loadingTimer.current);
+    }
     setTick(t => t + 1);
   }, []);
 
   const finishLoading = useCallback(() => {
     const elapsed = Date.now() - loadStarted.current;
     const wait = Math.min(MAX_SKELETON_MS, Math.max(MIN_SKELETON_MS - elapsed, 0));
-    loadingTimer.current = window.setTimeout(() => setIsLoading(false), wait);
+    if (loadingTimer.current) window.clearTimeout(loadingTimer.current);
+    loadingTimer.current = window.setTimeout(() => {
+      hasLoadedOnce.current = true;
+      setIsLoading(false);
+    }, wait);
   }, []);
 
   useEffect(() => {
+    hasLoadedOnce.current = false;
     if (!isActive) {
       setIsLoading(false);
       return;
     }
-    refresh();
+    refresh('full');
   }, [isActive, profileId, refresh]);
 
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive || !isLoading) return;
     finishLoading();
     return () => {
       if (loadingTimer.current) window.clearTimeout(loadingTimer.current);
     };
-  }, [tick, isActive, finishLoading]);
+  }, [tick, isActive, isLoading, finishLoading]);
 
   useEffect(() => {
     if (!isActive) return;
-    const handler = () => refresh();
+    const handler = () => refresh('soft');
     window.addEventListener(DASHBOARD_REFRESH_EVENT, handler);
     window.addEventListener('arbol-goals-updated', handler);
     window.addEventListener('arbol-tasks-updated', handler);
     window.addEventListener('arbol-live-feedback-updated', handler);
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') refresh();
+      if (document.visibilityState === 'visible') refresh('soft');
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => {

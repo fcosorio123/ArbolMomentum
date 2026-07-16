@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { App, Button, Progress } from 'antd';
 import { DeleteOutlined, CheckCircleFilled, PlayCircleOutlined, EditOutlined, PlusOutlined, CloseOutlined } from '@ant-design/icons';
 import {
@@ -849,6 +849,7 @@ export function TaskList({
   const [editingTask, setEditingTask] = useState<UserTask | null>(null);
   const [defaultTaskGoalId, setDefaultTaskGoalId] = useState<string | undefined>(undefined);
   const [showTour, setShowTour] = useState(false);
+  const tasksTourAutoStarted = useRef(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [congratTask, setCongratTask] = useState<{ label: string; rows: Array<{ icon: string; label: string; value: string }> } | null>(null);
@@ -938,10 +939,18 @@ export function TaskList({
 
   // Auto-start tasks tour on first visit
   useEffect(() => {
+    tasksTourAutoStarted.current = false;
+  }, [profile.id]);
+
+  useEffect(() => {
     if (!canStartPageTours) return;
+    if (tasksTourAutoStarted.current) return;
     if (areToursDismissedForProfile(profile.id)) return;
     if (!localStorage.getItem(tourStorageKey(TOUR_KEYS.tasks, profile.id))) {
-      const t = setTimeout(() => setShowTour(true), 700);
+      const t = setTimeout(() => {
+        tasksTourAutoStarted.current = true;
+        setShowTour(true);
+      }, 700);
       return () => clearTimeout(t);
     }
   }, [profile.id, canStartPageTours]);
