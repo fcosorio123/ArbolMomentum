@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────
-// Web Push — subscription storage + send (Supabase Edge)
+// Web Push - subscription storage + send (Supabase Edge)
 // Requires VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY in function secrets.
 // ──────────────────────────────────────────────
 
@@ -100,7 +100,7 @@ const PUSH_SLOTS: PushNudgeSlot[] = [
     tag: "daily-morning",
     hour: 8,
     title: "Good morning! ☀️",
-    body: "Check your key financial tasks for today — FAFSA, TAP, and payments.",
+    body: "Check your key financial tasks for today - FAFSA, TAP, and payments.",
   },
   {
     tag: "daily-midday",

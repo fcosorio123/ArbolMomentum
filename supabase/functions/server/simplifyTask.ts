@@ -1,4 +1,4 @@
-// AI-assisted task simplification — task-anchored decomposition with answer context.
+// AI-assisted task simplification - task-anchored decomposition with answer context.
 // Always returns answer-review data for UI. Atomic tasks prefer validated rules packages
 // so device/time answers materially change the output.
 
@@ -155,7 +155,7 @@ async function callOpenAi(input: SimplifyTaskInput): Promise<SimplifiedStep[] | 
   const maxSteps = complexity === "atomic" ? 2 : 5;
 
   const context = [
-    `ORIGINAL TASK TO DECOMPOSE (anchor — every step must advance THIS task): ${input.taskLabel}`,
+    `ORIGINAL TASK TO DECOMPOSE (anchor - every step must advance THIS task): ${input.taskLabel}`,
     `Complexity class: ${complexity} (atomic → exactly 2 compact actions; decomposable/broad → 2-${maxSteps}, never pad)`,
     `Internal task facts from answers (DO NOT quote or paraphrase into labels):`,
     ...facts.map((f) => `- [${f.category}/${f.influence}] ${f.fact}`),
@@ -185,7 +185,7 @@ async function callOpenAi(input: SimplifyTaskInput): Promise<SimplifiedStep[] | 
               "Decompose ONE original task into replacement checklist actions that complete THAT task. "
               + 'Return JSON only: {"tasks":[{"label":"...","timeOfDay":"morning|evening"}]}. '
               + "Rules: (1) Original task is the only object being simplified. "
-              + "(2) Use answer-derived facts to change first action, tool, timing, size, order, or prerequisites — different answers must yield different labels. "
+              + "(2) Use answer-derived facts to change first action, tool, timing, size, order, or prerequisites - different answers must yield different labels. "
               + "(3) Never quote or paraphrase user answers. Never say because you said. "
               + "(4) Never repeat the original task as a suggestion. "
               + "(5) Never add lifestyle habits, goal plans, or unrelated tips (no sleep hygiene when the task is setting a reminder). "

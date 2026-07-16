@@ -10,7 +10,7 @@ const FN = 'make-server-5d90ddf5';
 const FN_BASE = `https://${projectId}.supabase.co/functions/v1`;
 const STORAGE_KEY = getStorageKey('arbol-email-settings');
 
-/** Avoid apikey header — CORS preflight breaks browser POSTs to edge. */
+/** Avoid apikey header - CORS preflight breaks browser POSTs to edge. */
 async function edgeFetch(
   path: string,
   options: { method?: string; body?: Record<string, unknown> } = {},
@@ -289,7 +289,7 @@ export async function sendManualNudge(opts: {
   pendingCount?: number;
   streak?: number;
   topTasks?: Array<{ label: string; goalTitle?: string }>;
-  /** Comma/semicolon-separated or array — wins over server profile lookup */
+  /** Comma/semicolon-separated or array - wins over server profile lookup */
   recipient?: string;
   recipients?: string[];
 }): Promise<{ ok: boolean; reason?: string; sentTo?: string[] }> {
@@ -324,7 +324,7 @@ export async function sendManualNudge(opts: {
       const reason = data?.reason === 'no_valid_recipient'
         ? 'No valid email on this profile. Enter an address and try again.'
         : data?.reason === 'global_disabled' || data?.reason === 'type_or_global_disabled'
-          ? 'Email or this nudge type is turned off — try again after enabling, or use Send nudge now (force may still apply after redeploy).'
+          ? 'Email or this nudge type is turned off - try again after enabling, or use Send nudge now (force may still apply after redeploy).'
           : data?.reason === 'no_test_recipient'
             ? 'Set a test recipient email first.'
             : typeof data?.reason === 'string' && data.reason.startsWith('send_failed')

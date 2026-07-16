@@ -90,7 +90,7 @@ function toUserTaskRow(ut: UserTask, profileId: string, dateKey: string): TodayT
   };
 }
 
-/** Collect every task for today — active, skipped, and permanently removed. */
+/** Collect every task for today - active, skipped, and permanently removed. */
 export function getTodayTaskRows(profileId: string, dateKey = getTodayKey()): TodayTaskRow[] {
   const categories = getTaskCategoriesForProfile(profileId);
   const userTasks = getUserTasks(profileId);
@@ -324,7 +324,7 @@ export function buildNudgeSnapshot(profileId: string, profileName: string, dateK
   };
 }
 
-/** Admin + analytics day rollup — same rules as the student dashboard. */
+/** Admin + analytics day rollup - same rules as the student dashboard. */
 export interface DayStats {
   done: number;
   inprogress: number;
@@ -333,7 +333,7 @@ export interface DayStats {
   notStarted: number;
   skipped: number;
   removed: number;
-  /** @deprecated use removed — kept for AdminView compat */
+  /** @deprecated use removed - kept for AdminView compat */
   deleted: number;
   total: number;
   pct: number;

@@ -27,7 +27,7 @@ function countTaskStatus(
 
 /** Single source of truth for goal ↔ task membership (user links override category defaults). */
 export function getGoalTaskBreakdown(profileId: string, goalId: string, dateKey: string): GoalTaskBreakdown {
-  // Must use the weekday for dateKey — not always "today" — or weekly/history progress stays wrong.
+  // Must use the weekday for dateKey - not always "today" - or weekly/history progress stays wrong.
   const categories = getTaskCategoriesForProfile(profileId, dayNameFromDateKey(dateKey));
   const userTasks = getUserTasks(profileId);
   const tallies = { done: 0, inprogress: 0, notStarted: 0 };

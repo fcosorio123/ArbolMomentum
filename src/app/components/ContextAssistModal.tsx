@@ -1,5 +1,5 @@
 /**
- * LEGACY — quarantined AI Assist V1 (brain dump → SeedSuggestionGroup packages → confirm).
+ * LEGACY - quarantined AI Assist V1 (brain dump → SeedSuggestionGroup packages → confirm).
  * Not imported by GoalsPage / TaskList. CreateProfile uses parse-context-tasks directly.
  * Do not rewire this modal. AI Assist Creation V2 lives in AiAssistCreationModal.
  * Delete only after V2 fully passes acceptance and rollback no longer needs this file.
@@ -28,7 +28,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   profileId?: string;
-  /** Legacy entry hint — unified flow still asks Goal vs Task unless profile mode. */
+  /** Legacy entry hint - unified flow still asks Goal vs Task unless profile mode. */
   mode: AssistMode;
   existingGoals?: AssistGoalOption[];
   onConfirm: (groups: SeedSuggestionGroup[]) => void;
@@ -37,13 +37,13 @@ interface Props {
 const MODE_COPY: Record<'goals' | 'tasks', { title: string; hint: string; placeholder: string; confirm: string }> = {
   goals: {
     title: 'Describe your goal',
-    hint: 'Paste an outcome, deadline, or brain dump — we\'ll turn it into a Goal (outcome) plus starter Tasks (actions).',
+    hint: 'Paste an outcome, deadline, or brain dump - we\'ll turn it into a Goal (outcome) plus starter Tasks (actions).',
     placeholder: 'Save $2k by December, finish capstone proposal, gym 3x/week...',
     confirm: 'Create goals & tasks',
   },
   tasks: {
     title: 'Describe your tasks',
-    hint: 'Paste actions or a routine — we\'ll suggest Tasks you can attach to a Goal.',
+    hint: 'Paste actions or a routine - we\'ll suggest Tasks you can attach to a Goal.',
     placeholder: 'Review budget every Sunday, call advisor Tuesday, submit lab report Friday...',
     confirm: 'Add selected tasks',
   },
@@ -234,7 +234,7 @@ export function ContextAssistModal({ open, onClose, mode, existingGoals = [], on
         selected: true,
         goal: {
           title: eg.title,
-          deepWhy: 'Existing goal — tasks added from AI Assist.',
+          deepWhy: 'Existing goal - tasks added from AI Assist.',
         },
         tasks: tasks.map((t, i) => ({ ...t, id: t.id || `t-${i}`, selected: true })),
       }];
@@ -321,7 +321,7 @@ export function ContextAssistModal({ open, onClose, mode, existingGoals = [], on
             >
               <div style={{ fontSize: 15, fontWeight: 700, color: C.headline }}>Goal</div>
               <div style={{ fontSize: 12, color: C.body, marginTop: 4 }}>
-                An outcome you want — we&apos;ll also suggest starter tasks.
+                An outcome you want - we&apos;ll also suggest starter tasks.
               </div>
             </button>
             <button
@@ -335,7 +335,7 @@ export function ContextAssistModal({ open, onClose, mode, existingGoals = [], on
             >
               <div style={{ fontSize: 15, fontWeight: 700, color: C.headline }}>Task</div>
               <div style={{ fontSize: 12, color: C.body, marginTop: 4 }}>
-                Actions to do — we&apos;ll ask which Goal they belong to.
+                Actions to do - we&apos;ll ask which Goal they belong to.
               </div>
             </button>
           </>
@@ -373,7 +373,7 @@ export function ContextAssistModal({ open, onClose, mode, existingGoals = [], on
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: C.headline }}>Existing goal</div>
                 {existingGoals.length === 0 ? (
-                  <div style={{ fontSize: 11, color: C.secondary, marginTop: 4 }}>No goals yet — create one below.</div>
+                  <div style={{ fontSize: 11, color: C.secondary, marginTop: 4 }}>No goals yet - create one below.</div>
                 ) : (
                   <Select
                     value={existingGoalId || undefined}
@@ -523,8 +523,8 @@ export function ContextAssistModal({ open, onClose, mode, existingGoals = [], on
                 background: '#fff8e6', border: '1px solid #f5a62350', fontSize: 12, color: '#8a6d00', lineHeight: 1.45,
               }}>
                 {parseReason === 'llm_unavailable' || parseReason === 'rate_limited'
-                  ? 'AI assist is temporarily unavailable (missing key, rate limit, or model error). Showing rule-based suggestions — review carefully, then confirm.'
-                  : 'AI was enabled but the server used rule-based parsing. Results may be less tailored — you can go back and try again.'}
+                  ? 'AI assist is temporarily unavailable (missing key, rate limit, or model error). Showing rule-based suggestions - review carefully, then confirm.'
+                  : 'AI was enabled but the server used rule-based parsing. Results may be less tailored - you can go back and try again.'}
               </div>
             )}
             <p style={{ margin: '0 0 10px', fontSize: 11, color: C.secondary, lineHeight: 1.4 }}>

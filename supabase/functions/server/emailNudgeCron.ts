@@ -1,4 +1,4 @@
-// ── Scheduled email nudges (server cron — app does not need to be open) ──
+// ── Scheduled email nudges (server cron - app does not need to be open) ──
 
 import * as kv from "./kv_store.tsx";
 import {
@@ -188,7 +188,7 @@ function buildNudgeCopy(
       title: period === "morning" ? timeGreeting : "Quick check-in 📋",
       body: pending > 0
         ? `${pending} ${taskWord} still open today. Tap a task to mark progress and keep your goals moving.${taskLines}`
-        : `Check in on your goals — open Arbol Momentum to update today's tasks.`,
+        : `Check in on your goals - open Arbol Momentum to update today's tasks.`,
     };
   }
 
@@ -197,7 +197,7 @@ function buildNudgeCopy(
       const taskLabel = done === 1 ? "task" : "tasks";
       return {
         title: `Nice work today, ${firstName}! 🎓`,
-        body: `Solid progress — ${done} ${taskLabel} completed toward your goals.`,
+        body: `Solid progress - ${done} ${taskLabel} completed toward your goals.`,
       };
     }
     if (pending > 0) {

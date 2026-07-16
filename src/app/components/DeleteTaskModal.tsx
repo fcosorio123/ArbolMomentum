@@ -17,7 +17,7 @@ const OPTIONS: Array<{ value: DeleteTaskChoice; label: string; sub: string }> = 
   {
     value: 'today',
     label: 'Skip Just Today',
-    sub: 'Marks the task as Skipped — it stays visible but dimmed until tomorrow.',
+    sub: 'Marks the task as Skipped - it stays visible but dimmed until tomorrow.',
   },
   {
     value: 'forever',

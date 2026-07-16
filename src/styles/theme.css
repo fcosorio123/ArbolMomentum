@@ -199,7 +199,7 @@
   }
 }
 
-/* ── Global toast (Ant Design message) — Linear-style bottom placement */
+/* ── Global toast (Ant Design message) - Linear-style bottom placement */
 .ant-message {
   top: auto !important;
   bottom: calc(72px + env(safe-area-inset-bottom, 0px) + 12px) !important;

@@ -1,4 +1,4 @@
-/** Client/rules fallback that emits V2 CandidateDraft[] — not SeedSuggestionGroup packages. */
+/** Client/rules fallback that emits V2 CandidateDraft[] - not SeedSuggestionGroup packages. */
 
 import {
   newAiAssistId,

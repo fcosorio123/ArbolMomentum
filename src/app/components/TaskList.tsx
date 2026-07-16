@@ -1569,7 +1569,7 @@ export function TaskList({
       </div>
       <p style={{ margin: '0 0 12px', color: C.secondary, fontSize: 13, lineHeight: 1.5 }}>
         {taskView === 'all' && 'Tasks are actions. Link them to a goal, create a new goal, or leave them unassigned.'}
-        {taskView === 'today' && "Today's actions by goal. Create manually or with AI Assist — nothing saves until you confirm."}
+        {taskView === 'today' && "Today's actions by goal. Create manually or with AI Assist - nothing saves until you confirm."}
         {taskView === 'month' && 'See timing and workload across the month.'}
       </p>
 
@@ -1978,7 +1978,7 @@ export function TaskList({
           },
           {
             title: 'Progress coach',
-            description: 'Live check-in feedback updates as you complete work — use it to decide what to focus on next.',
+            description: 'Live check-in feedback updates as you complete work - use it to decide what to focus on next.',
             targetId: 'tasks-live-checkin',
             placement: 'bottom',
           },

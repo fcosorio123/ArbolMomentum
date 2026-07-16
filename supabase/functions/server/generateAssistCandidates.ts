@@ -1,4 +1,4 @@
-// AI Assist Creation V2 — primary-object candidate generation (not SeedSuggestionGroup packages)
+// AI Assist Creation V2 - primary-object candidate generation (not SeedSuggestionGroup packages)
 
 import * as kv from "./kv_store.tsx";
 import type {

@@ -12,7 +12,7 @@ interface Props {
 export function MomentumMiniChart({ profileId, height = 96 }: Props) {
   const chartData = getTodayChartData(profileId);
   const hasData = chartData.length > 0;
-  const display = hasData ? chartData : [{ label: '—', progress: 0, momentum: 0 }];
+  const display = hasData ? chartData : [{ label: '-', progress: 0, momentum: 0 }];
 
   return (
     <div style={{ width: '100%', height }}>

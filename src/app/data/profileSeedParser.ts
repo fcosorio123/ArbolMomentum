@@ -241,7 +241,7 @@ export function parseGoalInput(text: string): SeedSuggestionGroup[] {
     const theme = matchTheme(line);
     if (theme) {
       const group = findOrCreateThemeGroup(groups, theme);
-      // Feeling/keyword dumps become starter actions under the outcome theme — not the goal title itself
+      // Feeling/keyword dumps become starter actions under the outcome theme - not the goal title itself
       if (looksLikeAction(label) && label.length >= 8) {
         pushUniqueTask(group, line, label, recurrence);
       } else if (group.tasks.length === 0) {
@@ -283,7 +283,7 @@ export function parseGoalInput(text: string): SeedSuggestionGroup[] {
       id: nextId('goal'),
       goal: {
         title: `Make progress on: ${label.slice(0, 50)}`,
-        deepWhy: 'An outcome-oriented goal from what you wrote — edit the title if needed.',
+        deepWhy: 'An outcome-oriented goal from what you wrote - edit the title if needed.',
       },
       selected: true,
       tasks: [

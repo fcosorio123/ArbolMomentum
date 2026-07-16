@@ -37,7 +37,7 @@ app.get("/health", (c) => {
   return c.json({ status: "ok" });
 });
 
-// Save profile backup — server-side union merge so peer-device activity is never wiped
+// Save profile backup - server-side union merge so peer-device activity is never wiped
 app.post("/backup/:profileId", async (c) => {
   const profileId = c.req.param("profileId");
   try {
@@ -296,7 +296,7 @@ app.post("/parse-context-tasks", async (c) => {
   }
 });
 
-// AI Assist Creation V2 — primary-object candidates (not SeedSuggestionGroup packages)
+// AI Assist Creation V2 - primary-object candidates (not SeedSuggestionGroup packages)
 app.post("/generate-assist-candidates", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));

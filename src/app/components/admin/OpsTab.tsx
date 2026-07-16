@@ -44,7 +44,7 @@ function SyncStatusCard({ status }: { status: ProfileSyncStatus }) {
         <br />
         Local saved: {status.localSavedAt ? new Date(status.localSavedAt).toLocaleString() : 'never'}
         <br />
-        Cloud saved: {status.cloudSavedAt ? new Date(status.cloudSavedAt).toLocaleString() : '—'}
+        Cloud saved: {status.cloudSavedAt ? new Date(status.cloudSavedAt).toLocaleString() : '-'}
         <br />
         {formatSyncDirection(status.lastSyncDirection)}
       </div>
@@ -144,13 +144,13 @@ export function OpsTab() {
           Email qualification (from KV backup)
         </div>
         <div style={{ fontSize: 12, color: C.body, lineHeight: 1.6 }}>
-          Email: {qual.emailMasked} {qual.hasEmail ? '' : '(missing — cron will skip)'}
+          Email: {qual.emailMasked} {qual.hasEmail ? '' : '(missing - cron will skip)'}
           <br />
           Email source: {emailSourceLabel}
           <br />
           User email enabled: {qual.emailEnabled ? 'yes' : 'no'}
           <br />
-          Archived: {qual.archived ? 'yes — cron skips' : 'no'}
+          Archived: {qual.archived ? 'yes - cron skips' : 'no'}
           <br />
           Snapshot date: {qual.snapshotDate} · Pending: {qual.pending}
           <br />

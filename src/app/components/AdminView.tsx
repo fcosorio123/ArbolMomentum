@@ -138,7 +138,7 @@ function OverviewTab() {
     const profileStats = await Promise.all(profiles.map(async p => {
       const todayVisits = await fetchVisitCountForAdmin(p.id, adminToday);
       const backup = backupById[p.id] ?? null;
-      // Use each profile's calendar today (tz-normalized) — not the admin browser's date.
+      // Use each profile's calendar today (tz-normalized) - not the admin browser's date.
       const today = backup ? getBackupTodayKey(backup) : adminToday;
 
       const calculateDayStats = (date: string) => {
@@ -652,7 +652,7 @@ function AnalyticsTab() {
     return data;
   }, [selectedId]);
 
-  // Fetch backup first, then engagement — previously engagement ran before backup landed (stale zeros).
+  // Fetch backup first, then engagement - previously engagement ran before backup landed (stale zeros).
   useEffect(() => {
     let cancelled = false;
     setBackup(null);
@@ -2018,7 +2018,7 @@ function SettingsTab() {
     if (result.ok) {
       const to = (result.sentTo ?? list).join(', ');
       setManualResult(`Sent to ${to} ✓`);
-      // Update admin fallback map only — do NOT overwrite the profile's own Profile email SoT
+      // Update admin fallback map only - do NOT overwrite the profile's own Profile email SoT
       // (that caused other users' addresses to be replaced with the admin test inbox).
       if (list.length === 1) {
         updateProfileEmail(manualProfileId, list[0]);
@@ -2183,12 +2183,12 @@ function SettingsTab() {
             </div>
             {cronLastRun.ranAt && Date.now() - cronLastRun.ranAt > 2 * 60 * 60 * 1000 && (
               <div style={{ marginTop: 8, fontSize: 12, color: C.streak, fontWeight: 600 }}>
-                Last run is over 2 hours ago — check GitHub Actions schedule.
+                Last run is over 2 hours ago - check GitHub Actions schedule.
               </div>
             )}
             {(cronLastRun.details ?? []).some(d => d.status === 'global_disabled') && (
               <div style={{ marginTop: 8, fontSize: 12, color: C.streak, fontWeight: 600 }}>
-                Last cron reported global_disabled — enable global email and smart nudges above.
+                Last cron reported global_disabled - enable global email and smart nudges above.
               </div>
             )}
             {(cronLastRun.details?.length ?? 0) > 0 && (
@@ -2223,7 +2223,7 @@ function SettingsTab() {
         </div>
         <div style={{ marginTop: 6, fontSize: 11, color: C.secondary, lineHeight: 1.45 }}>
           Common skip reasons: <code>no_email</code> (profile email missing in backup),{' '}
-          <code>already_sent</code> (same slot today), <code>no_copy</code> (zero pending tasks — expected),{' '}
+          <code>already_sent</code> (same slot today), <code>no_copy</code> (zero pending tasks - expected),{' '}
           <code>global_disabled</code> (toggle above), <code>archived</code> (profile archived).
         </div>
       </div>
@@ -2235,7 +2235,7 @@ function SettingsTab() {
       }}>
         Production delivery to each profile&apos;s inbox requires a verified Resend domain
         and EMAIL_FROM_ADDRESS on that domain (not onboarding@resend.dev). With sandbox
-        FROM, only the Resend account owner can receive mail — other profiles will fail loudly.
+        FROM, only the Resend account owner can receive mail - other profiles will fail loudly.
       </div>
 
       <div style={cardStyle}>
@@ -2356,7 +2356,7 @@ function SettingsTab() {
         <div style={labelStyle}>Profile emails (admin fallback only)</div>
         <div style={{ fontSize: 12, color: C.body, marginBottom: 8, lineHeight: 1.4 }}>
           Delivery uses each profile&apos;s own email from Profile settings first.
-          These fields are a fallback if the cloud backup has no email yet — never a shared inbox for all users.
+          These fields are a fallback if the cloud backup has no email yet - never a shared inbox for all users.
         </div>
         {getOperativeProfiles().map(p => (
           <div key={p.id} style={{ marginTop: 10 }}>

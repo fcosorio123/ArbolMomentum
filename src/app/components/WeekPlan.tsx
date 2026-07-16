@@ -410,7 +410,7 @@ export function WeekPlan({ profile }: Props) {
           },
           {
             title: '☑️ Today\'s Tasks',
-            description: 'Tap any task to cycle its status: not started → in-progress → done. Skipped tasks stay visible — tap to restore.',
+            description: 'Tap any task to cycle its status: not started → in-progress → done. Skipped tasks stay visible - tap to restore.',
             targetId: 'week-today',
             placement: 'top',
           },

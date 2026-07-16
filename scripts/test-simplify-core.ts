@@ -106,7 +106,7 @@ assert(
   'B: Android-oriented how-to/link',
 );
 
-// C: one minute — faster wording, still ≤2, differs from A
+// C: one minute - faster wording, still ≤2, differs from A
 assert(testC.suggestions.length === 2, 'C: exactly 2');
 assert(
   testC.suggestions.some(s => /tonight|under a minute|now|save one/i.test(s.label)),
@@ -116,7 +116,7 @@ assert(suggestionsDiffer(testA.suggestions, testC.suggestions), 'A ≠ C');
 assert(suggestionsDiffer(testB.suggestions, testC.suggestions), 'B ≠ C');
 assert(!testC.suggestions.every(s => /quickly/i.test(s.label) && /iphone/i.test(s.label)), 'C: not just "quickly" appended to A');
 
-// D: pizza irrelevant — shown, not used, does not force into labels
+// D: pizza irrelevant - shown, not used, does not force into labels
 assert(testD.answers[0].rawAnswer === 'My favorite food is pizza.', 'D: pizza answer preserved');
 assert(testD.answers[0].usageStatus === 'irrelevant', `D: pizza marked irrelevant (got ${testD.answers[0].usageStatus})`);
 assert(testD.answers[0].influenceTypes.length === 0, 'D: pizza has no influence types');

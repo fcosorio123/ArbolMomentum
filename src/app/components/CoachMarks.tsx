@@ -17,7 +17,7 @@ const STEPS = [
     emoji: '🎯',
     title: 'Goals vs Tasks',
     desc: 'Goals are outcomes you want to reach. Tasks are the concrete actions that move those outcomes forward. Use Goals to set direction and Tasks to get things done.',
-    tip: '💡 Start with either a goal or a task — you can link them later.',
+    tip: '💡 Start with either a goal or a task - you can link them later.',
     accent: '#ef4565',
     dark: false,
     id: 'goals-vs-tasks',
@@ -25,7 +25,7 @@ const STEPS = [
   {
     emoji: '✍️',
     title: 'Create manually or with AI Assist',
-    desc: 'Manual creation gives you full control. AI Assist turns a brain dump into a few editable options — nothing is saved until you confirm in the editor.',
+    desc: 'Manual creation gives you full control. AI Assist turns a brain dump into a few editable options - nothing is saved until you confirm in the editor.',
     tip: '💡 You can switch between Goal and Task while using AI Assist.',
     accent: '#3da9fc',
     dark: false,

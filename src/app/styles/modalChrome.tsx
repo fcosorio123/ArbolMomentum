@@ -1,4 +1,4 @@
-/** Shared Ant Design Modal chrome — keep close (X) clear of accent bars. */
+/** Shared Ant Design Modal chrome - keep close (X) clear of accent bars. */
 export const ACCENT_MODAL_STYLES = {
   content: {
     borderRadius: 20,

@@ -34,7 +34,7 @@ export interface ParseContextTasksResult {
   reason?: string;
 }
 
-/** Authorization-only fetch — avoid apikey header (CORS preflight breaks POSTs). */
+/** Authorization-only fetch - avoid apikey header (CORS preflight breaks POSTs). */
 async function edgePost(
   path: string,
   body: Record<string, unknown>,
@@ -245,7 +245,7 @@ function packageToClientResult(
   };
 }
 
-/** Client-side mirror — uses shared task-anchored core (same validators as edge). */
+/** Client-side mirror - uses shared task-anchored core (same validators as edge). */
 export function ruleBasedSimplifyClient(input: SimplifyTaskInput): SimplifiedTaskSuggestion[] {
   const answers = normalizeClientAnswers(input);
   const goalTitle = isGoalRelevantToTask(input.taskLabel, input.goalTitle) ? input.goalTitle : undefined;

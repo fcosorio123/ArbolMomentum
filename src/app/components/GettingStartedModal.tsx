@@ -71,7 +71,7 @@ export function GettingStartedModal({
         </h2>
         <p style={{ margin: '0 0 18px', fontSize: 14, lineHeight: 1.5, color: C.body }}>
           Start by adding a goal you want to reach or a task you need to get done. You can create it
-          manually or use AI Assist to turn your thoughts into editable options — nothing saves until you confirm.
+          manually or use AI Assist to turn your thoughts into editable options - nothing saves until you confirm.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

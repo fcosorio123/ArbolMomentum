@@ -55,7 +55,7 @@ export function requestEmailSend(payload: EmailSendPayload): void {
     recipient: recipient || undefined,
   };
 
-  // Do not send if we have no address for this profile — avoids silent mis-routing.
+  // Do not send if we have no address for this profile - avoids silent mis-routing.
   if (!body.recipient) {
     console.warn('[EmailNudges] Skip send: no email for profile', payload.profileId);
     return;

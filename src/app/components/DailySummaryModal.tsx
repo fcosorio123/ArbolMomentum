@@ -405,7 +405,7 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
           )}
         </div>
 
-        {/* Pinned footer — always reachable on small screens */}
+        {/* Pinned footer - always reachable on small screens */}
         <div style={{
           flexShrink: 0, padding: '12px 16px 16px',
           borderTop: `1px solid ${C.border}`, background: C.bg,

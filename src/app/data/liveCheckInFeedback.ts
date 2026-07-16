@@ -356,7 +356,7 @@ export function recommendNextAction(
       return {
         label: top.label,
         reason: pace === 'catch_up'
-          ? 'stay on this priority — finishing it moves the whole day'
+          ? 'stay on this priority - finishing it moves the whole day'
           : 'you already started the highest-leverage work',
         taskId: top.id,
         adjustment: pace === 'catch_up' ? 'increase_pace' : 'maintain',
@@ -392,7 +392,7 @@ export function recommendNextAction(
 
   return {
     label: 'Protect what you finished',
-    reason: 'today’s list is complete — recovery counts as progress too',
+    reason: 'today’s list is complete - recovery counts as progress too',
     adjustment: 'recover',
   };
 }
@@ -436,7 +436,7 @@ export function generateReportText(opts: {
 
   const paceAdvice = (() => {
     if (adj === 'increase_pace' && remaining > 0) {
-      return `Given the ${dayPart} and ${remaining} task${remaining === 1 ? '' : 's'} still open, I'd increase intensity for the next stretch — not by doing everything, but by protecting time for "${next}".`;
+      return `Given the ${dayPart} and ${remaining} task${remaining === 1 ? '' : 's'} still open, I'd increase intensity for the next stretch - not by doing everything, but by protecting time for "${next}".`;
     }
     if (adj === 'close_loops') {
       return `I'd slow the starting of new work and close loops first. "${next}" is the one I'd finish before opening anything else.`;
@@ -450,7 +450,7 @@ export function generateReportText(opts: {
     if (pace === 'ahead') {
       return `You're ahead of where I'd expect for this ${dayPart}. Keep the rhythm on "${next}" rather than adding busywork.`;
     }
-    return `Stay with "${next}" at a steady pace — that's the move that keeps momentum honest.`;
+    return `Stay with "${next}" at a steady pace - that's the move that keeps momentum honest.`;
   })();
 
   if (warningType === 'blocker') {
@@ -458,15 +458,15 @@ export function generateReportText(opts: {
   }
 
   if (movementState === 'down') {
-    return `Progress slipped from ${previousProgress}% to ${progress}%, so something reopened or got harder — that's worth treating seriously, not brushing off. Momentum is ${momentumScore}. Before you add new work, stabilize with "${next}". ${adj === 'increase_pace' ? 'Once stable, pick up the pace on that one task only.' : ''}`.trim();
+    return `Progress slipped from ${previousProgress}% to ${progress}%, so something reopened or got harder - that's worth treating seriously, not brushing off. Momentum is ${momentumScore}. Before you add new work, stabilize with "${next}". ${adj === 'increase_pace' ? 'Once stable, pick up the pace on that one task only.' : ''}`.trim();
   }
 
   if (progress >= 100 && remaining === 0) {
-    return `You closed the full list — ${doneCount} task${doneCount === 1 ? '' : 's'} done. That last completion on "${taskTitle}" wasn't cosmetic; it finished the day. ${paceAdvice}`;
+    return `You closed the full list - ${doneCount} task${doneCount === 1 ? '' : 's'} done. That last completion on "${taskTitle}" wasn't cosmetic; it finished the day. ${paceAdvice}`;
   }
 
   if (isFirstCompletionToday && status === 'done') {
-    return `Good — "${taskTitle}" is your first completion today, and it moved you to ${progress}%. That sets the tone. ${isPriority ? 'Starting with a priority item was the right call.' : 'If you want the day to feel stronger, follow with your highest-leverage task next.'} ${paceAdvice}`;
+    return `Good - "${taskTitle}" is your first completion today, and it moved you to ${progress}%. That sets the tone. ${isPriority ? 'Starting with a priority item was the right call.' : 'If you want the day to feel stronger, follow with your highest-leverage task next.'} ${paceAdvice}`;
   }
 
   if (significantJump && status === 'done') {
@@ -474,11 +474,11 @@ export function generateReportText(opts: {
   }
 
   if (inProgressCount > 2) {
-    return `You have ${inProgressCount} tasks in motion at once — activity without closure creates drag even when you're working hard. Progress is ${progress}% and momentum is ${momentumScore}. ${paceAdvice}`;
+    return `You have ${inProgressCount} tasks in motion at once - activity without closure creates drag even when you're working hard. Progress is ${progress}% and momentum is ${momentumScore}. ${paceAdvice}`;
   }
 
   if (pace === 'catch_up' && remaining > 0) {
-    return `Honest read: ${progress}% done this ${dayPart} with ${remaining} still open — you're behind the pace I'd want for today. The fix isn't panic; it's a focused catch-up block on "${next}". ${paceAdvice}`;
+    return `Honest read: ${progress}% done this ${dayPart} with ${remaining} still open - you're behind the pace I'd want for today. The fix isn't panic; it's a focused catch-up block on "${next}". ${paceAdvice}`;
   }
 
   if (pace === 'behind' && remaining > 0) {
@@ -486,7 +486,7 @@ export function generateReportText(opts: {
   }
 
   if (status === 'done' && movementState === 'up') {
-    return `"${taskTitle}" is done — progress moved from ${previousProgress}% to ${progress}% and momentum is ${momentumScore}. ${progressDelta >= 3 ? 'That was a real step forward.' : 'Solid closure.'} ${paceAdvice}`;
+    return `"${taskTitle}" is done - progress moved from ${previousProgress}% to ${progress}% and momentum is ${momentumScore}. ${progressDelta >= 3 ? 'That was a real step forward.' : 'Solid closure.'} ${paceAdvice}`;
   }
 
   if (status === 'done') {
@@ -494,7 +494,7 @@ export function generateReportText(opts: {
   }
 
   if (movementState === 'flat') {
-    return `You touched "${taskTitle}" but the scoreboard is still flat at ${progress}%. That usually means prep or partial work — not nothing, but not closure yet. ${paceAdvice}`;
+    return `You touched "${taskTitle}" but the scoreboard is still flat at ${progress}%. That usually means prep or partial work - not nothing, but not closure yet. ${paceAdvice}`;
   }
 
   return `Update on "${taskTitle}": progress is ${progress}% (from ${previousProgress}%), momentum ${momentumScore}. ${paceAdvice}`;
@@ -709,7 +709,7 @@ export function getFeedbackTeaser(responseText: string, maxLen = 110): string {
   const cleaned = responseText
     .replace(/\s+/g, ' ')
     .trim()
-    .replace(/—/g, '-')
+    .replace(/\u2014/g, '-') // strip em dashes from model output
     .replace(/–/g, '-');
   if (!cleaned) return '';
 

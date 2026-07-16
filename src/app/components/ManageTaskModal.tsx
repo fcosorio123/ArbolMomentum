@@ -36,7 +36,7 @@ interface Props {
   draft?: TaskDraftValues | null;
   defaultGoalId?: string;
   goals: PersonalGoal[];
-  /** Unsaved new-goal draft from AI Assist — shown as a selectable option. */
+  /** Unsaved new-goal draft from AI Assist - shown as a selectable option. */
   pendingNewGoal?: { title: string } | null;
   onRequestCreateGoal?: () => void;
   confirmLabel?: string;

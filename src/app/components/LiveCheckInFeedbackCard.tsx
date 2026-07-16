@@ -155,7 +155,7 @@ export function LiveCheckInFeedbackCard({ profileId }: Props) {
   );
   const pointCount = displayChart.length;
   const manyTicks = pointCount > 5;
-  // Never show every tick when crowded — Recharts interval=0 caused overlapping "Done N" labels
+  // Never show every tick when crowded - Recharts interval=0 caused overlapping "Done N" labels
   const xTickInterval = pointCount <= 3
     ? 0
     : pointCount <= 6

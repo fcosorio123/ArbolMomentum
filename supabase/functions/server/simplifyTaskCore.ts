@@ -21,7 +21,7 @@ export interface TaskContextFact {
     | 'tools'
     | 'environment'
     | 'completion_detail';
-  /** Short internal fact — never shown / never pasted into labels from raw answers. */
+  /** Short internal fact - never shown / never pasted into labels from raw answers. */
   fact: string;
   influence:
     | 'prerequisite'
@@ -347,7 +347,7 @@ function preferMorning(facts: TaskContextFact[], answers: SimplifyAnswers): bool
 
 export type TaskComplexity = 'atomic' | 'decomposable' | 'broad';
 
-/** Classify how far to decompose — drives step count caps. */
+/** Classify how far to decompose - drives step count caps. */
 export function classifyTaskComplexity(taskLabel: string): TaskComplexity {
   const t = taskLabel.toLowerCase().trim();
   if (
@@ -506,7 +506,7 @@ function decomposeSetReminder(facts: TaskContextFact[], answers: SimplifyAnswers
   // Platform unknown
   if (needsApp || needsSimple) {
     return [
-      'Open Clock (alarms) or Reminders — either works for a Phone-down cue',
+      'Open Clock (alarms) or Reminders - either works for a Phone-down cue',
       'Create a repeating Phone-down alert for 30 minutes before bedtime',
     ];
   }
@@ -830,7 +830,7 @@ export function ruleBasedSimplifyCore(input: {
     }
   }
 
-  // Never return an empty package — rescue with task-anchored atomic actions.
+  // Never return an empty package - rescue with task-anchored atomic actions.
   if (out.length === 0) {
     const rescue = family === 'send_message'
       ? [

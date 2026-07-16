@@ -81,7 +81,7 @@ export interface SendEmailPayload {
   streak?: number;
   topTasks?: Array<{ label: string; goalTitle?: string }>;
   force?: boolean;
-  /** Server cron path — bypasses client trigger_mode gates */
+  /** Server cron path - bypasses client trigger_mode gates */
   scheduled?: boolean;
 }
 
@@ -314,7 +314,7 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
       html: content.html,
       text: content.text,
       replyTo,
-      // Sandbox FROM may only be used for intentional admin tests — never profile nudges.
+      // Sandbox FROM may only be used for intentional admin tests - never profile nudges.
       allowSandbox: payload.type === "test",
     });
     if (result.ok) {

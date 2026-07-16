@@ -9,7 +9,7 @@ export const TOUR_KEYS = {
   home:     'arbol-tour-home-done',
   goals:    'arbol-tour-goals-done',
   tasks:    'arbol-tour-tasks-done',
-  /** Legacy week tour — kept for cloud backup compatibility; not required for “all dismissed”. */
+  /** Legacy week tour - kept for cloud backup compatibility; not required for “all dismissed”. */
   week:     'arbol-tour-week-done',
   calendar: 'arbol-tour-calendar-done',
   checkIn:  'arbol-tour-checkin-done',
@@ -79,7 +79,7 @@ export type TourPlacement = 'top' | 'bottom' | 'left' | 'right' | 'auto';
 export interface PageTourStep {
   title: string;
   description: string;
-  /** Query `[data-tour-id="…"]` — preferred for readable step configs */
+  /** Query `[data-tour-id="…"]` - preferred for readable step configs */
   targetId?: string;
   target?: () => HTMLElement | null;
   placement?: TourPlacement;
@@ -729,7 +729,7 @@ export function PageTour({
           }}>
             <div style={{ fontSize: 40, marginBottom: 8 }}>{doneEmoji}</div>
             <h3 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 800, color: C.headline }}>
-              {pageLabel} — ready!
+              {pageLabel} - ready!
             </h3>
             <p style={{ margin: '0 0 20px', color: C.body, fontSize: 13, lineHeight: 1.55 }}>
               {doneMessage ?? `Tap ? anytime to revisit this tour.`}

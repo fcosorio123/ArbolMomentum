@@ -1,6 +1,6 @@
 /**
- * Admin views of student activity computed from KV profile backup —
- * same SoT students sync — not from the admin browser's localStorage.
+ * Admin views of student activity computed from KV profile backup -
+ * same SoT students sync - not from the admin browser's localStorage.
  */
 
 import {
@@ -47,7 +47,7 @@ function applyOverlay(rows: TodayTaskRow[], overlay?: RemoteDayOverlay): TodayTa
       if (remote) {
         return { ...row, status: remote, disposition: 'active' as const };
       }
-      // When backup is SoT, do not fall back to admin-local status for missing remote —
+      // When backup is SoT, do not fall back to admin-local status for missing remote -
       // keep backup status already on the row.
       return row;
     });

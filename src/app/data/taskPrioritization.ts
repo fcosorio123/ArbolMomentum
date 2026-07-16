@@ -1,4 +1,4 @@
-// Centralized task ranking (WP-11) — shared by Dashboard, nudge snapshot, live check-in.
+// Centralized task ranking (WP-11) - shared by Dashboard, nudge snapshot, live check-in.
 
 import type { TaskStatus, TaskType } from './profiles';
 import type { PotentialValue } from './potentialValue';

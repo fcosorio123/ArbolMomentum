@@ -221,7 +221,7 @@ export function Dashboard({
     onPageTourRequestConsumed?.();
   }, [requestPageTour, isActive, onPageTourRequestConsumed]);
 
-  // Goal Check-In tour — after Welcome, Summary, Home tour, and Tasks tour
+  // Goal Check-In tour - after Welcome, Summary, Home tour, and Tasks tour
   useEffect(() => {
     if (!isActive || !canStartPageTours || isLoading) return;
     if (checkInTourAutoStarted.current) return;
@@ -389,7 +389,7 @@ export function Dashboard({
             Add your first goal or task to get started
           </div>
           <div style={{ fontSize: 12, color: C.body, marginBottom: 10, lineHeight: 1.45 }}>
-            Create manually or use AI Assist — nothing saves until you confirm.
+            Create manually or use AI Assist - nothing saves until you confirm.
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {onNavigateGoals && (
@@ -558,7 +558,7 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* ── [2] My Goals — header + swipe cards (before Do This Now) */}
+      {/* ── [2] My Goals - header + swipe cards (before Do This Now) */}
       <ActiveGoalsList
         profileId={profile.id}
         onNavigateGoals={onNavigateGoals}
@@ -828,7 +828,7 @@ export function Dashboard({
         ]}
       />
 
-      {/* Goal Check-In tour — separate sequence, after Home + Tasks tours */}
+      {/* Goal Check-In tour - separate sequence, after Home + Tasks tours */}
       <PageTour
         open={showCheckInTour}
         onClose={() => setShowCheckInTour(false)}

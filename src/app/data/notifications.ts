@@ -40,7 +40,7 @@ export async function showNotification(
     return { ok: false, reason: 'Notification permission is not granted.' };
   }
   if (!options?.skipDedupe && shouldSuppress(tag)) {
-    return { ok: false, reason: 'A similar notification was just sent — wait a moment and try again.' };
+    return { ok: false, reason: 'A similar notification was just sent - wait a moment and try again.' };
   }
 
   const payload = {
@@ -53,7 +53,7 @@ export async function showNotification(
   };
 
   try {
-    // Prefer the native Notification API for Test / explicit user actions —
+    // Prefer the native Notification API for Test / explicit user actions -
     // SW postMessage alone is easy to miss and silent when the worker is idle.
     if (options?.skipDedupe || tag.startsWith('test')) {
       new Notification(title, { body, tag, icon: NOTIF_ICON });
@@ -71,6 +71,6 @@ export async function showNotification(
     return { ok: true };
   } catch (err) {
     console.warn('[Notification] show failed:', err);
-    return { ok: false, reason: 'Could not display the notification — check system notification settings.' };
+    return { ok: false, reason: 'Could not display the notification - check system notification settings.' };
   }
 }

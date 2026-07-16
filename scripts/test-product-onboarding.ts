@@ -1,5 +1,5 @@
 /**
- * Product onboarding v2 — empty-state detection and profile-scoped persistence.
+ * Product onboarding v2 - empty-state detection and profile-scoped persistence.
  * Run: npx tsx scripts/test-product-onboarding.ts
  */
 

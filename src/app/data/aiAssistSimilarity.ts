@@ -64,7 +64,7 @@ export function titleSimilarity(a: string, b: string): number {
 
 /**
  * True when titles are too similar (paraphrase / near-duplicate).
- * Default threshold 0.62 after stemming — catches insurer/insurance paraphrases.
+ * Default threshold 0.62 after stemming - catches insurer/insurance paraphrases.
  */
 export function isNearDuplicate(
   candidate: string,

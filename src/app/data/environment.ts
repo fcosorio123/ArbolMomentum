@@ -9,7 +9,7 @@ export const LEGACY_FIGMA_PUBLISHED_ORIGIN = 'https://sound-press-69397091.figma
 export const GITHUB_PAGES_ORIGIN = 'https://fcosorio123.github.io';
 export const GITHUB_PAGES_BASE_PATH = '/ArbolMomentum';
 
-/** Canonical production URL — always GitHub Pages (auto-deploys on push to main) */
+/** Canonical production URL - always GitHub Pages (auto-deploys on push to main) */
 export const CANONICAL_PRODUCTION_URL = `${GITHUB_PAGES_ORIGIN}${GITHUB_PAGES_BASE_PATH}`;
 
 /** @deprecated Use CANONICAL_PRODUCTION_URL */

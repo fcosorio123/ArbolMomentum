@@ -189,7 +189,7 @@ export const PROFILES: Profile[] = [
     avatar: '🌱',
     joinedWeek: 1,
     completionRate: 0,
-    bio: 'Empty slate profile — add your own goals and tasks from scratch.',
+    bio: 'Empty slate profile - add your own goals and tasks from scratch.',
   },
 ];
 
@@ -1799,7 +1799,7 @@ function writeArchivedProfileIds(ids: Set<string>): void {
   localStorage.setItem(ARCHIVED_PROFILES_KEY, JSON.stringify([...ids]));
 }
 
-/** Cloud sync merge — no archive notification email. */
+/** Cloud sync merge - no archive notification email. */
 export function applyProfileArchivedFromSync(profileId: string, archived: boolean): void {
   const ids = getArchivedProfileIds();
   if (archived) ids.add(profileId);
@@ -2056,7 +2056,7 @@ export function isTaskActiveForDate(profileId: string, taskId: string, dateKey: 
   return true;
 }
 
-/** Mark a task as skipped for one day — stays visible with dimmed Skipped state. */
+/** Mark a task as skipped for one day - stays visible with dimmed Skipped state. */
 export function skipTaskForToday(profileId: string, taskId: string, date: string) {
   setTaskStatus(profileId, taskId, date, 'skipped');
   try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch { /* ignore */ }

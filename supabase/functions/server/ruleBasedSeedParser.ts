@@ -1,4 +1,4 @@
-// Rule-based goal/task parser (Deno port of client profileSeedParser — edge fallback)
+// Rule-based goal/task parser (Deno port of client profileSeedParser - edge fallback)
 
 export type RecurrenceType = "daily" | "weekly" | "monthly" | "one-time";
 export type TaskType = "priority" | "goal" | "routine";
@@ -261,7 +261,7 @@ export function parseGoalInputRuleBased(text: string): SeedSuggestionGroup[] {
       id: nextId("goal"),
       goal: {
         title: `Make progress on: ${label.slice(0, 50)}`,
-        deepWhy: "An outcome-oriented goal from what you wrote — edit the title if needed.",
+        deepWhy: "An outcome-oriented goal from what you wrote - edit the title if needed.",
       },
       selected: true,
       tasks: [

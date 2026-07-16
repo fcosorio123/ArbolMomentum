@@ -181,7 +181,7 @@ export function AiAssistCreationModal({
     if (!res.ok || res.candidates.length < 2) {
       setError(
         res.reason === 'rate_limited'
-          ? 'Too many requests — try again in a bit, or use the offline suggestions below.'
+          ? 'Too many requests - try again in a bit, or use the offline suggestions below.'
           : res.reason === 'input_too_short'
             ? 'Add a bit more detail before generating.'
             : 'Could not build candidates. Showing offline suggestions if available.',
@@ -537,14 +537,14 @@ export function AiAssistCreationModal({
         createdTaskCount: result.createdTaskIds.length,
         failedCount: result.failed.length,
       });
-      message.warning('Partially saved — some items failed. You can retry without duplicating successes.');
+      message.warning('Partially saved - some items failed. You can retry without duplicating successes.');
       setSession(setStep(nextSession, 'final_review', true));
     } else {
       trackEvent(profileId, 'ai_assist_save_failed', {
         failedCount: result.failed.length,
         creationType,
       });
-      message.error('Save failed. Nothing new was created — try again.');
+      message.error('Save failed. Nothing new was created - try again.');
     }
   };
 
@@ -864,7 +864,7 @@ export function AiAssistCreationModal({
                         ))}
                         {session.goalDraft.starterTasks.filter(t => t.selected).length === 0 && (
                           <li style={{ listStyle: 'none', marginLeft: -18, color: C.secondary }}>
-                            No starter tasks selected — goal only will be created.
+                            No starter tasks selected - goal only will be created.
                           </li>
                         )}
                       </ul>
@@ -887,7 +887,7 @@ export function AiAssistCreationModal({
                         ).goalId)?.title ?? 'Existing goal'
                       )}
                       {session.taskDraft.goalRelationship.kind === 'new' && (
-                        <>New — {session.taskDraft.goalRelationship.goalDraft.title}</>
+                        <>New - {session.taskDraft.goalRelationship.goalDraft.title}</>
                       )}
                     </div>
                   </>

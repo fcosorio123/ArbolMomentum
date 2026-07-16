@@ -39,7 +39,7 @@ export function SimplifyHarnessPage() {
 
   return (
     <div style={{ minHeight: '100vh', padding: 24, background: C.bg, fontFamily: 'system-ui, sans-serif' }}>
-      <h1 style={{ color: C.headline, fontSize: 20 }}>Simplify for Me — browser harness</h1>
+      <h1 style={{ color: C.headline, fontSize: 20 }}>Simplify for Me - browser harness</h1>
       <p style={{ color: C.body, fontSize: 13 }}>
         Task: <strong>{current.taskLabel}</strong>
       </p>

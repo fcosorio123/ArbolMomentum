@@ -188,7 +188,7 @@ function taskDomainHints(taskLabel: string): { reminder: boolean; insurance: boo
   };
 }
 
-/** Rule-based candidate additions — always prevalidated before return. */
+/** Rule-based candidate additions - always prevalidated before return. */
 export function buildRuleBasedDetailCandidates(
   questionId: SimplifyQuestionId,
   taskLabel: string,

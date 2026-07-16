@@ -8,7 +8,7 @@ import { detectDevice, saveDeviceRecord, trackEvent } from './deviceAnalytics';
 const FN = 'make-server-5d90ddf5';
 const SUB_KEY = (profileId: string) => `arbol-push-sub-${profileId}`;
 
-/** VAPID public key — set VITE_VAPID_PUBLIC_KEY at build time, or fetched from server */
+/** VAPID public key - set VITE_VAPID_PUBLIC_KEY at build time, or fetched from server */
 export const VAPID_PUBLIC_KEY = (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined)?.trim() ?? '';
 
 let cachedVapidKey = VAPID_PUBLIC_KEY;

@@ -83,7 +83,7 @@ const arbolTheme = {
   },
 };
 
-// ── App Badge API — main thread is authoritative; SW mirrors for background
+// ── App Badge API - main thread is authoritative; SW mirrors for background
 function updateAppBadge(count: number) {
   try {
     if ('setAppBadge' in navigator) {
@@ -460,7 +460,7 @@ export default function App() {
     return () => window.clearTimeout(t);
   }, [activeProfile?.id]);
 
-  // Getting-started empty-state modal — only after coach/summary/feedback queue is idle
+  // Getting-started empty-state modal - only after coach/summary/feedback queue is idle
   useEffect(() => {
     if (!activeProfile) return;
     if (onboardingModal) {
@@ -476,7 +476,7 @@ export default function App() {
     return () => window.clearTimeout(t);
   }, [activeProfile?.id, onboardingModal]);
 
-  // ── Feedback nudge when queue is idle (streak milestone or 9 p.m. — PD-05)
+  // ── Feedback nudge when queue is idle (streak milestone or 9 p.m. - PD-05)
   useEffect(() => {
     if (!activeProfile || onboardingModal) return;
     const profileId = activeProfile.id;

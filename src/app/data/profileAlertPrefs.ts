@@ -49,7 +49,7 @@ export function saveProfileAlertPrefs(profileId: string, prefs: ProfileAlertPref
   scheduleSave(profileId);
 }
 
-/** User email channel — default on unless explicitly disabled. */
+/** User email channel - default on unless explicitly disabled. */
 export function isProfileEmailEnabled(profileId: string): boolean {
   const prefs = getProfileAlertPrefs(profileId);
   if (prefs.emailEnabled === false) return false;
@@ -71,7 +71,7 @@ export function toHtmlTimeValue(slot: SmartSlotConfig): string {
   return `${String(slot.hour).padStart(2, '0')}:${String(slot.minute).padStart(2, '0')}`;
 }
 
-/** 12-hour display (e.g. 8:00 AM) — avoid military time in the UI. */
+/** 12-hour display (e.g. 8:00 AM) - avoid military time in the UI. */
 export function formatSlotTime(slot: SmartSlotConfig): string {
   const h24 = slot.hour;
   const period = h24 >= 12 ? 'PM' : 'AM';

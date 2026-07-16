@@ -101,7 +101,7 @@ export function createCustomProfile(input: CreateProfileInput): Profile {
     joinedWeek: 1,
     completionRate: 0,
     bio: input.profileType === 'fresh'
-      ? 'A fresh profile — add your own goals and tasks.'
+      ? 'A fresh profile - add your own goals and tasks.'
       : 'Profile created with personalized goal and task suggestions.',
     profileType: input.profileType,
     createdAt: Date.now(),

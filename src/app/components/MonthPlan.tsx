@@ -20,7 +20,7 @@ interface Props {
   onGoAllTasks: () => void;
 }
 
-/** Standalone Month tab — same calendar as Tasks → Month. */
+/** Standalone Month tab - same calendar as Tasks → Month. */
 export function MonthPlan({ profile, onGoAllTasks }: Props) {
   const [manageOpen, setManageOpen] = useState(false);
   const [editing, setEditing] = useState<UserTask | null>(null);

@@ -173,7 +173,7 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
               <div style={{ fontSize: 22, marginBottom: 8 }}>🌱</div>
               <div style={{ fontWeight: 700, fontSize: 15, color: C.headline }}>Fresh Profile</div>
               <div style={{ fontSize: 12, color: C.body, marginTop: 4 }}>
-                Empty slate — no goals or tasks. Build everything yourself.
+                Empty slate - no goals or tasks. Build everything yourself.
               </div>
             </button>
             <button type="button" style={card} onClick={() => handlePickType('seeded')}>
@@ -200,7 +200,7 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
             Describe your goals
           </h2>
           <p style={{ margin: '0 0 14px', fontSize: 12, color: C.body, lineHeight: 1.45 }}>
-            Use a paragraph or bullet list — e.g. &quot;Complete FAFSA, track monthly expenses, exercise MWF.&quot;
+            Use a paragraph or bullet list - e.g. &quot;Complete FAFSA, track monthly expenses, exercise MWF.&quot;
           </p>
           <TextArea
             value={goalText}
@@ -309,7 +309,7 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
             Name your profile
           </h2>
           <p style={{ margin: '0 0 14px', fontSize: 12, color: C.body }}>
-            Pick an avatar and name — you&apos;ll switch to this profile right away.
+            Pick an avatar and name - you&apos;ll switch to this profile right away.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
             {AVATAR_OPTIONS.map(emoji => (

@@ -168,9 +168,9 @@ function systemPromptForMode(mode: string): string {
   const base =
     'You turn unstructured student text into READY-TO-USE goals and tasks. Return JSON only: {"groups":[{"goal":{"title","deepWhy"},"tasks":[{"label","timeOfDay":"morning|evening","type":"priority|goal|routine","recurrence":{"type":"daily|weekly|monthly|one-time","weekdays":[0-6]}}]}]}. ' +
     "CRITICAL: Do the planning yourself. Do NOT return coaching/meta tasks like \"identify your goal\", \"think about next steps\", \"break this down\", or \"define the next step\". " +
-    "Goals must be OUTCOME-driven titles (what success looks like), NEVER a raw feeling dump like \"I'm hungry\" — rewrite those into outcomes like \"Eat well & feel nourished\". " +
+    "Goals must be OUTCOME-driven titles (what success looks like), NEVER a raw feeling dump like \"I'm hungry\" - rewrite those into outcomes like \"Eat well & feel nourished\". " +
     "Tasks must be ACTION-driven checklist items that start with a verb (Eat, Prep, Walk, Submit…). " +
-    "For each goal invent 2–4 concrete, checkable tasks — not paragraphs, not duplicates of the goal title. Prefer useful structure over refusing. Max 8 goals, 12 tasks per goal.";
+    "For each goal invent 2–4 concrete, checkable tasks - not paragraphs, not duplicates of the goal title. Prefer useful structure over refusing. Max 8 goals, 12 tasks per goal.";
   if (mode === "tasks") {
     return base + " Mode=tasks: prioritize actionable next steps; if a larger outcome is clear, still include a short goal title to group them.";
   }
@@ -193,7 +193,7 @@ async function checkRateLimit(key: string): Promise<boolean> {
 async function callOpenAi(prompt: string, mode: string): Promise<RawLlmGroup[] | null> {
   const apiKey = Deno.env.get("LLM_API_KEY")?.trim();
   if (!apiKey) {
-    console.log("[ParseContext] LLM_API_KEY not set — skipping LLM");
+    console.log("[ParseContext] LLM_API_KEY not set - skipping LLM");
     return null;
   }
 

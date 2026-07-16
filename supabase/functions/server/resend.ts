@@ -16,7 +16,7 @@ export function getEmailConfig() {
   };
 }
 
-/** Resend sandbox FROM — can only deliver to the Resend account owner, not each profile. */
+/** Resend sandbox FROM - can only deliver to the Resend account owner, not each profile. */
 export function isResendSandboxFrom(fromAddress: string): boolean {
   return /onboarding@resend\.dev/i.test((fromAddress ?? "").trim());
 }

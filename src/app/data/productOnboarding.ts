@@ -1,5 +1,5 @@
 /**
- * Product onboarding v2 — empty-state detection, getting-started persistence, tour version.
+ * Product onboarding v2 - empty-state detection, getting-started persistence, tour version.
  * Extends existing AppTour / CoachMarks rather than replacing them.
  */
 

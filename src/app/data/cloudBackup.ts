@@ -534,7 +534,7 @@ function applyLocalData(profileId: string, data: Record<string, unknown>): void 
 }
 
 // ── API calls ────────────────────────────────────────────────────────
-// Use raw fetch (Authorization only — no `apikey` header).
+// Use raw fetch (Authorization only - no `apikey` header).
 // supabase.functions.invoke always sends `apikey`, which fails CORS preflight on POST
 // (platform OPTIONS returns 204 with no Access-Control-Allow-Headers).
 
@@ -747,7 +747,7 @@ function mergeStreakBest(a: unknown, b: unknown): Record<string, number> {
 /**
  * Guarantee a save never drops the other device's activity.
  * Pull cloud → union into local → collect payload as the union of both.
- * Throws CLOUD_FETCH_FAILED when GET errors (fail-closed — do not POST sparse local).
+ * Throws CLOUD_FETCH_FAILED when GET errors (fail-closed - do not POST sparse local).
  */
 async function buildUnionPayload(profileId: string): Promise<Record<string, unknown>> {
   const fetch = await fetchCloudBackupResult(profileId);
@@ -762,7 +762,7 @@ async function buildUnionPayload(profileId: string): Promise<Record<string, unkn
     persistTzOffset(profileId, cloud.tzOffset);
     rebuildStreakDaysFromDoneTasks(profileId);
   } else {
-    // First backup for this profile — stamp current device timezone.
+    // First backup for this profile - stamp current device timezone.
     const tz = currentBrowserTimezone();
     if (tz) persistTimezone(profileId, tz);
     persistTzOffset(profileId, new Date().getTimezoneOffset());
@@ -837,7 +837,7 @@ async function saveToCloudUnlocked(profileId: string, opts?: { retryOnStale?: bo
     payload = await buildUnionPayload(profileId);
   } catch (err) {
     if (String(err).includes('CLOUD_FETCH_FAILED')) {
-      console.warn('[CloudBackup] Save skipped — cloud fetch failed (fail-closed)');
+      console.warn('[CloudBackup] Save skipped - cloud fetch failed (fail-closed)');
       // Retry later; do not upload incomplete local over unknown cloud state.
       if (pendingRetryTimers[profileId]) clearTimeout(pendingRetryTimers[profileId]);
       pendingRetryTimers[profileId] = setTimeout(() => {
@@ -873,7 +873,7 @@ async function saveToCloudUnlocked(profileId: string, opts?: { retryOnStale?: bo
     return true;
   }
 
-  // Server now union-merges; stale_backup is rare / legacy — still retry once.
+  // Server now union-merges; stale_backup is rare / legacy - still retry once.
   if (data?.reason === 'stale_backup' && opts?.retryOnStale !== false) {
     await syncProfileFromCloud(profileId);
     try {
@@ -900,7 +900,7 @@ async function saveToCloudUnlocked(profileId: string, opts?: { retryOnStale?: bo
   return false;
 }
 
-/** Serialized per-profile save — prevents overlapping buildUnionPayload races. */
+/** Serialized per-profile save - prevents overlapping buildUnionPayload races. */
 export async function saveToCloud(profileId: string, opts?: { retryOnStale?: boolean }): Promise<boolean> {
   const prev = saveChains[profileId] ?? Promise.resolve(true);
   const next = prev

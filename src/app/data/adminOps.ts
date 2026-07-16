@@ -10,7 +10,7 @@ export const DATA_SOURCE_OF_TRUTH = [
 ] as const;
 
 export function maskEmail(email: string | null | undefined): string {
-  if (!email?.trim()) return '—';
+  if (!email?.trim()) return '-';
   const trimmed = email.trim();
   const at = trimmed.indexOf('@');
   if (at <= 0) return '***';
@@ -19,8 +19,8 @@ export function maskEmail(email: string | null | undefined): string {
 
 export function formatSyncDirection(direction: string): string {
   switch (direction) {
-    case 'local_newer': return 'Local newer — push pending';
-    case 'cloud_newer': return 'Cloud newer — pull may apply';
+    case 'local_newer': return 'Local newer - push pending';
+    case 'cloud_newer': return 'Cloud newer - pull may apply';
     case 'in_sync': return 'In sync';
     default: return 'Unknown';
   }
@@ -61,9 +61,9 @@ export function summarizeBackupQualification(
       emailSource: adminOnly ? 'admin' : 'none',
       emailEnabled: true,
       archived: false,
-      snapshotDate: '—',
+      snapshotDate: '-',
       pending: 0,
-      savedAt: '—',
+      savedAt: '-',
     };
   }
   const email = typeof backup.profileEmail === 'string' ? backup.profileEmail : '';
@@ -71,7 +71,7 @@ export function summarizeBackupQualification(
   const snap = backup.nudgeSnapshot as { dateKey?: string; pending?: number } | null;
   const savedAt = typeof backup.savedAt === 'number'
     ? new Date(backup.savedAt).toLocaleString()
-    : '—';
+    : '-';
   const emailSource = opts?.profileId
     ? resolveEmailRecipientSource(opts.profileId, backup, opts.adminProfileEmails ?? {})
     : (email.trim() ? 'profile' : 'none');
@@ -83,7 +83,7 @@ export function summarizeBackupQualification(
     emailSource,
     emailEnabled: prefs?.emailEnabled !== false,
     archived: backup.profileArchived === true,
-    snapshotDate: snap?.dateKey ?? '—',
+    snapshotDate: snap?.dateKey ?? '-',
     pending: snap?.pending ?? 0,
     savedAt,
   };

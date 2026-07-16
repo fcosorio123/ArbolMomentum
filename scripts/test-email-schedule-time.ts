@@ -22,10 +22,10 @@ function section(name: string) {
 function check(name: string, condition: boolean, detail = '') {
   if (condition) {
     passed++;
-    console.log(`  ✓ ${name}${detail ? ` — ${detail}` : ''}`);
+    console.log(`  ✓ ${name}${detail ? ` - ${detail}` : ''}`);
   } else {
     failed++;
-    console.error(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`);
+    console.error(`  ✗ ${name}${detail ? ` - ${detail}` : ''}`);
   }
 }
 

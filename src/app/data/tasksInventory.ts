@@ -39,7 +39,7 @@ export interface TasksInventory {
   unassigned: InventoryTask[];
 }
 
-/** Build full task inventory for All Tasks — one row per setup, with frequency. */
+/** Build full task inventory for All Tasks - one row per setup, with frequency. */
 export function buildAllTasksInventory(profileId: string): TasksInventory {
   const goals = getPersonalGoals(profileId);
   const goalTaskMap: Record<string, InventoryTask[]> = {};
@@ -62,7 +62,7 @@ export function buildAllTasksInventory(profileId: string): TasksInventory {
   };
 
   // Collect weekday seeds, then collapse same-label setups into one row + frequency.
-  // (Profiles like Favio store Mon/Tue/… copies with different IDs — users want frequency, not 7 rows.)
+  // (Profiles like Favio store Mon/Tue/… copies with different IDs - users want frequency, not 7 rows.)
   const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
   const todayName = DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
   type Acc = {

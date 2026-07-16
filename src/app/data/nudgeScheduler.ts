@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────
-// State-based daily nudges — smart slots + custom reminders
+// State-based daily nudges - smart slots + custom reminders
 // ──────────────────────────────────────────────
 
 import type { Profile } from './profiles';
@@ -126,7 +126,7 @@ export function buildSmartNudgeCopy(
       const taskLabel = done === 1 ? 'task' : 'tasks';
       return {
         title: `Nice work today, ${firstName}! 🎓`,
-        body: `Solid progress — ${done} ${taskLabel} completed toward your goals.`,
+        body: `Solid progress - ${done} ${taskLabel} completed toward your goals.`,
       };
     }
     if (pending > 0) {
@@ -194,7 +194,7 @@ export function rebuildDailySchedule(profileId: string): ScheduledNotif[] {
   addSmart('morning', slots.morning, 'Good morning! ☀️', 'Your tasks for today are ready.');
   addSmart('midday', slots.midday, 'Quick check-in 📋', 'Check in on your goal-linked tasks.');
   addSmart('evening', slots.evening, 'Evening summary 🎓', 'See how your progress went today.');
-  addSmart('streakRisk', slots.streakRisk, 'Streak reminder 🔥', 'Protect your streak — finish today\'s check-in.');
+  addSmart('streakRisk', slots.streakRisk, 'Streak reminder 🔥', 'Protect your streak - finish today\'s check-in.');
 
   for (const r of parseCustomReminders(profileId)) {
     if (!r.enabled) continue;
@@ -202,7 +202,7 @@ export function rebuildDailySchedule(profileId: string): ScheduledNotif[] {
     upsertSlot(schedule, {
       tag: `reminder-${r.id}`,
       title: `${r.label} ⏰`,
-      body: `Time for your ${r.label.toLowerCase()} — stay on track with your goals.`,
+      body: `Time for your ${r.label.toLowerCase()} - stay on track with your goals.`,
       atMs: toMs(h, m),
       kind: 'custom',
       days: r.days,
@@ -220,7 +220,7 @@ export interface ProcessNudgesOptions {
   sendEmail?: boolean;
 }
 
-/** Check schedule, fire due nudges with dedup — call every 60s + on visibility */
+/** Check schedule, fire due nudges with dedup - call every 60s + on visibility */
 export async function processDueNudges({
   profile,
   swReg,

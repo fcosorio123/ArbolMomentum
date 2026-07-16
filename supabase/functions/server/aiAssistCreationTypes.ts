@@ -1,4 +1,4 @@
-// Edge twin of client aiAssistCreationTypes — keep fields identical.
+// Edge twin of client aiAssistCreationTypes - keep fields identical.
 
 export type AiAssistCreationType = "goal" | "task";
 export type AiAssistGenerationSource = "llm" | "server_rules" | "client_fallback";

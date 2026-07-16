@@ -176,7 +176,7 @@ export function ProfileSelector({ onSelect, onAdmin }: Props) {
           </button>
         ))}
 
-        {/* Create New Profile — only on this screen */}
+        {/* Create New Profile - only on this screen */}
         <button
           type="button"
           onClick={() => setCreateOpen(true)}

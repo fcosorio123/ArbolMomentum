@@ -241,7 +241,7 @@ function firedKey(profileId: string) {
   return `arbol-fired-${profileId}-${localDateKey()}`;
 }
 
-/** Persistent per-day dedup — survives schedule rebuilds */
+/** Persistent per-day dedup - survives schedule rebuilds */
 export function wasNudgeFiredToday(profileId: string, tag: string): boolean {
   try {
     const fired: string[] = JSON.parse(localStorage.getItem(firedKey(profileId)) || '[]');

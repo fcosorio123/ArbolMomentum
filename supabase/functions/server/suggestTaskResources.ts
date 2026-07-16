@@ -25,7 +25,7 @@ export function ruleBasedResources(taskLabel: string, goalTitle?: string): TaskR
   const t = label.toLowerCase();
   const context = goalTitle ? ` (${goalTitle})` : "";
 
-  // Reminder / alarm — before sleep matching on "bed"
+  // Reminder / alarm - before sleep matching on "bed"
   if (
     /(set|create|add|make|schedule).*(remind|alarm|notif)/i.test(t)
     || /phone-?down/i.test(t)

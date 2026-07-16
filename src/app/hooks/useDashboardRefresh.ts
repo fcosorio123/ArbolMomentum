@@ -17,7 +17,7 @@ export function useDashboardRefresh(profileId: string, isActive: boolean) {
 
   /**
    * Full load shows skeleton.
-   * Soft refresh only recomputes the snapshot — avoids remounting Home and
+   * Soft refresh only recomputes the snapshot - avoids remounting Home and
    * restarting auto page tours on every goals/tasks event (flash loop).
    */
   const refresh = useCallback((mode: 'full' | 'soft' = 'full') => {

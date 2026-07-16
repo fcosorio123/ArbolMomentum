@@ -22,7 +22,7 @@ import { ACCENT_MODAL_STYLES, ModalAccentBar } from '../styles/modalChrome';
 
 const { TextArea } = Input;
 
-/** Question prompts (form) — display labels for review use SIMPLIFY_QUESTION_META semantics. */
+/** Question prompts (form) - display labels for review use SIMPLIFY_QUESTION_META semantics. */
 const QUESTIONS = [
   'What feels difficult?',
   'What would make this easier?',
@@ -71,7 +71,7 @@ export function SimplifyTaskModal({
   const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(null);
   const [baseAnswerBeforeAssist, setBaseAnswerBeforeAssist] = useState<string>('');
   const [refreshNonce, setRefreshNonce] = useState(0);
-  /** Questions accepted via a prevalidated system suggestion — skip re-assist. */
+  /** Questions accepted via a prevalidated system suggestion - skip re-assist. */
   const acceptedViaSuggestion = useRef<Set<SimplifyQuestionId>>(new Set());
   /** Questions that already showed assist once (custom text still validates). */
   const assistShownFor = useRef<Set<SimplifyQuestionId>>(new Set());
@@ -239,7 +239,7 @@ export function SimplifyTaskModal({
     const combined = s.validatedCombinedAnswer || mergeAnswerWithAddition(base, s.appendText);
     const check = evaluateAnswerSufficiency(qId, combined, taskLabel);
     if (check.status !== 'sufficient') {
-      // Prevalidated mismatch — do not block; accept enriched answer.
+      // Prevalidated mismatch - do not block; accept enriched answer.
       trackEvent(analyticsId, 'simplify_detail_validation_mismatch', { questionId: qId });
     } else {
       trackEvent(analyticsId, 'simplify_detail_validation_passed', { questionId: qId });
@@ -373,7 +373,7 @@ export function SimplifyTaskModal({
     }
 
     if (detailAssist && assistShownFor.current.has(qId)) {
-      // Assist already visible — keep helping, do not generic-block
+      // Assist already visible - keep helping, do not generic-block
       setDetailError(null);
       return;
     }

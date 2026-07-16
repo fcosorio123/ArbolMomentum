@@ -292,7 +292,7 @@ export function GoalsPage({
         />
       </div>
       <p style={{ margin: '0 0 22px', color: C.secondary, fontSize: 13, lineHeight: 1.5 }}>
-        Goals are outcomes you want to reach. Create one manually or with AI Assist — nothing saves until you confirm.
+        Goals are outcomes you want to reach. Create one manually or with AI Assist - nothing saves until you confirm.
       </p>
 
       {goals.length > 0 && (
@@ -422,7 +422,7 @@ export function GoalsPage({
         onSaved={() => loadGoals()}
       />
 
-      {/* FAB — Add manually + Create with AI (when enabled) */}
+      {/* FAB - Add manually + Create with AI (when enabled) */}
       <>
         {fabMenuOpen && (
           <div
@@ -612,7 +612,7 @@ export function GoalsPage({
         profileId={profile.id}
         pageLabel="Goals"
         doneEmoji="🎯"
-        doneMessage="You're ready to set goals. Use Create manually or Create with AI — nothing saves until you confirm."
+        doneMessage="You're ready to set goals. Use Create manually or Create with AI - nothing saves until you confirm."
         onInteract={() => { setFabMenuOpen(true); }}
         interactLabel="Open create options →"
         steps={[
@@ -624,7 +624,7 @@ export function GoalsPage({
           },
           {
             title: 'Task progress',
-            description: 'See how linked tasks are doing today — done, in progress, or not started.',
+            description: 'See how linked tasks are doing today - done, in progress, or not started.',
             targetId: 'goals-task-breakdown',
             placement: 'bottom',
           },
