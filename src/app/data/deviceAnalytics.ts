@@ -47,7 +47,13 @@ export type EventType =
   | 'simplify_detail_custom_text_used'
   | 'simplify_detail_assist_failed'
   | 'simplify_detail_validation_passed'
-  | 'simplify_detail_validation_mismatch';
+  | 'simplify_detail_validation_mismatch'
+  | 'focus_task_shown'
+  | 'focus_task_opened'
+  | 'focus_task_resumed'
+  | 'focus_task_completed'
+  | 'focus_task_simplify_clicked'
+  | 'task_overflow_opened';
 
 export interface DeviceRecord {
   profileId: string;

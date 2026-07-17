@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { App, Button, Progress } from 'antd';
-import { DeleteOutlined, CheckCircleFilled, PlayCircleOutlined, EditOutlined, PlusOutlined, CloseOutlined } from '@ant-design/icons';
+import { DeleteOutlined, CheckCircleFilled, PlayCircleOutlined, EditOutlined, PlusOutlined, CloseOutlined, MoreOutlined } from '@ant-design/icons';
+import { selectFocusTask, type FocusLabel } from '../data/taskFocusSelection';
 import {
   type Profile, type Task, type TaskStatus,
   getTaskCategoriesForProfile, getTaskStatus,
@@ -131,11 +132,136 @@ function taskDurationLabel(task: UserTask_): string {
   return task.timeOfDay === 'morning' ? '☀️ Morning' : '🌙 Evening';
 }
 
+function TaskOverflowMenu({
+  onEdit,
+  onArchive,
+  onRestore,
+  onDelete,
+  onSimplify,
+  includeSimplify,
+  onOpened,
+}: {
+  onEdit?: () => void;
+  onArchive?: () => void;
+  onRestore?: () => void;
+  onDelete: () => void;
+  onSimplify?: () => void;
+  includeSimplify?: boolean;
+  onOpened?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const items: Array<{ key: string; label: string; onClick: () => void; danger?: boolean }> = [];
+  if (includeSimplify && onSimplify) {
+    items.push({ key: 'simplify', label: 'Simplify', onClick: onSimplify });
+  }
+  if (onEdit) items.push({ key: 'edit', label: 'Edit', onClick: onEdit });
+  if (onRestore) items.push({ key: 'restore', label: 'Restore', onClick: onRestore });
+  if (onArchive && !onRestore) items.push({ key: 'archive', label: 'Archive', onClick: onArchive });
+  items.push({ key: 'delete', label: 'Delete', onClick: onDelete, danger: true });
+
+  return (
+    <div ref={rootRef} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        aria-label="More task actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="More actions"
+        onClick={() => {
+          setOpen(o => {
+            const next = !o;
+            if (next) onOpened?.();
+            return next;
+          });
+        }}
+        style={{
+          ...touchIconButton,
+          minWidth: 36,
+          minHeight: 36,
+          padding: '6px 8px',
+          background: C.bgAlt,
+          border: `1px solid ${C.border}`,
+          borderRadius: 8,
+          color: C.secondary,
+          fontSize: 13,
+        }}
+      >
+        <MoreOutlined />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          aria-label="Task actions"
+          style={{
+            position: 'absolute',
+            right: 0,
+            bottom: '100%',
+            marginBottom: 4,
+            zIndex: 20,
+            minWidth: 148,
+            background: C.bgCard,
+            border: `1px solid ${C.borderStrong}`,
+            borderRadius: 10,
+            boxShadow: C.shadowMd,
+            padding: 4,
+          }}
+        >
+          {items.map(item => (
+            <button
+              key={item.key}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                item.onClick();
+              }}
+              style={{
+                display: 'block',
+                width: '100%',
+                textAlign: 'left',
+                background: 'none',
+                border: 'none',
+                borderRadius: 8,
+                padding: '10px 12px',
+                fontSize: 13,
+                fontWeight: 600,
+                color: item.danger ? C.tertiary : C.headline,
+                cursor: 'pointer',
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Task item
 function TaskItem({
   task, catColor, status, remark, onOpenUpdate, onDelete, onEdit, onSimplify, onArchive, onRestore, statusLocked,
   profileId, profileName, calendarDateKey, statusHint,
   selectionMode, selected, onToggleSelect,
+  focusLabel, onOverflowOpened,
 }: {
   task: UserTask_; catColor: string; status: TaskStatus | null; remark?: string;
   onOpenUpdate: () => void; onDelete: () => void;
@@ -151,8 +277,14 @@ function TaskItem({
   selectionMode?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
+  /** Highest visual emphasis when set (Today focus only). */
+  focusLabel?: FocusLabel | null;
+  onOverflowOpened?: () => void;
 }) {
   const isSkipped = status === 'skipped';
+  const isDone = status === 'done';
+  const isMuted = isSkipped || isDone;
+  const isFocus = !!focusLabel;
   const display = status ? TASK_STATUS_DISPLAY[status] : TASK_STATUS_DISPLAY.null;
   const remarkText = remark ? truncateRemark(remark) : '';
   const showRemark = shouldShowRemark(status, remarkText);
@@ -186,20 +318,42 @@ function TaskItem({
     fontSize: 13,
   };
 
+  const focusBorder = focusLabel === 'active'
+    ? C.streak
+    : focusLabel === 'up_next'
+      ? C.primary
+      : null;
+  const focusBadgeLabel = focusLabel === 'active' ? 'Active' : focusLabel === 'up_next' ? 'Up next' : null;
+  const primaryActionLabel = focusLabel === 'active' ? 'Resume' : 'Update';
+
+  // hierarchyMode (Today): focus keeps Simplify direct; compact cards put it in overflow.
+  // Non-hierarchy (All Tasks / overdue): keep prior inline Simplify + inline maintenance.
+  const hierarchyMode = focusLabel !== undefined;
+  const simplifyDirect = !!onSimplify && !isMuted && (!hierarchyMode || isFocus);
+  const simplifyOverflow = !!onSimplify && !isMuted && hierarchyMode && !isFocus;
+
   return (
     <div
       role="button"
       tabIndex={0}
+      aria-label={
+        focusBadgeLabel
+          ? `${focusBadgeLabel} task: ${task.label}`
+          : undefined
+      }
       onClick={handleActivate}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleActivate(); } }}
       style={{
-        display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 14px',
-        background: isSkipped ? display.bg : display.bg,
+        display: 'flex', flexDirection: 'column', gap: 10,
+        padding: isFocus ? '14px 16px' : '12px 14px',
+        background: isMuted ? (isDone ? '#f7fafc' : display.bg) : (isFocus ? '#fff' : display.bg),
         borderRadius: 14,
-        border: `1.5px solid ${isSkipped ? `${C.tertiary}25` : status ? display.color + '35' : C.border}`,
+        border: isFocus && focusBorder
+          ? `2px solid ${focusBorder}`
+          : `1.5px solid ${isSkipped ? `${C.tertiary}25` : isDone ? C.border : status ? display.color + '35' : C.border}`,
         marginBottom: 8, transition: 'all 0.2s', cursor: statusLocked ? 'default' : 'pointer',
-        boxShadow: status === 'done' || isSkipped ? 'none' : C.shadow,
-        opacity: isSkipped ? 0.58 : 1,
+        boxShadow: isMuted ? 'none' : isFocus ? C.shadowMd : C.shadow,
+        opacity: isSkipped ? 0.48 : isDone ? 0.62 : 1,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
@@ -213,7 +367,7 @@ function TaskItem({
           />
         )}
         <div style={{
-          width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+          width: isFocus ? 40 : 36, height: isFocus ? 40 : 36, borderRadius: '50%', flexShrink: 0,
           background: isSkipped ? C.bgAlt : status === 'done' ? display.color : status === 'inprogress' ? display.color : '#fff',
           border: isSkipped ? `2px solid ${C.border}` : status ? 'none' : `2px solid ${C.borderStrong}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -229,14 +383,28 @@ function TaskItem({
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontSize: 9, fontWeight: 800, letterSpacing: 0.45, textTransform: 'uppercase',
-            color: catColor, marginBottom: 2,
-          }}>
-            Task
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' }}>
+            <div style={{
+              fontSize: 9, fontWeight: 800, letterSpacing: 0.45, textTransform: 'uppercase',
+              color: catColor,
+            }}>
+              Task
+            </div>
+            {focusBadgeLabel && (
+              <span
+                style={{
+                  fontSize: 10, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase',
+                  padding: '2px 8px', borderRadius: 6,
+                  background: focusLabel === 'active' ? `${C.streak}22` : `${C.primary}18`,
+                  color: focusLabel === 'active' ? '#c47d0e' : C.primaryDark,
+                }}
+              >
+                {focusBadgeLabel}
+              </span>
+            )}
           </div>
           <div style={{
-            fontSize: 15, fontWeight: 600,
+            fontSize: isFocus ? 16 : 15, fontWeight: isFocus ? 700 : 600,
             color: isSkipped ? C.secondary : status === 'done' ? C.secondary : C.headline,
             textDecoration: status === 'done' ? 'line-through' : 'none',
             lineHeight: 1.35,
@@ -280,9 +448,14 @@ function TaskItem({
           {!statusLocked && (
             <div style={{
               fontSize: 12, fontWeight: 700, marginTop: 6,
-              color: display.color,
+              color: isFocus && focusLabel === 'active' ? C.streak : display.color,
             }}>
-              {statusHint ?? display.label}
+              {statusHint
+                ?? (focusLabel === 'active'
+                  ? 'In progress - resume here'
+                  : focusLabel === 'up_next'
+                    ? 'Recommended next'
+                    : display.label)}
             </div>
           )}
           {showRemark && (
@@ -353,7 +526,27 @@ function TaskItem({
         style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', paddingLeft: selectionMode ? 30 : 48 }}
         onClick={e => e.stopPropagation()}
       >
-        {!isSkipped && status !== 'done' && onSimplify && (
+        {isFocus && !statusLocked && (
+          <button
+            type="button"
+            onClick={onOpenUpdate}
+            aria-label={primaryActionLabel}
+            style={{
+              ...touchPrimaryButton,
+              minWidth: 'auto',
+              padding: '8px 14px',
+              borderRadius: 10,
+              border: 'none',
+              background: focusLabel === 'active' ? C.streak : C.primary,
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 800,
+            }}
+          >
+            {primaryActionLabel}
+          </button>
+        )}
+        {simplifyDirect && (
           <button
             onClick={onSimplify}
             type="button"
@@ -384,61 +577,75 @@ function TaskItem({
             title={`Add "${task.label}" to calendar for ${calendarDateKey === getTodayKey() ? 'today' : 'tomorrow'}`}
           />
         )}
-        {onEdit && (
-          <button
-            onClick={onEdit}
-            type="button"
-            title="Edit task"
-            aria-label="Edit task"
-            style={actionBtnStyle}
-            onMouseEnter={e => { e.currentTarget.style.color = C.primary; e.currentTarget.style.background = `${C.primary}12`; }}
-            onMouseLeave={e => { e.currentTarget.style.color = C.secondary; e.currentTarget.style.background = C.bgAlt; }}
-          >
-            <EditOutlined />
-          </button>
+        {hierarchyMode ? (
+          <TaskOverflowMenu
+            onEdit={onEdit}
+            onArchive={onArchive}
+            onRestore={onRestore}
+            onDelete={onDelete}
+            onSimplify={onSimplify}
+            includeSimplify={simplifyOverflow}
+            onOpened={onOverflowOpened}
+          />
+        ) : (
+          <>
+            {onEdit && (
+              <button
+                onClick={onEdit}
+                type="button"
+                title="Edit task"
+                aria-label="Edit task"
+                style={actionBtnStyle}
+                onMouseEnter={e => { e.currentTarget.style.color = C.primary; e.currentTarget.style.background = `${C.primary}12`; }}
+                onMouseLeave={e => { e.currentTarget.style.color = C.secondary; e.currentTarget.style.background = C.bgAlt; }}
+              >
+                <EditOutlined />
+              </button>
+            )}
+            {onRestore && (
+              <button
+                onClick={onRestore}
+                type="button"
+                title="Restore"
+                style={{
+                  ...actionBtnStyle,
+                  color: C.primary,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  minWidth: 'auto',
+                }}
+              >
+                Restore
+              </button>
+            )}
+            {onArchive && !onRestore && (
+              <button
+                onClick={onArchive}
+                type="button"
+                title="Archive"
+                style={{
+                  ...actionBtnStyle,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  minWidth: 'auto',
+                }}
+              >
+                Archive
+              </button>
+            )}
+            <button
+              onClick={onDelete}
+              type="button"
+              title="Delete task"
+              aria-label="Delete task"
+              style={actionBtnStyle}
+              onMouseEnter={e => { e.currentTarget.style.color = C.tertiary; e.currentTarget.style.background = `${C.tertiary}12`; }}
+              onMouseLeave={e => { e.currentTarget.style.color = C.secondary; e.currentTarget.style.background = C.bgAlt; }}
+            >
+              <DeleteOutlined />
+            </button>
+          </>
         )}
-        {onRestore && (
-          <button
-            onClick={onRestore}
-            type="button"
-            title="Restore"
-            style={{
-              ...actionBtnStyle,
-              color: C.primary,
-              fontSize: 11,
-              fontWeight: 700,
-              minWidth: 'auto',
-            }}
-          >
-            Restore
-          </button>
-        )}
-        {onArchive && !onRestore && (
-          <button
-            onClick={onArchive}
-            type="button"
-            title="Archive"
-            style={{
-              ...actionBtnStyle,
-              fontSize: 11,
-              fontWeight: 700,
-              minWidth: 'auto',
-            }}
-          >
-            Archive
-          </button>
-        )}
-        <button
-          onClick={onDelete}
-          type="button"
-          title="Delete task"
-          aria-label="Delete task"
-          style={actionBtnStyle}
-          onMouseEnter={e => { e.currentTarget.style.color = C.tertiary; e.currentTarget.style.background = `${C.tertiary}12`; }}
-          onMouseLeave={e => { e.currentTarget.style.color = C.secondary; e.currentTarget.style.background = C.bgAlt; }}
-        >
-          <DeleteOutlined />
-        </button>
       </div>
     </div>
   );
@@ -551,6 +758,9 @@ function GoalGroup({
   selectionMode, selectedTaskIds, onToggleTaskSelect, showExploreSuggestions = true,
   emptyMessage = 'No tasks yet for this goal today.',
   getStatusHint,
+  focusTaskId,
+  focusLabel,
+  onOverflowOpened,
 }: {
   goal: PersonalGoal; tasks: UserTask_[];
   statuses: StatusMap; notes: NotesMap;
@@ -572,14 +782,21 @@ function GoalGroup({
   showExploreSuggestions?: boolean;
   emptyMessage?: string;
   getStatusHint?: (task: UserTask_) => string | undefined;
+  focusTaskId?: string | null;
+  focusLabel?: FocusLabel | null;
+  onOverflowOpened?: () => void;
 }) {
-  const [collapsed, setCollapsed] = useState(!isFirst);
-  const accentColor = goalAccentColor(goal.id);
-
   const allVisibleTasks = tasks.filter(t =>
     timeFilter === 'all' || t.timeOfDay === timeFilter
   );
+  const containsFocus = !!(focusTaskId && allVisibleTasks.some(t => t.id === focusTaskId));
+  const [collapsed, setCollapsed] = useState(!(isFirst || containsFocus));
+  const accentColor = goalAccentColor(goal.id);
   const suggestedLabels = suggestTasksForGoal(goal).map(s => s.label);
+
+  useEffect(() => {
+    if (containsFocus) setCollapsed(false);
+  }, [containsFocus, focusTaskId]);
 
   if (allVisibleTasks.length === 0) {
     return (
@@ -622,6 +839,7 @@ function GoalGroup({
   const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
   const allDone = totalTasks > 0 && doneTasks === totalTasks;
   const accent = allDone ? C.primary : accentColor;
+  const hierarchyOn = focusTaskId !== undefined;
 
   return (
     <div style={{
@@ -727,6 +945,10 @@ function GoalGroup({
               }
               onArchive={task.isUserCreated && onArchiveTask && !task.archivedAt ? () => onArchiveTask(task) : undefined}
               onRestore={task.isUserCreated && onRestoreTask && task.archivedAt ? () => onRestoreTask(task) : undefined}
+              focusLabel={hierarchyOn
+                ? (task.id === focusTaskId ? focusLabel ?? null : null)
+                : undefined}
+              onOverflowOpened={hierarchyOn ? onOverflowOpened : undefined}
             />
           ))}
         </div>
@@ -1312,6 +1534,38 @@ export function TaskList({
   const isEmpty = categories.length === 0 && userTasks.length === 0 && goals.length === 0;
   const hideExploreSuggestions = isFreshProfile(profile.id) || isUserDefinedProfile(profile.id);
 
+  // Today focus: at most one globally emphasized task for current daypart filter.
+  const todayFocusCandidates = taskView === 'today'
+    ? [
+        ...Object.values(goalTaskMap).flat(),
+        ...ungroupedTasks,
+      ].filter(t => timeFilter === 'all' || t.timeOfDay === timeFilter)
+    : [];
+  const todayFocus = taskView === 'today'
+    ? selectFocusTask(
+        todayFocusCandidates.map(t => ({
+          id: t.id,
+          label: t.label,
+          timeOfDay: t.timeOfDay,
+          type: t.type,
+          goalId: t.goalId,
+          status: statuses[t.id] ?? null,
+          potentialValue: t.potentialValue,
+        })),
+      )
+    : null;
+  const focusTaskId = todayFocus?.taskId ?? null;
+  const focusLabel = todayFocus?.label ?? null;
+
+  useEffect(() => {
+    if (taskView !== 'today' || !focusTaskId || !focusLabel) return;
+    trackEvent(profile.id, 'focus_task_shown', {
+      taskId: focusTaskId,
+      label: focusLabel,
+      timeFilter,
+    });
+  }, [taskView, focusTaskId, focusLabel, timeFilter, profile.id]);
+
   const statusHintForAll = (task: UserTask_): string | undefined => {
     const scheduledToday = task.isUserCreated
       ? (() => {
@@ -1331,6 +1585,17 @@ export function TaskList({
     statusDateKey?: string,
   ) => {
     captureScroll();
+    if (taskView === 'today' && focusTaskId && task.id === focusTaskId) {
+      const st = statuses[task.id] ?? null;
+      if (st === 'inprogress') {
+        trackEvent(profile.id, 'focus_task_resumed', { taskId: task.id, label: 'active' });
+      } else {
+        trackEvent(profile.id, 'focus_task_opened', {
+          taskId: task.id,
+          label: focusLabel === 'active' ? 'active' : 'up_next',
+        });
+      }
+    }
     setTaskUpdateContext({
       taskId: task.id,
       taskLabel: task.label,
@@ -1383,6 +1648,14 @@ export function TaskList({
 
     if (statusSaved) {
       message.success({ content: 'Progress saved!', duration: 2 });
+      if (
+        taskView === 'today'
+        && focusTaskId
+        && taskId === focusTaskId
+        && status === 'done'
+      ) {
+        trackEvent(profile.id, 'focus_task_completed', { taskId, label: focusLabel ?? 'up_next' });
+      }
     } else {
       message.error({ content: 'Could not save progress. Try again.', duration: 3 });
       return;
@@ -1466,6 +1739,7 @@ export function TaskList({
       unassignedLabel: string;
       emptyMessage: string;
       getStatusHint?: (task: UserTask_) => string | undefined;
+      enableFocusHierarchy?: boolean;
     },
   ) => (
     <>
@@ -1484,7 +1758,15 @@ export function TaskList({
             isFirst={idx === 0}
             onEditTask={t => handleEditAnyTask(t, goal.id)}
             onAddSuggestedTask={handleAddSuggestedTask}
-            onSimplifyTask={(t, g) => setSimplifyTarget({ task: t, goal: g })}
+            onSimplifyTask={(t, g) => {
+              if (opts.enableFocusHierarchy && focusTaskId && t.id === focusTaskId) {
+                trackEvent(profile.id, 'focus_task_simplify_clicked', {
+                  taskId: t.id,
+                  label: focusLabel ?? 'up_next',
+                });
+              }
+              setSimplifyTarget({ task: t, goal: g });
+            }}
             onArchiveTask={handleArchiveTask}
             onRestoreTask={handleRestoreTask}
             showExploreSuggestions={opts.showExplore && !hideExploreSuggestions}
@@ -1493,6 +1775,11 @@ export function TaskList({
             selectionMode={selectMode}
             selectedTaskIds={selectedTaskIds}
             onToggleTaskSelect={toggleTaskSelect}
+            focusTaskId={opts.enableFocusHierarchy ? focusTaskId : undefined}
+            focusLabel={opts.enableFocusHierarchy ? focusLabel : undefined}
+            onOverflowOpened={opts.enableFocusHierarchy
+              ? () => trackEvent(profile.id, 'task_overflow_opened', { view: 'today' })
+              : undefined}
           />
         </div>
       ))}
@@ -1525,11 +1812,25 @@ export function TaskList({
                 onEdit={() => handleEditAnyTask(task, undefined)}
                 onSimplify={
                   (statuses[task.id] ?? null) !== 'done' && (statuses[task.id] ?? null) !== 'skipped'
-                    ? () => setSimplifyTarget({ task })
+                    ? () => {
+                        if (opts.enableFocusHierarchy && focusTaskId && task.id === focusTaskId) {
+                          trackEvent(profile.id, 'focus_task_simplify_clicked', {
+                            taskId: task.id,
+                            label: focusLabel ?? 'up_next',
+                          });
+                        }
+                        setSimplifyTarget({ task });
+                      }
                     : undefined
                 }
                 onArchive={task.isUserCreated && !task.archivedAt ? () => handleArchiveTask(task) : undefined}
                 onRestore={task.isUserCreated && task.archivedAt ? () => handleRestoreTask(task) : undefined}
+                focusLabel={opts.enableFocusHierarchy
+                  ? (task.id === focusTaskId ? focusLabel : null)
+                  : undefined}
+                onOverflowOpened={opts.enableFocusHierarchy
+                  ? () => trackEvent(profile.id, 'task_overflow_opened', { view: 'today' })
+                  : undefined}
               />
             ))}
         </div>
@@ -1814,6 +2115,7 @@ export function TaskList({
               showExplore: true,
               unassignedLabel: 'Tasks · no goal yet',
               emptyMessage: 'No tasks yet for this goal today.',
+              enableFocusHierarchy: true,
             })
           )}
         </>
