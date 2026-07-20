@@ -3,6 +3,15 @@
 // ──────────────────────────────────────────────
 import { getCustomProfiles, isRegisteredFreshProfile, isUserDefinedProfile } from './customProfiles';
 import { calculateWeeklyStreak, calculateMonthlyStreak } from './streakCalculations';
+import {
+  getSeedFamilyIdForTaskId,
+  readHiddenSeedFamilyIds,
+  applySeedHideTombstones,
+  runSeedFamilyBackfillCore,
+  isSeedHiddenByTombstones,
+  readHiddenSeedTaskIds,
+  hiddenSeedTaskStorageKey,
+} from './seedFamilies';
 export interface ValueStats {
   money: number;      // ₱ saved/earned
   health: number;     // calories burned
@@ -214,6 +223,8 @@ export interface Task {
   timeOfDay: TimeOfDay;
   type: TaskType;
   category: string;
+  /** Canonical family for day-sibling seed habits (never derived from label). */
+  seedFamilyId?: string;
   // Value tracking (for reward system)
   valueType?: ValueType;
   estimatedValue?: number;
@@ -1703,7 +1714,6 @@ export function getAllTasks(): Task[] {
 
 export function getAllTasksForProfile(profileId: string): Task[] {
   if (isFreshProfile(profileId) || isUserDefinedProfile(profileId)) return [];
-  const hidden = getPermanentlyHiddenSeedTaskIds(profileId);
   let tasks: Task[];
   switch (profileId) {
     case 'kyle':   tasks = Object.values(KYLE_BY_DAY).flat().flatMap(c => c.tasks); break;
@@ -1716,7 +1726,7 @@ export function getAllTasksForProfile(profileId: string): Task[] {
     case 'eunice': tasks = Object.values(EUNICE_BY_DAY).flat().flatMap(c => c.tasks); break;
     default:       tasks = getAllTasks();
   }
-  return hidden.size === 0 ? tasks : tasks.filter(t => !hidden.has(t.id));
+  return tasks.filter(t => !isSeedTaskPermanentlyHidden(profileId, t.id));
 }
 
 export function getTasksForToday(profileId: string): Task[] {
@@ -1760,9 +1770,13 @@ export function getWeekPlanForProfile(profileId: string): Record<string, string[
       plan = WEEK_PLAN;
   }
   const hidden = getPermanentlyHiddenSeedTaskIds(profileId);
-  if (hidden.size === 0) return plan;
+  const hiddenFamilies = getHiddenSeedFamilyIds(profileId);
+  if (hidden.size === 0 && hiddenFamilies.size === 0) return plan;
   return Object.fromEntries(
-    Object.entries(plan).map(([day, ids]) => [day, ids.filter(id => !hidden.has(id))]),
+    Object.entries(plan).map(([day, ids]) => [
+      day,
+      ids.filter(id => !isSeedTaskPermanentlyHidden(profileId, id)),
+    ]),
   );
 }
 
@@ -2047,7 +2061,7 @@ export function isTaskDeleted(profileId: string, taskId: string, date: string): 
 
 /** Permanently removed via Delete Forever (seed tasks). */
 export function isTaskPermanentlyRemoved(profileId: string, taskId: string): boolean {
-  return getPermanentlyHiddenSeedTaskIds(profileId).has(taskId);
+  return isSeedTaskPermanentlyHidden(profileId, taskId);
 }
 
 /** Single source of truth: should this task appear anywhere for this date? */
@@ -2078,55 +2092,87 @@ export function purgeTaskLocalState(profileId: string, taskId: string) {
 }
 
 function hiddenSeedStorageKey(profileId: string) {
-  return `arbol-hidden-seed-${profileId}`;
+  return hiddenSeedTaskStorageKey(profileId);
+}
+
+function annotateSeedFamily(task: Task): Task {
+  const familyId = task.seedFamilyId ?? getSeedFamilyIdForTaskId(task.id) ?? undefined;
+  return familyId ? { ...task, seedFamilyId: familyId } : task;
+}
+
+function isSeedTaskHidden(
+  task: Task,
+  hiddenIds: Set<string>,
+  hiddenFamilies: Set<string>,
+): boolean {
+  if (hiddenIds.has(task.id)) return true;
+  const familyId = task.seedFamilyId ?? getSeedFamilyIdForTaskId(task.id);
+  return !!(familyId && hiddenFamilies.has(familyId));
 }
 
 function filterHiddenSeedCategories(profileId: string, categories: TaskCategory[]): TaskCategory[] {
-  const hidden = getPermanentlyHiddenSeedTaskIds(profileId);
-  if (hidden.size === 0) return categories;
+  const hiddenIds = getPermanentlyHiddenSeedTaskIds(profileId);
+  const hiddenFamilies = getHiddenSeedFamilyIds(profileId);
+  if (hiddenIds.size === 0 && hiddenFamilies.size === 0) {
+    return categories.map(cat => ({
+      ...cat,
+      tasks: cat.tasks.map(annotateSeedFamily),
+    }));
+  }
   return categories.map(cat => ({
     ...cat,
-    tasks: cat.tasks.filter(t => !hidden.has(t.id)),
+    tasks: cat.tasks
+      .map(annotateSeedFamily)
+      .filter(t => !isSeedTaskHidden(t, hiddenIds, hiddenFamilies)),
   }));
 }
 
 export function getPermanentlyHiddenSeedTaskIds(profileId: string): Set<string> {
-  try {
-    return new Set(JSON.parse(localStorage.getItem(hiddenSeedStorageKey(profileId)) || '[]') as string[]);
-  } catch {
-    return new Set();
-  }
+  return readHiddenSeedTaskIds(profileId);
+}
+
+export function getHiddenSeedFamilyIds(profileId: string): Set<string> {
+  return readHiddenSeedFamilyIds(profileId);
 }
 
 export function isSeedTaskPermanentlyHidden(profileId: string, taskId: string): boolean {
-  return getPermanentlyHiddenSeedTaskIds(profileId).has(taskId);
+  return isSeedHiddenByTombstones(profileId, taskId);
 }
 
+/**
+ * Permanently hide a seed task. If it belongs to a seed family, tombstone the
+ * family (and known member IDs). Does not purge status/notes history.
+ */
 export function permanentlyHideSeedTask(profileId: string, taskId: string) {
-  const hidden = getPermanentlyHiddenSeedTaskIds(profileId);
-  hidden.add(taskId);
-  localStorage.setItem(hiddenSeedStorageKey(profileId), JSON.stringify([...hidden]));
-  purgeTaskLocalState(profileId, taskId);
+  const familyId = applySeedHideTombstones(profileId, taskId);
+  if (familyId) {
+    try {
+      import('./deviceAnalytics').then(({ trackEvent }) => {
+        trackEvent(profileId, 'seed_family_hide', { familyId });
+      });
+    } catch { /* ignore */ }
+  }
+  // Do not purgeTaskLocalState — preserve completion history and notes.
   import('./supabaseSync').then(({ syncTaskDeletion }) => {
     syncTaskDeletion(profileId, taskId, 'permanent');
-  });
-  import('./cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId));
+  }).catch(() => {});
+  import('./cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId)).catch(() => {});
   try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch { /* ignore */ }
   try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch { /* ignore */ }
-  import('./dashboardSnapshot').then(({ dispatchDashboardRefresh }) => dispatchDashboardRefresh());
+  import('./dashboardSnapshot').then(({ dispatchDashboardRefresh }) => dispatchDashboardRefresh()).catch(() => {});
 }
 
-/** Hide all seed tasks that share the same label (day-sibling family). */
-export function permanentlyHideSeedTasksByLabel(profileId: string, label: string) {
-  const normalized = label.trim().toLowerCase();
-  if (!normalized) return;
-  getTaskCategoriesForProfile(profileId).forEach(cat => {
-    cat.tasks.forEach(t => {
-      if (t.label.trim().toLowerCase() === normalized) {
-        permanentlyHideSeedTask(profileId, t.id);
-      }
-    });
-  });
+/**
+ * One-shot: convert known hidden task IDs into family tombstones.
+ * Call only from App mount post-sync. Idempotent via marker key.
+ * @returns true if this call performed the backfill pass (marker was unset).
+ */
+export function runSeedFamilyBackfillIfNeeded(profileId: string): boolean {
+  const ran = runSeedFamilyBackfillCore(profileId);
+  if (ran) {
+    import('./cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId)).catch(() => {});
+  }
+  return ran;
 }
 
 export function markTaskDeleted(profileId: string, taskId: string, date: string) {

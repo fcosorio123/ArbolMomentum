@@ -136,6 +136,9 @@ export function MomentumUpdateModal({
                     <span style={{ fontSize: 12, color: C.primary, marginLeft: 6 }}>+{delta}%</span>
                   )}
                 </div>
+                <div style={{ fontSize: 12, color: C.body, marginTop: 6, lineHeight: 1.4 }}>
+                  Today&apos;s progress after updating &ldquo;{entry.taskTitle}&rdquo;
+                </div>
               </div>
               <div style={{ borderLeft: `1px solid ${C.border}`, paddingLeft: 16 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: C.secondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>

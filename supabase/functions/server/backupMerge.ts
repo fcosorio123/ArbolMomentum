@@ -140,13 +140,19 @@ export function unionMergeBackupPayload(
   const deletedTasks = unionStringIds(existing.deletedUserTasks, incoming.deletedUserTasks);
   merged.deletedUserGoals = deletedGoals;
   merged.deletedUserTasks = deletedTasks;
-  merged.deletedDefaultGoals = unionStringIds(existing.deletedDefaultGoals, incoming.deletedDefaultGoals);
+  const deletedDefaultGoals = unionStringIds(existing.deletedDefaultGoals, incoming.deletedDefaultGoals);
+  merged.deletedDefaultGoals = deletedDefaultGoals;
 
   merged.userTasks = mergeEntityArraysById(existing.userTasks, incoming.userTasks, new Set(deletedTasks));
-  merged.personalGoals = mergeEntityArraysById(existing.personalGoals, incoming.personalGoals, new Set(deletedGoals));
-  merged.permanentlyHiddenSeedTasks = preferRicherArray(
+  const allDeletedGoals = new Set([...deletedGoals, ...deletedDefaultGoals]);
+  merged.personalGoals = mergeEntityArraysById(existing.personalGoals, incoming.personalGoals, allDeletedGoals);
+  merged.permanentlyHiddenSeedTasks = unionStringIds(
     existing.permanentlyHiddenSeedTasks,
     incoming.permanentlyHiddenSeedTasks,
+  );
+  merged.permanentlyHiddenSeedFamilies = unionStringIds(
+    existing.permanentlyHiddenSeedFamilies,
+    incoming.permanentlyHiddenSeedFamilies,
   );
   merged.seedOverrides = preferRicherObject(existing.seedOverrides, incoming.seedOverrides);
   merged.liveReports = preferRicherObject(existing.liveReports, incoming.liveReports);

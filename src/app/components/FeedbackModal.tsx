@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal } from 'antd';
 import {
   RATING_EMOJIS, RATING_LABELS, WHAT_WORKED_OPTIONS, WHAT_DIDNT_OPTIONS,
-  saveFeedback, recordNudge, type FeedbackEntry,
+  FEATURE_INTEREST_OPTIONS, saveFeedback, recordNudge, type FeedbackEntry,
+  hasAnsweredFeatureInterest, markFeatureInterestAnswered,
 } from '../data/feedback';
 import { getTodayKey } from '../data/profiles';
 import { C } from '../data/colors';
+import { trackEvent } from '../data/deviceAnalytics';
 
 interface Props {
   open: boolean;
@@ -20,6 +22,14 @@ export function FeedbackModal({ open, profileId, onSubmit, onLater }: Props) {
   const [didnt, setDidnt] = useState<Set<string>>(new Set());
   const [suggestion, setSuggestion] = useState('');
   const [step, setStep] = useState<'prompt' | 'form' | 'success'>('prompt');
+  const [interest, setInterest] = useState<Set<string>>(new Set());
+  const showInterest = !hasAnsweredFeatureInterest(profileId);
+
+  useEffect(() => {
+    if (open && step === 'form' && showInterest) {
+      trackEvent(profileId, 'feature_interest_shown', { entry: 'feedback_modal' });
+    }
+  }, [open, step, showInterest, profileId]);
 
   const toggle = (set: Set<string>, val: string, setter: (s: Set<string>) => void) => {
     const next = new Set(set);
@@ -29,12 +39,24 @@ export function FeedbackModal({ open, profileId, onSubmit, onLater }: Props) {
 
   const handleSubmit = () => {
     if (!rating) return;
+    const interestIds = [...interest];
     const entry: FeedbackEntry = {
       profileId, date: getTodayKey(),
       rating, whatWorked: [...worked], whatDidnt: [...didnt],
       suggestion: suggestion.trim(), timestamp: Date.now(),
+      ...(interestIds.length > 0 ? { featureInterest: interestIds } : {}),
     };
     saveFeedback(entry);
+    if (showInterest) {
+      markFeatureInterestAnswered(profileId);
+      if (interestIds.length > 0) {
+        for (const feature of interestIds) {
+          trackEvent(profileId, 'feature_interest_selected', { feature, entry: 'feedback_modal' });
+        }
+      } else {
+        trackEvent(profileId, 'feature_interest_dismissed', { entry: 'feedback_modal' });
+      }
+    }
     setStep('success');
     setTimeout(() => {
       reset();
@@ -49,7 +71,7 @@ export function FeedbackModal({ open, profileId, onSubmit, onLater }: Props) {
 
   const reset = () => {
     setRating(null); setWorked(new Set()); setDidnt(new Set());
-    setSuggestion(''); setStep('prompt');
+    setSuggestion(''); setInterest(new Set()); setStep('prompt');
   };
 
   const handleClose = () => { reset(); handleLater(); };
@@ -229,7 +251,7 @@ export function FeedbackModal({ open, profileId, onSubmit, onLater }: Props) {
             </div>
 
             {/* Suggestion */}
-            <div style={{ marginBottom: 20 }}>
+            <div style={{ marginBottom: showInterest ? 16 : 20 }}>
               <div style={{ fontSize: 12, color: C.secondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>
                 💡 Suggestion (optional)
               </div>
@@ -248,6 +270,38 @@ export function FeedbackModal({ open, profileId, onSubmit, onLater }: Props) {
                 onBlur={e => e.target.style.borderColor = C.border}
               />
             </div>
+
+            {showInterest && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 12, color: C.secondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>
+                  Curious about (optional)
+                </div>
+                <p style={{ margin: '0 0 10px', fontSize: 12, color: C.body, lineHeight: 1.45 }}>
+                  No commitment - helps us decide what to build next.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {FEATURE_INTEREST_OPTIONS.map(opt => {
+                    const selected = interest.has(opt.id);
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => toggle(interest, opt.id, setInterest)}
+                        style={{
+                          textAlign: 'left', padding: '10px 12px', borderRadius: 12, fontSize: 13, cursor: 'pointer',
+                          border: `1.5px solid ${selected ? C.primary : C.border}`,
+                          background: selected ? `${C.primary}12` : C.bgCard,
+                          color: selected ? C.primary : C.body,
+                          fontWeight: selected ? 700 : 400,
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Actions */}
             <button

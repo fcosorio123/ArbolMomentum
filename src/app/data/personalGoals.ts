@@ -4,7 +4,7 @@
 
 import { getTodayKey } from './profiles';
 import { clearTaskGoalLinksForGoal } from './goalTaskResolution';
-import { recordDeletedUserGoal } from './deletionTombstones';
+import { recordDeletedUserGoal, getDeletedUserGoalIds } from './deletionTombstones';
 
 export type MilestoneLevel = 'light' | 'medium' | 'medium-high' | 'hard' | 'epic';
 
@@ -1224,6 +1224,18 @@ export function getDeletedDefaultGoalIds(profileId: string): Set<string> {
   }
 }
 
+function getAllGoalTombstoneIds(profileId: string): Set<string> {
+  const dead = new Set(getDeletedDefaultGoalIds(profileId));
+  for (const id of getDeletedUserGoalIds(profileId)) dead.add(id);
+  return dead;
+}
+
+function filterGoalsByAllTombstones(goals: PersonalGoal[], profileId: string): PersonalGoal[] {
+  const dead = getAllGoalTombstoneIds(profileId);
+  if (dead.size === 0) return goals;
+  return goals.filter(g => !dead.has(g.id));
+}
+
 function recordDeletedDefaultGoal(profileId: string, goalId: string) {
   const isDefault = DEFAULT_PERSONAL_GOALS.some(g => g.id === goalId && g.profileId === profileId);
   if (!isDefault) return;
@@ -1247,7 +1259,10 @@ export function getPersonalGoals(profileId: string): PersonalGoal[] {
         const old = oldGoals.find(o => o.id === def.id);
         return old ? { ...def, currentValue: old.currentValue, milestones: def.milestones.map((m, i) => ({ ...m, completed: old.milestones[i]?.completed ?? m.completed })) } : def;
       });
-      const merged = [...mergedDefaults, ...userGoals.filter(ug => !mergedDefaults.some(m => m.id === ug.id))];
+      const merged = filterGoalsByAllTombstones(
+        [...mergedDefaults, ...userGoals.filter(ug => !mergedDefaults.some(m => m.id === ug.id))],
+        profileId,
+      );
       savePersonalGoals(profileId, merged);
       localStorage.setItem(goalsVersionKey(profileId), GOALS_DATA_VERSION);
       return merged;
@@ -1256,15 +1271,16 @@ export function getPersonalGoals(profileId: string): PersonalGoal[] {
 
   if (stored && storedVersion === GOALS_DATA_VERSION) {
     const parsed: PersonalGoal[] = JSON.parse(stored);
-    if (parsed.length > 0) return parsed;
+    if (parsed.length > 0) return filterGoalsByAllTombstones(parsed, profileId);
   }
 
   const defaults = DEFAULT_PERSONAL_GOALS
     .filter(g => g.profileId === profileId && !deletedDefaults.has(g.id));
   if (defaults.length > 0) {
-    savePersonalGoals(profileId, defaults);
+    const live = filterGoalsByAllTombstones(defaults, profileId);
+    savePersonalGoals(profileId, live);
     localStorage.setItem(goalsVersionKey(profileId), GOALS_DATA_VERSION);
-    return defaults;
+    return live;
   }
 
   return [];

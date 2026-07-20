@@ -19,7 +19,11 @@
     "test:onboarding": "npx tsx scripts/test-product-onboarding.ts",
     "test:simplify-detail": "npx tsx scripts/test-simplify-detail-assist.ts",
     "test:email-schedule": "npx tsx scripts/test-email-schedule-time.ts",
-    "test:task-focus": "npx tsx scripts/test-task-focus-selection.ts"
+    "test:task-focus": "npx tsx scripts/test-task-focus-selection.ts",
+    "test:seed-deletion": "npx tsx scripts/test-seed-deletion-tombstones.ts",
+    "test:today-hierarchy": "npx tsx scripts/test-today-hierarchy-order.ts",
+    "test:feedback-interest": "npx tsx scripts/test-feedback-interest.ts",
+    "test:surgical-ux": "npm run test:seed-deletion && npm run test:today-hierarchy && npm run test:feedback-interest && npm run test:task-focus"
   },
   "dependencies": {
     "@ant-design/colors": "^8.0.1",

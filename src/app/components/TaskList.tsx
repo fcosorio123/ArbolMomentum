@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { App, Button, Progress } from 'antd';
 import { DeleteOutlined, CheckCircleFilled, PlayCircleOutlined, EditOutlined, PlusOutlined, CloseOutlined, MoreOutlined } from '@ant-design/icons';
 import { selectFocusTask, type FocusLabel } from '../data/taskFocusSelection';
+import { orderGoalsForToday, unfinishedGoalsToExpand } from '../data/goalFocusOrder';
 import {
   type Profile, type Task, type TaskStatus,
   getTaskCategoriesForProfile, getTaskStatus,
-  skipTaskForToday, permanentlyHideSeedTask, permanentlyHideSeedTasksByLabel, getTodayKey, getPermanentlyHiddenSeedTaskIds,
+  skipTaskForToday, permanentlyHideSeedTask, getTodayKey, isSeedTaskPermanentlyHidden,
   getEarnedBadges, type Badge, isFreshProfile,
 } from '../data/profiles';
 import { isUserDefinedProfile } from '../data/customProfiles';
@@ -96,6 +97,8 @@ interface Props {
   openCreateEntry?: boolean;
   onCreateEntryConsumed?: () => void;
   canStartPageTours?: boolean;
+  /** False until App mount sync + seed-family backfill complete. */
+  seedCatalogReady?: boolean;
 }
 
 function isRecurringUT(task: UserTask): boolean {
@@ -196,15 +199,20 @@ function TaskOverflowMenu({
           ...touchIconButton,
           minWidth: 36,
           minHeight: 36,
-          padding: '6px 8px',
+          padding: '6px 10px',
           background: C.bgAlt,
-          border: `1px solid ${C.border}`,
+          border: `1.5px solid ${C.borderStrong}`,
           borderRadius: 8,
-          color: C.secondary,
-          fontSize: 13,
+          color: C.headline,
+          fontSize: 12,
+          fontWeight: 700,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
         }}
       >
         <MoreOutlined />
+        More
       </button>
       {open && (
         <div
@@ -754,7 +762,7 @@ function goalAccentColor(goalId: string) {
 function GoalGroup({
   goal, tasks, statuses, notes, onOpenUpdate, onDelete, timeFilter,
   onEditTask, onAddSuggestedTask, onSimplifyTask, onArchiveTask, onRestoreTask,
-  isFirst, profileId, profileName, calendarDateKey,
+  defaultExpanded, deemphasized, profileId, profileName, calendarDateKey,
   selectionMode, selectedTaskIds, onToggleTaskSelect, showExploreSuggestions = true,
   emptyMessage = 'No tasks yet for this goal today.',
   getStatusHint,
@@ -772,7 +780,8 @@ function GoalGroup({
   onSimplifyTask?: (t: UserTask_, goal: PersonalGoal) => void;
   onArchiveTask?: (t: UserTask_) => void;
   onRestoreTask?: (t: UserTask_) => void;
-  isFirst?: boolean;
+  defaultExpanded?: boolean;
+  deemphasized?: boolean;
   profileId: string;
   profileName: string;
   calendarDateKey: string;
@@ -790,13 +799,13 @@ function GoalGroup({
     timeFilter === 'all' || t.timeOfDay === timeFilter
   );
   const containsFocus = !!(focusTaskId && allVisibleTasks.some(t => t.id === focusTaskId));
-  const [collapsed, setCollapsed] = useState(!(isFirst || containsFocus));
+  const [collapsed, setCollapsed] = useState(!(defaultExpanded || containsFocus));
   const accentColor = goalAccentColor(goal.id);
   const suggestedLabels = suggestTasksForGoal(goal).map(s => s.label);
 
   useEffect(() => {
-    if (containsFocus) setCollapsed(false);
-  }, [containsFocus, focusTaskId]);
+    if (defaultExpanded || containsFocus) setCollapsed(false);
+  }, [defaultExpanded, containsFocus, focusTaskId]);
 
   if (allVisibleTasks.length === 0) {
     return (
@@ -848,7 +857,8 @@ function GoalGroup({
       borderRadius: 16,
       overflow: 'hidden',
       background: C.bgCard,
-      boxShadow: C.shadow,
+      boxShadow: deemphasized ? 'none' : C.shadow,
+      opacity: deemphasized ? 0.72 : 1,
     }}>
       {/* Goal header card */}
       <div
@@ -1054,6 +1064,7 @@ function suggestTasksForGoal(goal: PersonalGoal): Array<{ label: string; timeOfD
 export function TaskList({
   profile, onNavigateMonth: _onNavigateMonth, onPerfectDay, onTasksChange, initialTaskView,
   onProductTour, openCreateEntry, onCreateEntryConsumed, canStartPageTours = true,
+  seedCatalogReady = true,
 }: Props) {
   const { message } = App.useApp();
   // Land on Today by default; Home "Open Month" can request the Month tab.
@@ -1421,7 +1432,7 @@ export function TaskList({
         recurrence: merged?.recurrence,
         sourceSeedTaskId: task.id,
       });
-      permanentlyHideSeedTasksByLabel(profile.id, sourceLabel);
+      permanentlyHideSeedTask(profile.id, task.id);
       clearSeedOverride(profile.id, task.id);
     }
 
@@ -1458,14 +1469,15 @@ export function TaskList({
   goals.forEach(g => { goalTaskMap[g.id] = []; });
   const ungroupedTasks: UserTask_[] = [];
 
-  const hiddenSeedIds = getPermanentlyHiddenSeedTaskIds(profile.id);
   const convertedSeedIds = new Set(
     userTasks.map(u => u.sourceSeedTaskId).filter((id): id is string => !!id),
   );
   const userTaskIds = new Set(userTasks.map(u => u.id));
 
   const shouldSkipSeedTask = (seedId: string) =>
-    hiddenSeedIds.has(seedId) || convertedSeedIds.has(seedId);
+    !seedCatalogReady
+    || isSeedTaskPermanentlyHidden(profile.id, seedId)
+    || convertedSeedIds.has(seedId);
 
   // Seed tasks from categories (today view)
   categories.forEach(cat => {
@@ -1614,6 +1626,9 @@ export function TaskList({
     captureScroll();
     trackActivity(profile.id);
     const { taskId, taskLabel, dateKey: ctxDate } = taskUpdateContext;
+    const goalTitleForToast = taskUpdateContext.goalTitle;
+    const goalDoneForToast = taskUpdateContext.goalDoneCount;
+    const goalTotalForToast = taskUpdateContext.goalTotalCount;
     const statusDate = ctxDate ?? today;
     const prevStatus = getTaskStatus(profile.id, taskId, statusDate);
 
@@ -1647,7 +1662,16 @@ export function TaskList({
     onTasksChange?.(newPending);
 
     if (statusSaved) {
-      message.success({ content: 'Progress saved!', duration: 2 });
+      if (status === 'done' && goalTitleForToast && goalTotalForToast) {
+        const doneAfter = (goalDoneForToast ?? 0) + (prevStatus === 'done' ? 0 : 1);
+        const total = goalTotalForToast;
+        message.success({
+          content: `Done · ${goalTitleForToast} ${Math.min(doneAfter, total)}/${total} today`,
+          duration: 2.5,
+        });
+      } else {
+        message.success({ content: 'Progress saved!', duration: 2 });
+      }
       if (
         taskView === 'today'
         && focusTaskId
@@ -1741,13 +1765,49 @@ export function TaskList({
       getStatusHint?: (task: UserTask_) => string | undefined;
       enableFocusHierarchy?: boolean;
     },
-  ) => (
+  ) => {
+    let goalsToRender = goals;
+    let taskMap = map;
+    let expandIds = new Set<string>();
+
+    if (opts.enableFocusHierarchy) {
+      const ordered = orderGoalsForToday(
+        goals.map((g, originalIndex) => ({
+          id: g.id,
+          originalIndex,
+          tasks: (map[g.id] ?? [])
+            .filter(t => timeFilter === 'all' || t.timeOfDay === timeFilter)
+            .map((t, originalIndex) => ({
+              id: t.id,
+              label: t.label,
+              timeOfDay: t.timeOfDay,
+              type: t.type,
+              status: statuses[t.id] ?? null,
+              potentialValue: t.potentialValue,
+              originalIndex,
+            })),
+        })),
+        focusTaskId,
+        focusLabel,
+      );
+      expandIds = unfinishedGoalsToExpand(ordered, 2);
+      const byId = new Map(goals.map(g => [g.id, g]));
+      goalsToRender = ordered.map(o => byId.get(o.goalId)!).filter(Boolean);
+      taskMap = {};
+      for (const o of ordered) {
+        const orig = map[o.goalId] ?? [];
+        const byTaskId = new Map(orig.map(t => [t.id, t]));
+        taskMap[o.goalId] = o.tasks.map(t => byTaskId.get(t.id)!).filter(Boolean);
+      }
+    }
+
+    return (
     <>
-      {goals.map((goal, idx) => (
+      {goalsToRender.map((goal, idx) => (
         <div key={goal.id} {...(idx === 0 ? { 'data-tour-id': 'tasks-goal-group' } : {})}>
           <GoalGroup
             goal={goal}
-            tasks={map[goal.id] ?? []}
+            tasks={taskMap[goal.id] ?? []}
             statuses={statuses} notes={notes}
             profileId={profile.id}
             profileName={profile.name}
@@ -1755,7 +1815,12 @@ export function TaskList({
             onOpenUpdate={openTaskUpdate}
             onDelete={t => openDeleteTask(t)}
             timeFilter={timeFilter}
-            isFirst={idx === 0}
+            defaultExpanded={opts.enableFocusHierarchy
+              ? expandIds.has(goal.id)
+              : idx === 0}
+            deemphasized={opts.enableFocusHierarchy
+              ? !expandIds.has(goal.id) && !(focusTaskId && (taskMap[goal.id] ?? []).some(t => t.id === focusTaskId))
+              : false}
             onEditTask={t => handleEditAnyTask(t, goal.id)}
             onAddSuggestedTask={handleAddSuggestedTask}
             onSimplifyTask={(t, g) => {
@@ -1778,7 +1843,7 @@ export function TaskList({
             focusTaskId={opts.enableFocusHierarchy ? focusTaskId : undefined}
             focusLabel={opts.enableFocusHierarchy ? focusLabel : undefined}
             onOverflowOpened={opts.enableFocusHierarchy
-              ? () => trackEvent(profile.id, 'task_overflow_opened', { view: 'today' })
+              ? () => trackEvent(profile.id, 'task_overflow_opened', { view: 'today', labeled: true })
               : undefined}
           />
         </div>
@@ -1837,6 +1902,7 @@ export function TaskList({
       )}
     </>
   );
+  };
 
   return (
     <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 100px', background: C.bg, minHeight: '100dvh' }}>

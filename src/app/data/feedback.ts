@@ -11,6 +11,8 @@ export interface FeedbackEntry {
   whatDidnt: string[];
   suggestion: string;
   timestamp: number;
+  /** Optional demand-test selections (directional discovery only). */
+  featureInterest?: string[];
 }
 
 export const WHAT_WORKED_OPTIONS = [
@@ -27,8 +29,26 @@ export const WHAT_DIDNT_OPTIONS = [
   'Hard to navigate',
 ];
 
+export const FEATURE_INTEREST_OPTIONS = [
+  { id: 'agent_complete', label: 'AI agent that completes tasks with my approval' },
+  { id: 'import_list', label: 'Import a task list from notes or a doc' },
+  { id: 'voice_capture', label: 'Add tasks by voice' },
+] as const;
+
 export const RATING_EMOJIS = ['😞', '😐', '🙂', '😊', '🎉'] as const;
 export const RATING_LABELS = ['Poor', 'Fair', 'Good', 'Great', 'Amazing'] as const;
+
+function featureInterestAnsweredKey(profileId: string) {
+  return `arbol-feature-interest-answered-${profileId}`;
+}
+
+export function hasAnsweredFeatureInterest(profileId: string): boolean {
+  return localStorage.getItem(featureInterestAnsweredKey(profileId)) === '1';
+}
+
+export function markFeatureInterestAnswered(profileId: string) {
+  localStorage.setItem(featureInterestAnsweredKey(profileId), '1');
+}
 
 // ──────────────────────────────────────────────
 // Feedback storage

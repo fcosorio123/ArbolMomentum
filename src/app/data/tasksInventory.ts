@@ -1,6 +1,6 @@
 import {
   getTaskCategoriesForProfile,
-  getPermanentlyHiddenSeedTaskIds,
+  isSeedTaskPermanentlyHidden,
   getTaskStatus,
   type Task,
   type TimeOfDay,
@@ -47,7 +47,6 @@ export function buildAllTasksInventory(profileId: string): TasksInventory {
   const unassigned: InventoryTask[] = [];
 
   const userTasks = getUserTasks(profileId);
-  const hiddenSeedIds = getPermanentlyHiddenSeedTaskIds(profileId);
   const convertedSeedIds = new Set(
     userTasks.map(u => u.sourceSeedTaskId).filter((id): id is string => !!id),
   );
@@ -76,7 +75,7 @@ export function buildAllTasksInventory(profileId: string): TasksInventory {
   for (const day of DAYS) {
     getTaskCategoriesForProfile(profileId, day).forEach(cat => {
       cat.tasks.forEach(t => {
-        if (hiddenSeedIds.has(t.id) || convertedSeedIds.has(t.id) || userTaskIds.has(t.id)) return;
+        if (isSeedTaskPermanentlyHidden(profileId, t.id) || convertedSeedIds.has(t.id) || userTaskIds.has(t.id)) return;
         const merged = mergeSeedForProfile(profileId, t);
         const effectiveGoalId = getPrimaryGoalIdForTask(profileId, t.id, cat.goalId);
         const setupKey = [

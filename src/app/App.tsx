@@ -135,6 +135,8 @@ export default function App() {
   const [pendingCount, setPendingCount] = useState(0);
   const [badgeSupported] = useState(() => 'setAppBadge' in navigator);
   const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 1024);
+  /** False until mount sync + seed-family backfill finish for the active profile. */
+  const [profileSeedReady, setProfileSeedReady] = useState(false);
 
   const swRef = useRef<ServiceWorkerRegistration | null>(null);
   swRef.current = swRegistration;
@@ -383,10 +385,12 @@ export default function App() {
     let lastSyncAt = 0;
     let inFlight = false;
     const MIN_GAP_MS = 8_000;
+    setProfileSeedReady(false);
 
     const notifyUi = () => {
       try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
       try { window.dispatchEvent(new CustomEvent(DASHBOARD_REFRESH_EVENT)); } catch {}
+      try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch {}
     };
 
     const runSync = (reason: 'mount' | 'focus') => {
@@ -399,6 +403,11 @@ export default function App() {
         syncProfileFromCloud(profileId)
           .then(async result => {
             lastSyncAt = Date.now();
+            if (reason === 'mount') {
+              const { runSeedFamilyBackfillIfNeeded } = await import('./data/profiles');
+              runSeedFamilyBackfillIfNeeded(profileId);
+              setProfileSeedReady(true);
+            }
             if (result === 'full-restore') {
               // applyLocalData already wrote synchronously. Refresh mounted
               // views instead of reloading; an intentionally empty cloud
@@ -418,6 +427,16 @@ export default function App() {
               notifyUi();
             } else {
               await pushQualificationAfterSync(profileId);
+              if (reason === 'mount') notifyUi();
+            }
+          })
+          .catch(() => {
+            if (reason === 'mount') {
+              import('./data/profiles').then(({ runSeedFamilyBackfillIfNeeded }) => {
+                runSeedFamilyBackfillIfNeeded(profileId);
+                setProfileSeedReady(true);
+                notifyUi();
+              });
             }
           })
           .finally(() => { inFlight = false; });
@@ -707,6 +726,7 @@ export default function App() {
         <TaskList
           key={`tasks-${tasksInitialView}`}
           profile={activeProfile}
+          seedCatalogReady={profileSeedReady}
           initialTaskView={tasksInitialView}
           onNavigateMonth={() => {
             setTasksInitialView('month');
