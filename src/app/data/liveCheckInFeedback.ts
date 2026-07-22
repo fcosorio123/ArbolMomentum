@@ -177,8 +177,16 @@ export function calculateScopeProgress(profileId: string, dateKey: string): {
   }
 
   const countable = tasks.filter(t => getTaskStatus(profileId, t.id, dateKey) !== 'skipped');
-  // Binary done% — matches Dashboard + Live check-in chart help text ("already Done").
-  const progress = countable.length > 0 ? Math.round((done / countable.length) * 100) : 0;
+  // Weighted status % so demotions (Done→In Progress, In Progress→Haven't yet) move the live chart.
+  // Dashboard task counters stay binary done/total separately.
+  let sum = 0;
+  for (const t of countable) {
+    sum += taskStatusToPercent(
+      getTaskStatus(profileId, t.id, dateKey),
+      isTaskBlockedFlag(profileId, t.id, dateKey),
+    );
+  }
+  const progress = countable.length > 0 ? Math.round(sum / countable.length) : 0;
   return { progress, doneTaskCount: done, inProgressTaskCount: inProgress, notStartedTaskCount: notStarted, blockedTaskCount: blocked };
 }
 

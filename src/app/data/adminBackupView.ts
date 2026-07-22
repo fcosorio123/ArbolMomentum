@@ -27,7 +27,7 @@ function mapGet(map: unknown, key: string): string | undefined {
 
 function parseStatus(raw: string | undefined): TaskStatus | null {
   if (raw === 'done' || raw === 'inprogress' || raw === 'skipped') return raw;
-  return null;
+  return null; // includes missing and `__cleared`
 }
 
 function rowDisposition(status: TaskStatus | null): TaskDisposition {

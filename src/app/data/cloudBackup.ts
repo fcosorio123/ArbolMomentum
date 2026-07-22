@@ -26,6 +26,13 @@ import {
   getDeletedUserTaskIds,
 } from './deletionTombstones';
 import { hiddenSeedFamilyStorageKey } from './seedFamilies';
+import {
+  mergeTaskStatusMaps,
+  statusKeyToUpdatedAtKey,
+  asUpdatedAtMap,
+  asStringMap,
+} from './taskStatusMerge';
+import { dispatchDashboardRefresh } from './dashboardSnapshot';
 
 function getAllDeletedGoalIds(profileId: string): Set<string> {
   const dead = new Set(getDeletedUserGoalIds(profileId));
@@ -108,18 +115,6 @@ function readPersonalGoals(profileId: string): unknown {
 
 // ── Collect all localStorage entries for a profile ──────────────────
 
-/** Prefer stronger task status so mobile/desktop done marks aren't lost. */
-function preferTaskStatus(a: string | undefined, b: string | undefined): string {
-  const rank = (s: string | undefined) => {
-    if (s === 'done') return 4;
-    if (s === 'inprogress') return 3;
-    if (s === 'skipped') return 2;
-    if (s) return 1;
-    return 0;
-  };
-  return (rank(b) > rank(a) ? b : a) || a || b || '';
-}
-
 function preferBooleanish(a: string | undefined, b: string | undefined): string {
   if (a === 'true' || b === 'true') return 'true';
   return b || a || '';
@@ -157,6 +152,7 @@ function unionMergeStringMap(
 
 function collectLocalData(profileId: string): Record<string, unknown> {
   const taskStatuses: Record<string, string> = {};
+  const taskStatusUpdatedAt: Record<string, number> = {};
   const taskDeletions: Record<string, string> = {};
   const streakDays: Record<string, string> = {};
   const taskNotes: Record<string, string> = {};
@@ -178,8 +174,15 @@ function collectLocalData(profileId: string): Record<string, unknown> {
           if (log.profileId === profileId) goalProgressLogs[key] = v;
         } catch { /* ignore */ }
       }
+    } else if (key.startsWith(`task-at-${profileId}-`)) {
+      const v = localStorage.getItem(key);
+      const n = Number(v);
+      if (Number.isFinite(n) && n > 0) {
+        taskStatusUpdatedAt[`task-${key.slice(`task-at-`.length)}`] = n;
+      }
     } else if (key.startsWith(`task-${profileId}-`)) {
       const v = localStorage.getItem(key);
+      // Include `__cleared` so demotions survive cloud merge.
       if (v) taskStatuses[key] = v;
     } else if (key.startsWith(`task-del-${profileId}-`)) {
       const v = localStorage.getItem(key);
@@ -253,6 +256,7 @@ function collectLocalData(profileId: string): Record<string, unknown> {
     deletedUserGoals: readDeletedUserGoalsRaw(profileId),
     deletedUserTasks: readDeletedUserTasksRaw(profileId),
     taskStatuses,
+    taskStatusUpdatedAt,
     taskDeletions,
     streakDays,
     taskNotes,
@@ -422,9 +426,68 @@ function restoreStringMap(map: unknown): void {
   }
 }
 
+/** Apply merged task statuses + timestamps; skip keys where local is newer (race-safe). */
+function restoreTaskStatuses(
+  statuses: unknown,
+  updatedAt: unknown,
+): boolean {
+  const map = asStringMap(statuses);
+  const atMap = asUpdatedAtMap(updatedAt);
+  let changed = false;
+  for (const [k, v] of Object.entries(map)) {
+    if (!k || !v) continue;
+    const atKey = statusKeyToUpdatedAtKey(k);
+    const localAt = Number(localStorage.getItem(atKey) || 0) || 0;
+    const incomingAt = atMap[k] || 0;
+    if (localAt > incomingAt) continue;
+    if (localStorage.getItem(k) !== v) {
+      localStorage.setItem(k, v);
+      changed = true;
+    }
+    if (incomingAt > 0 && localAt !== incomingAt) {
+      localStorage.setItem(atKey, String(incomingAt));
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+/** Merge cloud task statuses into localStorage using timestamp LWW. */
+function unionMergeTaskStatuses(cloudStatuses: unknown, cloudUpdatedAt: unknown): boolean {
+  const cloudMap = asStringMap(cloudStatuses);
+  const cloudAt = asUpdatedAtMap(cloudUpdatedAt);
+  if (Object.keys(cloudMap).length === 0 && Object.keys(cloudAt).length === 0) return false;
+
+  const localMap: Record<string, string> = {};
+  const localAt: Record<string, number> = {};
+  for (const k of new Set([...Object.keys(cloudMap), ...Object.keys(cloudAt)])) {
+    const lv = localStorage.getItem(k);
+    if (lv) localMap[k] = lv;
+    const la = Number(localStorage.getItem(statusKeyToUpdatedAtKey(k)) || 0);
+    if (la > 0) localAt[k] = la;
+  }
+
+  const { taskStatuses, taskStatusUpdatedAt } = mergeTaskStatusMaps(
+    localMap,
+    cloudMap,
+    localAt,
+    cloudAt,
+  );
+  return restoreTaskStatuses(taskStatuses, taskStatusUpdatedAt);
+}
+
+function notifyTaskStatusRestored(profileId: string): void {
+  try {
+    window.dispatchEvent(new CustomEvent('arbol-tasks-updated', { detail: { profileId } }));
+  } catch { /* ignore */ }
+  try {
+    dispatchDashboardRefresh();
+  } catch { /* ignore */ }
+}
+
 /**
  * Union-merge cloud activity into local so mobile/desktop both keep progress.
- * Task statuses prefer "done"; streak/check-in flags OR together; visit counts take max.
+ * Task statuses use timestamp last-write-wins (demotions and clears survive).
  * When cloud is newer, also pull task/goal blob fields that aren't key-level mergeable.
  */
 function mergeCloudActivityUnion(profileId: string, cloud: Record<string, unknown>): boolean {
@@ -432,7 +495,7 @@ function mergeCloudActivityUnion(profileId: string, cloud: Record<string, unknow
   const cloudAt = typeof cloud.savedAt === 'number' ? cloud.savedAt : 0;
 
   let changed = false;
-  if (unionMergeStringMap(cloud.taskStatuses, preferTaskStatus)) changed = true;
+  if (unionMergeTaskStatuses(cloud.taskStatuses, cloud.taskStatusUpdatedAt)) changed = true;
   if (unionMergeStringMap(cloud.taskDeletions, (a, b) => b || a || '')) changed = true;
   if (unionMergeStringMap(cloud.streakDays, preferBooleanish)) changed = true;
   if (unionMergeStringMap(cloud.taskNotes, (a, b) => (b && b.length >= (a?.length ?? 0) ? b : a) || '')) changed = true;
@@ -564,7 +627,7 @@ function applyLocalData(profileId: string, data: Record<string, unknown>): void 
     restoreStringMap(map);
   };
 
-  restoreMap(data.taskStatuses);
+  restoreTaskStatuses(data.taskStatuses, data.taskStatusUpdatedAt);
   restoreMap(data.taskDeletions);
   restoreMap(data.streakDays);
   restoreMap(data.taskNotes);
@@ -766,13 +829,26 @@ export async function getProfileSyncStatus(profileId: string): Promise<ProfileSy
 
 function rebuildStreakDaysFromDoneTasks(profileId: string): void {
   const dateRe = /(\d{4}-\d{2}-\d{2})$/;
+  const doneDates = new Set<string>();
+  const streakKeys: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (!key?.startsWith(`task-${profileId}-`)) continue;
+    if (!key) continue;
+    if (key.startsWith(`streak-${profileId}-`) && !key.includes('streak-best-')) {
+      streakKeys.push(key);
+    }
+    if (!key.startsWith(`task-${profileId}-`)) continue;
     if (localStorage.getItem(key) !== 'done') continue;
     const m = key.match(dateRe);
     if (!m) continue;
-    localStorage.setItem(`streak-${profileId}-${m[1]}`, 'true');
+    doneDates.add(m[1]);
+  }
+  for (const date of doneDates) {
+    localStorage.setItem(`streak-${profileId}-${date}`, 'true');
+  }
+  for (const key of streakKeys) {
+    const m = key.match(dateRe);
+    if (m && !doneDates.has(m[1])) localStorage.removeItem(key);
   }
 }
 
@@ -829,7 +905,14 @@ async function buildUnionPayload(profileId: string): Promise<Record<string, unkn
   const local = collectLocalData(profileId);
   if (!cloud) return local;
 
-  local.taskStatuses = mergeStringMaps(local.taskStatuses, cloud.taskStatuses, preferTaskStatus);
+  const mergedStatuses = mergeTaskStatusMaps(
+    local.taskStatuses,
+    cloud.taskStatuses,
+    local.taskStatusUpdatedAt,
+    cloud.taskStatusUpdatedAt,
+  );
+  local.taskStatuses = mergedStatuses.taskStatuses;
+  local.taskStatusUpdatedAt = mergedStatuses.taskStatusUpdatedAt;
   local.taskDeletions = mergeStringMaps(local.taskDeletions, cloud.taskDeletions, (a, b) => b || a || '');
   local.streakDays = mergeStringMaps(local.streakDays, cloud.streakDays, preferBooleanish);
   local.taskNotes = mergeStringMaps(local.taskNotes, cloud.taskNotes, (a, b) => (b && b.length >= (a?.length ?? 0) ? b : a) || '');
@@ -916,7 +999,8 @@ async function saveToCloudUnlocked(profileId: string, opts?: { retryOnStale?: bo
   }
 
   // Apply unioned maps back into localStorage so the open tab matches what we saved.
-  restoreStringMap(payload.taskStatuses);
+  // Race-safe: do not clobber a newer local edit that landed during fetch/merge.
+  const statusChanged = restoreTaskStatuses(payload.taskStatuses, payload.taskStatusUpdatedAt);
   restoreStringMap(payload.taskDeletions);
   restoreStringMap(payload.streakDays);
   restoreStringMap(payload.checkInDays);
@@ -927,6 +1011,7 @@ async function saveToCloudUnlocked(profileId: string, opts?: { retryOnStale?: bo
   }
   persistTimezone(profileId, payload.timezone);
   persistTzOffset(profileId, payload.tzOffset);
+  if (statusChanged) notifyTaskStatusRestored(profileId);
 
   const { data, error } = await invokeWithRetry(`${FN}/backup/${profileId}`, {
     method: 'POST',

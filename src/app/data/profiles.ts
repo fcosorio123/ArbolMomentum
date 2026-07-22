@@ -2008,20 +2008,37 @@ export function updateStreakBests(profileId: string): void {
 export function getTaskStatus(profileId: string, taskId: string, date: string): TaskStatus | null {
   const stored = localStorage.getItem(`task-${profileId}-${taskId}-${date}`);
   if (stored === 'inprogress' || stored === 'done' || stored === 'skipped') return stored;
+  // `__cleared` (or missing) means Haven't yet — intentional clear must survive cloud sync.
   if (localStorage.getItem(`task-del-${profileId}-${taskId}-${date}`) === 'true') return 'skipped';
   return null;
 }
 
+function hasAnyDoneTaskOnDate(profileId: string, date: string): boolean {
+  const suffix = `-${date}`;
+  const prefix = `task-${profileId}-`;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith(prefix) || !key.endsWith(suffix)) continue;
+    if (localStorage.getItem(key) === 'done') return true;
+  }
+  return false;
+}
+
 export function setTaskStatus(profileId: string, taskId: string, date: string, status: TaskStatus | null) {
   const key = `task-${profileId}-${taskId}-${date}`;
+  const atKey = `task-at-${profileId}-${taskId}-${date}`;
   const delKey = `task-del-${profileId}-${taskId}-${date}`;
-  if (!status) localStorage.removeItem(key);
+  // Persist clears as `__cleared` so backups can LWW-demote over older done/inprogress.
+  if (!status) localStorage.setItem(key, '__cleared');
   else localStorage.setItem(key, status);
+  localStorage.setItem(atKey, String(Date.now()));
   localStorage.removeItem(delKey);
 
   if (status === 'done') {
     localStorage.setItem(`streak-${profileId}-${date}`, 'true');
     updateStreakBests(profileId);
+  } else if (!hasAnyDoneTaskOnDate(profileId, date)) {
+    localStorage.removeItem(`streak-${profileId}-${date}`);
   }
 
   // Sync to Supabase (async, non-blocking)

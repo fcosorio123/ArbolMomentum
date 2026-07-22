@@ -61,7 +61,7 @@ function LiveCheckInHelpModal({ open, onClose }: { open: boolean; onClose: () =>
           How to read Live check-in
         </h3>
         <p style={{ margin: '0 0 14px', fontSize: 13, color: C.body, lineHeight: 1.5 }}>
-          Each time you mark a task Done, Arbol logs a check-in and updates this chart for today.
+          Each time you update a task status, Arbol logs a check-in and updates this chart for today.
         </p>
 
         <div style={{ fontSize: 13, color: C.body, lineHeight: 1.55, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -83,7 +83,8 @@ function LiveCheckInHelpModal({ open, onClose }: { open: boolean; onClose: () =>
           <div>
             <div style={{ fontWeight: 700, color: C.primary, marginBottom: 4 }}>Solid line: Progress %</div>
             <div style={{ color: C.secondary, fontSize: 12 }}>
-              How much of today&apos;s task list is already Done at that moment. Climbing means you are closing work.
+              Share of today&apos;s list completed, with In Progress counting as partial progress.
+              Climbing means you are closing work; dropping means a task was moved back.
             </div>
           </div>
 

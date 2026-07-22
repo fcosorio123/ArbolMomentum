@@ -1,14 +1,92 @@
 /** Server-side union merge for profile backups (prevents LWW wipe of peer activity). */
 
-function preferTaskStatus(a: string | undefined, b: string | undefined): string {
+const TASK_STATUS_CLEARED = "__cleared";
+
+function preferTaskStatusRank(a: string | undefined, b: string | undefined): string {
   const rank = (s: string | undefined) => {
     if (s === "done") return 4;
     if (s === "inprogress") return 3;
     if (s === "skipped") return 2;
-    if (s) return 1;
+    if (s && s !== TASK_STATUS_CLEARED) return 1;
     return 0;
   };
   return (rank(b) > rank(a) ? b : a) || a || b || "";
+}
+
+/** Timestamp last-write-wins so demotions / clears survive sync. */
+function preferTaskStatusLww(
+  a: string | undefined,
+  b: string | undefined,
+  ta?: number,
+  tb?: number,
+): string {
+  const left = a || "";
+  const right = b || "";
+  const hasTa = typeof ta === "number" && Number.isFinite(ta) && ta > 0;
+  const hasTb = typeof tb === "number" && Number.isFinite(tb) && tb > 0;
+  if (hasTa && hasTb) {
+    if (tb > ta) return right;
+    if (ta > tb) return left;
+  } else if (hasTa && !hasTb) {
+    return left;
+  } else if (hasTb && !hasTa) {
+    return right;
+  }
+  return preferTaskStatusRank(left || undefined, right || undefined);
+}
+
+function asUpdatedAtMap(raw: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!k) continue;
+    const n = typeof v === "number" ? v : Number(v);
+    if (Number.isFinite(n) && n > 0) out[k] = n;
+  }
+  return out;
+}
+
+function asStringMap(raw: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!k || v == null) continue;
+    const s = String(v);
+    if (s) out[k] = s;
+  }
+  return out;
+}
+
+function mergeTaskStatusMaps(
+  aStatuses: unknown,
+  bStatuses: unknown,
+  aUpdatedAt: unknown,
+  bUpdatedAt: unknown,
+): { taskStatuses: Record<string, string>; taskStatusUpdatedAt: Record<string, number> } {
+  const left = asStringMap(aStatuses);
+  const right = asStringMap(bStatuses);
+  const leftAt = asUpdatedAtMap(aUpdatedAt);
+  const rightAt = asUpdatedAtMap(bUpdatedAt);
+  const keys = new Set([
+    ...Object.keys(left),
+    ...Object.keys(right),
+    ...Object.keys(leftAt),
+    ...Object.keys(rightAt),
+  ]);
+  const taskStatuses: Record<string, string> = {};
+  const taskStatusUpdatedAt: Record<string, number> = {};
+
+  for (const k of keys) {
+    const next = preferTaskStatusLww(left[k], right[k], leftAt[k], rightAt[k]);
+    if (!next) continue;
+    taskStatuses[k] = next;
+    const ta = leftAt[k] || 0;
+    const tb = rightAt[k] || 0;
+    const winnerAt = tb > ta ? tb : ta > tb ? ta : Math.max(ta, tb);
+    if (winnerAt > 0) taskStatusUpdatedAt[k] = winnerAt;
+  }
+
+  return { taskStatuses, taskStatusUpdatedAt };
 }
 
 function preferBooleanish(a: string | undefined, b: string | undefined): string {
@@ -98,7 +176,14 @@ export function unionMergeBackupPayload(
 
   const merged: Record<string, unknown> = { ...existing, ...incoming };
 
-  merged.taskStatuses = mergeStringMaps(existing.taskStatuses, incoming.taskStatuses, preferTaskStatus);
+  const statusMerged = mergeTaskStatusMaps(
+    existing.taskStatuses,
+    incoming.taskStatuses,
+    existing.taskStatusUpdatedAt,
+    incoming.taskStatusUpdatedAt,
+  );
+  merged.taskStatuses = statusMerged.taskStatuses;
+  merged.taskStatusUpdatedAt = statusMerged.taskStatusUpdatedAt;
   merged.taskDeletions = mergeStringMaps(
     existing.taskDeletions,
     incoming.taskDeletions,
@@ -182,3 +267,6 @@ export function unionMergeBackupPayload(
 
   return merged;
 }
+
+/** Exported for unit tests mirrored on the client. */
+export { preferTaskStatusLww, mergeTaskStatusMaps, TASK_STATUS_CLEARED };
