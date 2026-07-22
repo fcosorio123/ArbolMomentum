@@ -240,6 +240,7 @@ export function unionMergeBackupPayload(
     incoming.permanentlyHiddenSeedFamilies,
   );
   merged.seedOverrides = preferRicherObject(existing.seedOverrides, incoming.seedOverrides);
+  merged.customProfileMeta = preferRicherObject(existing.customProfileMeta, incoming.customProfileMeta);
   merged.liveReports = preferRicherObject(existing.liveReports, incoming.liveReports);
   merged.liveSnapshots = preferRicherObject(existing.liveSnapshots, incoming.liveSnapshots);
 

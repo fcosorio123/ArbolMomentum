@@ -1,22 +1,23 @@
 // ──────────────────────────────────────────────
-// User-created profiles (localStorage demo store)
+// User-created profiles (local + cloud roster)
 // ──────────────────────────────────────────────
 
 import type { Profile } from './profiles';
 import { createUserGoal, savePersonalGoals } from './personalGoals';
 import { createUserTask } from './userTasks';
-import type { Recurrence } from './userTasks';
 import type { SeedSuggestionGroup } from './profileSeedParser';
+import {
+  type CustomProfileType,
+  type RosterProfileMeta,
+  mergeRosterProfiles,
+  normalizeRosterMeta,
+  isCustomProfileId,
+} from './profileRoster';
+
+export type { CustomProfileType, RosterProfileMeta as CustomProfileMeta };
 
 const CUSTOM_PROFILES_KEY = 'arbol-custom-profiles';
 const FRESH_PROFILE_IDS_KEY = 'arbol-fresh-profile-ids';
-
-export type CustomProfileType = 'fresh' | 'seeded';
-
-export interface CustomProfileMeta extends Profile {
-  profileType: CustomProfileType;
-  createdAt: number;
-}
 
 export interface CreateProfileInput {
   name: string;
@@ -48,15 +49,17 @@ export function isRegisteredFreshProfile(profileId: string): boolean {
   return readFreshProfileIds().has(profileId);
 }
 
-function readMetas(): CustomProfileMeta[] {
+function readMetas(): RosterProfileMeta[] {
   try {
-    return JSON.parse(localStorage.getItem(CUSTOM_PROFILES_KEY) || '[]') as CustomProfileMeta[];
+    const raw = JSON.parse(localStorage.getItem(CUSTOM_PROFILES_KEY) || '[]') as unknown;
+    if (!Array.isArray(raw)) return [];
+    return raw.map(normalizeRosterMeta).filter((p): p is RosterProfileMeta => !!p);
   } catch {
     return [];
   }
 }
 
-function writeMetas(metas: CustomProfileMeta[]): void {
+function writeMetas(metas: RosterProfileMeta[]): void {
   localStorage.setItem(CUSTOM_PROFILES_KEY, JSON.stringify(metas));
 }
 
@@ -64,13 +67,28 @@ export function getCustomProfiles(): Profile[] {
   return readMetas().map(({ profileType: _t, createdAt: _c, ...profile }) => profile);
 }
 
-export function getCustomProfileMeta(profileId: string): CustomProfileMeta | undefined {
+export function getCustomProfileMeta(profileId: string): RosterProfileMeta | undefined {
   return readMetas().find(p => p.id === profileId);
 }
 
 /** Custom profiles (fresh or seeded) never use built-in demo task seeds. */
 export function isUserDefinedProfile(profileId: string): boolean {
-  return !!getCustomProfileMeta(profileId);
+  return !!getCustomProfileMeta(profileId) || isCustomProfileId(profileId);
+}
+
+/** Merge remote roster entries into localStorage. Returns newly added ids. */
+export function upsertCustomProfilesFromRoster(remote: unknown): string[] {
+  const incoming = Array.isArray(remote)
+    ? remote.map(normalizeRosterMeta).filter((p): p is RosterProfileMeta => !!p)
+    : [];
+  if (incoming.length === 0) return [];
+  const before = new Set(readMetas().map(p => p.id));
+  const merged = mergeRosterProfiles(readMetas(), incoming);
+  writeMetas(merged);
+  for (const p of incoming) {
+    if (p.profileType === 'fresh') registerFreshProfileId(p.id);
+  }
+  return merged.map(p => p.id).filter(id => !before.has(id));
 }
 
 function slugify(name: string): string {
@@ -86,7 +104,7 @@ function initializeEmptyGoals(profileId: string): void {
 export function createCustomProfile(input: CreateProfileInput): Profile {
   const id = `custom-${slugify(input.name)}-${Date.now()}`;
   const name = input.name.trim();
-  const profile: CustomProfileMeta = {
+  const profile: RosterProfileMeta = {
     id,
     name,
     tagline: input.tagline?.trim() || `${name} · Custom profile`,
@@ -107,7 +125,7 @@ export function createCustomProfile(input: CreateProfileInput): Profile {
     createdAt: Date.now(),
   };
 
-  writeMetas([...readMetas(), profile]);
+  writeMetas(mergeRosterProfiles(readMetas(), [profile]));
 
   if (input.profileType === 'fresh') {
     registerFreshProfileId(id);
@@ -133,8 +151,24 @@ export function createCustomProfile(input: CreateProfileInput): Profile {
     }
   }
 
-  import('./cloudBackup').then(({ saveToCloud }) => saveToCloud(id));
+  // Persist roster + per-profile backup so other devices can discover this id.
+  import('./cloudBackup').then(({ registerCustomProfileToCloud, saveToCloud }) => {
+    void registerCustomProfileToCloud(profile).finally(() => {
+      void saveToCloud(id);
+    });
+  });
 
   const { profileType: _t, createdAt: _c, ...publicProfile } = profile;
   return publicProfile;
+}
+
+/**
+ * Pull shared custom-profile roster (and backup backfill) into this device.
+ * Safe to call on profile picker / app focus.
+ */
+export async function syncCustomProfilesFromCloud(): Promise<{ added: string[]; total: number }> {
+  const { fetchCustomProfileRoster } = await import('./cloudBackup');
+  const remote = await fetchCustomProfileRoster();
+  const added = upsertCustomProfilesFromRoster(remote);
+  return { added, total: readMetas().length };
 }

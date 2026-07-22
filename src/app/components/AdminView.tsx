@@ -112,6 +112,10 @@ function OverviewTab() {
 
   const load = async () => {
     setLoading(true);
+    try {
+      const { syncCustomProfilesFromCloud } = await import('../data/customProfiles');
+      await syncCustomProfilesFromCloud();
+    } catch { /* ignore */ }
     const adminToday = getTodayKey();
     const profiles = getActiveProfiles(true);
 

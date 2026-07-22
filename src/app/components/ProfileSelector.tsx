@@ -19,6 +19,13 @@ export function ProfileSelector({ onSelect, onAdmin }: Props) {
   const profiles = getActiveProfiles();
 
   const refreshStreaks = useCallback(async () => {
+    // Discover custom profiles created on other devices before listing/syncing.
+    try {
+      const { syncCustomProfilesFromCloud } = await import('../data/customProfiles');
+      const { added } = await syncCustomProfilesFromCloud();
+      if (added.length > 0) setProfileListKey(k => k + 1);
+    } catch { /* ignore */ }
+
     const list = getActiveProfiles();
     const next: Record<string, number> = {};
     // Seed from local immediately so UI isn't blank while cloud loads

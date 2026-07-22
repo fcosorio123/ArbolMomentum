@@ -52,6 +52,20 @@ app.post("/backup/:profileId", async (c) => {
       payload as Record<string, unknown>,
     );
     await kv.set(`arbol-backup-${profileId}`, merged);
+
+    // Keep shared custom-profile roster in sync so other devices can discover new ids.
+    try {
+      const { isCustomProfileId, rosterMetaFromBackup, upsertRosterProfiles } = await import(
+        "./profileRoster.ts"
+      );
+      if (isCustomProfileId(profileId)) {
+        const meta = rosterMetaFromBackup(profileId, merged as Record<string, unknown>);
+        if (meta) await upsertRosterProfiles(kv, [meta]);
+      }
+    } catch (rosterErr) {
+      console.log(`[Backup] Roster upsert skipped for ${profileId}:`, rosterErr);
+    }
+
     return c.json({ ok: true, savedAt: merged.savedAt });
   } catch (err) {
     console.log(`[Backup] Error saving backup for ${profileId}:`, err);
@@ -68,6 +82,31 @@ app.get("/backup/:profileId", async (c) => {
     return c.json({ ok: true, data });
   } catch (err) {
     console.log(`[Backup] Error fetching backup for ${profileId}:`, err);
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+/** Shared custom-profile list — required so creates appear on every device. */
+app.get("/profile-roster", async (c) => {
+  try {
+    const { buildFullProfileRoster } = await import("./profileRoster.ts");
+    const profiles = await buildFullProfileRoster(kv);
+    return c.json({ ok: true, profiles });
+  } catch (err) {
+    console.log("[ProfileRoster] GET failed:", err);
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+app.post("/profile-roster", async (c) => {
+  try {
+    const body = await c.req.json();
+    const incoming = body?.profiles ?? body?.profile ?? body;
+    const { upsertRosterProfiles } = await import("./profileRoster.ts");
+    const profiles = await upsertRosterProfiles(kv, incoming);
+    return c.json({ ok: true, profiles });
+  } catch (err) {
+    console.log("[ProfileRoster] POST failed:", err);
     return c.json({ error: String(err) }, 500);
   }
 });

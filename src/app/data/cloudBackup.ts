@@ -33,6 +33,8 @@ import {
   asStringMap,
 } from './taskStatusMerge';
 import { dispatchDashboardRefresh } from './dashboardSnapshot';
+import { getCustomProfileMeta } from './customProfiles';
+import { isCustomProfileId, normalizeRosterMeta, type RosterProfileMeta } from './profileRoster';
 
 function getAllDeletedGoalIds(profileId: string): Set<string> {
   const dead = new Set(getDeletedUserGoalIds(profileId));
@@ -233,6 +235,7 @@ function collectLocalData(profileId: string): Record<string, unknown> {
   if (allToursV) tourDismissals[allToursK] = allToursV;
 
   const profile = getActiveProfiles(true).find(p => p.id === profileId);
+  const customMeta = getCustomProfileMeta(profileId) ?? null;
 
   return {
     userTasks:      raw(`arbol-user-tasks-${profileId}`),
@@ -246,6 +249,7 @@ function collectLocalData(profileId: string): Record<string, unknown> {
     timezone:       getStoredTimezone(profileId),
     tzOffset:       getStoredTzOffset(profileId),
     nudgeSnapshot:  profile ? buildNudgeSnapshot(profileId, profile.name) : null,
+    customProfileMeta: customMeta,
     liveReports:    raw(`arbol-live-reports-${profileId}`),
     liveSnapshots:  raw(`arbol-live-snapshots-${profileId}`),
     permanentlyHiddenSeedTasks: raw(`arbol-hidden-seed-${profileId}`),
@@ -973,6 +977,22 @@ async function buildUnionPayload(profileId: string): Promise<Record<string, unkn
     local.tzOffset = cloud.tzOffset;
   }
 
+  // Keep custom profile card meta so other devices can reconstruct the selector.
+  const localMeta = normalizeRosterMeta(local.customProfileMeta);
+  const cloudMeta = normalizeRosterMeta(cloud.customProfileMeta);
+  if (localMeta || cloudMeta) {
+    local.customProfileMeta = localMeta && cloudMeta
+      ? (localMeta.createdAt >= cloudMeta.createdAt ? { ...cloudMeta, ...localMeta } : { ...localMeta, ...cloudMeta })
+      : localMeta || cloudMeta;
+  } else if (isCustomProfileId(profileId)) {
+    const fromBackup = normalizeRosterMeta({
+      id: profileId,
+      name: (cloud.nudgeSnapshot as { profileName?: string } | null)?.profileName,
+      createdAt: typeof cloud.savedAt === 'number' ? cloud.savedAt : Date.now(),
+    });
+    if (fromBackup) local.customProfileMeta = fromBackup;
+  }
+
   local.savedAt = Date.now();
   return local;
 }
@@ -1147,4 +1167,32 @@ export function scheduleSave(profileId: string): void {
     delete pendingTimers[profileId];
     saveToCloud(profileId);
   }, 2000);
+}
+
+/** Register / refresh a custom profile on the shared cloud roster. */
+export async function registerCustomProfileToCloud(meta: RosterProfileMeta): Promise<boolean> {
+  const normalized = normalizeRosterMeta(meta);
+  if (!normalized) return false;
+  const { data, error } = await invokeWithRetry(`${FN}/profile-roster`, {
+    method: 'POST',
+    body: { profiles: [normalized] },
+  });
+  if (error) {
+    if (!isTransientError(error)) console.warn('[CloudBackup] Roster register failed:', error);
+    return false;
+  }
+  return data?.ok === true;
+}
+
+/** Fetch all custom profiles known to the cloud (roster + backup backfill). */
+export async function fetchCustomProfileRoster(): Promise<RosterProfileMeta[]> {
+  const { data, error } = await invokeWithRetry(`${FN}/profile-roster`, { method: 'GET' });
+  if (error) {
+    if (!isTransientError(error)) console.warn('[CloudBackup] Roster fetch failed:', error);
+    return [];
+  }
+  if (!data?.ok || !Array.isArray(data?.profiles)) return [];
+  return data.profiles
+    .map((p: unknown) => normalizeRosterMeta(p))
+    .filter((p: RosterProfileMeta | null): p is RosterProfileMeta => !!p);
 }
