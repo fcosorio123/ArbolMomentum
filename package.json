@@ -23,7 +23,9 @@
     "test:seed-deletion": "npx tsx scripts/test-seed-deletion-tombstones.ts",
     "test:today-hierarchy": "npx tsx scripts/test-today-hierarchy-order.ts",
     "test:feedback-interest": "npx tsx scripts/test-feedback-interest.ts",
-    "test:surgical-ux": "npm run test:seed-deletion && npm run test:today-hierarchy && npm run test:feedback-interest && npm run test:task-focus"
+    "test:task-progress": "npx tsx scripts/test-task-progress-pipeline.ts",
+    "test:surgical-ux": "npm run test:seed-deletion && npm run test:today-hierarchy && npm run test:feedback-interest && npm run test:task-focus",
+    "test:progress-pipeline": "npm run test:task-progress && npm run test:task-focus"
   },
   "dependencies": {
     "@ant-design/colors": "^8.0.1",

@@ -1,5 +1,5 @@
 import {
-  getTaskStatus, getTodayKey, setTaskStatus,
+  getTaskStatus, getTodayKey, type TaskStatus,
 } from './profiles';
 import { getPersonalGoals, logGoalProgress, isMonetaryGoal, type PersonalGoal } from './personalGoals';
 import {
@@ -7,6 +7,7 @@ import {
   findFirstIncompleteTaskForGoal,
   type GoalTaskBreakdown,
 } from './goalTaskResolution';
+import { applyTaskStatusUpdate } from './taskStatusPipeline';
 
 export type { GoalTaskBreakdown };
 export { getGoalTaskBreakdown };
@@ -105,7 +106,14 @@ export function quickCheckInGoal(profileId: string, goalId: string): { ok: boole
   const today = getTodayKey();
   const task = findFirstIncompleteTaskForGoal(profileId, goalId, today);
   if (task) {
-    setTaskStatus(profileId, task.id, today, 'done');
+    applyTaskStatusUpdate({
+      profileId,
+      taskId: task.id,
+      status: 'done',
+      source: 'quick_checkin',
+      taskLabel: task.label,
+      dateKey: today,
+    });
     try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
     return { ok: true, detail: task.label };
   }

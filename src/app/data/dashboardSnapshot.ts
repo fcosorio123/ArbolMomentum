@@ -2,6 +2,7 @@ import {
   type TaskType, type TaskStatus,
   getTaskCategoriesForProfile, getTaskStatus, isTaskActiveForDate,
   getTodayKey, computeLiveStreak, getPermanentlyHiddenSeedTaskIds,
+  hasActivityOnDate,
 } from './profiles';
 import { getPersonalGoals, type PersonalGoal } from './personalGoals';
 import { getUserTasks, isTaskScheduledForDate, type UserTask } from './userTasks';
@@ -154,35 +155,46 @@ export function calculateBannerState(
   dateKey: string,
   doneCount: number,
   totalCount: number,
+  inProgressCount = 0,
 ): { bannerState: DashboardBannerState; checkInGoalTitles: string[] } {
   const checkedIn = isDailyCheckInComplete(profileId, dateKey);
+  const hasTaskActivity = doneCount > 0 || inProgressCount > 0 || hasActivityOnDate(profileId, dateKey);
 
-  if (!checkedIn) {
-    const goals = getPersonalGoals(profileId);
-    const cats = getTaskCategoriesForProfile(profileId);
-    const uts = getUserTasks(profileId);
-    const needingGoals = goals.filter(goal => {
-      const seedTasks = cats.flatMap(c =>
-        c.tasks.filter(t => getPrimaryGoalIdForTask(profileId, t.id, c.goalId) === goal.id),
-      );
-      const userTasksForGoal = uts.filter(ut => !ut.archivedAt && ut.goalId === goal.id && isTaskScheduledForDate(ut, dateKey));
-      return [...seedTasks, ...userTasksForGoal].some(t => {
-        if (!isTaskActiveForDate(profileId, t.id, dateKey)) return false;
-        const st = getTaskStatus(profileId, t.id, dateKey);
-        return st === null;
-      });
-    });
-    return {
-      bannerState: 'red',
-      checkInGoalTitles: needingGoals.map(g => g.title),
-    };
+  // Formal check-in complete → progress-based yellow/green.
+  if (checkedIn) {
+    if (totalCount > 0 && doneCount < totalCount) {
+      return { bannerState: 'yellow', checkInGoalTitles: [] };
+    }
+    return { bannerState: 'green', checkInGoalTitles: [] };
   }
 
-  if (totalCount > 0 && doneCount < totalCount) {
+  // Task page (or any non-check-in) activity must still be recognized:
+  // all done → green; partial progress → yellow; no activity → red.
+  if (hasTaskActivity) {
+    if (totalCount > 0 && doneCount >= totalCount) {
+      return { bannerState: 'green', checkInGoalTitles: [] };
+    }
     return { bannerState: 'yellow', checkInGoalTitles: [] };
   }
 
-  return { bannerState: 'green', checkInGoalTitles: [] };
+  const goals = getPersonalGoals(profileId);
+  const cats = getTaskCategoriesForProfile(profileId);
+  const uts = getUserTasks(profileId);
+  const needingGoals = goals.filter(goal => {
+    const seedTasks = cats.flatMap(c =>
+      c.tasks.filter(t => getPrimaryGoalIdForTask(profileId, t.id, c.goalId) === goal.id),
+    );
+    const userTasksForGoal = uts.filter(ut => !ut.archivedAt && ut.goalId === goal.id && isTaskScheduledForDate(ut, dateKey));
+    return [...seedTasks, ...userTasksForGoal].some(t => {
+      if (!isTaskActiveForDate(profileId, t.id, dateKey)) return false;
+      const st = getTaskStatus(profileId, t.id, dateKey);
+      return st === null;
+    });
+  });
+  return {
+    bannerState: 'red',
+    checkInGoalTitles: needingGoals.map(g => g.title),
+  };
 }
 
 export function getDashboardSnapshot(profileId: string, dateKey = getTodayKey()): DashboardSnapshot {
@@ -200,7 +212,7 @@ export function getDashboardSnapshot(profileId: string, dateKey = getTodayKey())
   const streak = computeLiveStreak(profileId, progressPercent > 0);
   const checkedIn = isDailyCheckInComplete(profileId, dateKey);
   const { bannerState, checkInGoalTitles } = calculateBannerState(
-    profileId, dateKey, doneCount, totalCount,
+    profileId, dateKey, doneCount, totalCount, inProgressCount,
   );
 
   const goalTaskGroups: GoalTaskGroup[] = personalGoals

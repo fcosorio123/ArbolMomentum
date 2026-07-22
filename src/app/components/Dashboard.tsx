@@ -182,6 +182,7 @@ export function Dashboard({
     streak: displayStreak,
     bannerState,
     checkInGoalTitles: checkInGoals,
+    checkedIn,
   } = snapshot;
 
   useEffect(() => {
@@ -456,8 +457,16 @@ export function Dashboard({
             }}>
               <span style={{ fontSize: 22, flexShrink: 0 }}>🟡</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#f5a623', marginBottom: 2 }}>You've checked in, but still have tasks to complete</div>
-                <div style={{ fontSize: 11, color: C.body, lineHeight: 1.4 }}>Keep going to finish your remaining tasks.</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#f5a623', marginBottom: 2 }}>
+                  {checkedIn
+                    ? "You've checked in, but still have tasks to complete"
+                    : 'Progress saved - keep going on your remaining tasks'}
+                </div>
+                <div style={{ fontSize: 11, color: C.body, lineHeight: 1.4 }}>
+                  {checkedIn
+                    ? 'Keep going to finish your remaining tasks.'
+                    : 'Task updates from Today count toward your day. Optional check-in is still available.'}
+                </div>
               </div>
               {onNavigateTasks && (
                 <button onClick={onNavigateTasks} style={{

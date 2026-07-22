@@ -68,8 +68,8 @@ function LiveCheckInHelpModal({ open, onClose }: { open: boolean; onClose: () =>
           <div>
             <div style={{ fontWeight: 700, color: C.headline, marginBottom: 4 }}>X axis: Check-ins today</div>
             <div style={{ color: C.secondary, fontSize: 12 }}>
-              Left to right follows your completions in order today.
-              <strong> Done 1</strong> is the first task you finished, then <strong>Done 2</strong>, and so on.
+              Left to right follows your updates in order today, starting from a Start baseline.
+              <strong> Update 1</strong> is your first save, then <strong> Update 2</strong>, and so on.
             </div>
           </div>
 

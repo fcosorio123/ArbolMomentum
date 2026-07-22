@@ -5,8 +5,14 @@ import {
   saveTaskNote, submitReportUpdate, dispatchFeedbackUpdated, type ReportEntry,
 } from './liveCheckInFeedback';
 import { isLiveCheckInEnabled } from './liveCheckInSettings';
+import { trackActivity } from './feedback';
 
-export type StatusUpdateSource = 'task_list' | 'check_in' | 'quick_checkin';
+export type StatusUpdateSource =
+  | 'task_list'
+  | 'check_in'
+  | 'quick_checkin'
+  | 'week_plan'
+  | 'personal_goals';
 
 export interface ApplyTaskStatusUpdateParams {
   profileId: string;
@@ -21,11 +27,15 @@ export interface ApplyTaskStatusUpdateParams {
   dateKey?: string;
 }
 
-/** Unified status write path for Tasks tab and Check-In. */
+/** Unified status write path for Tasks tab, Check-In, and related surfaces. */
 export function applyTaskStatusUpdate(params: ApplyTaskStatusUpdateParams): ReportEntry | null {
   const dateKey = params.dateKey ?? getTodayKey();
   const live = params.liveCheckInEnabled ?? isLiveCheckInEnabled();
   const prev = params.previousStatus ?? getTaskStatus(params.profileId, params.taskId, dateKey);
+
+  try {
+    trackActivity(params.profileId);
+  } catch { /* ignore */ }
 
   if (live && params.taskLabel) {
     const entry = submitReportUpdate({

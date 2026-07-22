@@ -9,10 +9,11 @@ import {
   type PersonalGoal, type Milestone, type GoalProgressLog,
 } from '../data/personalGoals';
 import {
-  getTaskCategoriesForProfile, getTaskStatus, setTaskStatus,
+  getTaskCategoriesForProfile, getTaskStatus,
   isTaskActiveForDate, getTodayKey, type TaskStatus,
 } from '../data/profiles';
 import { getUserTasks, type UserTask } from '../data/userTasks';
+import { applyTaskStatusUpdate } from '../data/taskStatusPipeline';
 
 interface Props {
   profileId: string;
@@ -58,7 +59,17 @@ export function PersonalGoals({ profileId, onBack, onNavigateTasks }: Props) {
   const cycleTaskStatus = (taskId: string) => {
     const cur = taskStatuses[taskId];
     const next: TaskStatus | null = cur === 'done' ? null : cur === 'inprogress' ? 'done' : 'inprogress';
-    setTaskStatus(profileId, taskId, today, next);
+    const seed = categories.flatMap(c => c.tasks).find(t => t.id === taskId);
+    const user = userTasks.find(t => t.id === taskId);
+    applyTaskStatusUpdate({
+      profileId,
+      taskId,
+      status: next,
+      source: 'personal_goals',
+      taskLabel: seed?.label ?? user?.label ?? taskId,
+      previousStatus: cur ?? null,
+      dateKey: today,
+    });
     setTaskStatuses(prev => ({ ...prev, [taskId]: next }));
   };
 

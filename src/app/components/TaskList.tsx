@@ -47,7 +47,6 @@ import {
   type SeedTaskOverride,
 } from '../data/seedOverrides';
 import { touchIconButton, touchPrimaryButton, MIN_TOUCH } from '../styles/touchTargets';
-import { trackActivity } from '../data/feedback';
 import { PageTour, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile, resetLiveToursForProfile } from './AppTour';
 import { HelpTourMenu } from './HelpTourMenu';
 import { CongratModal } from './CongratModal';
@@ -1624,7 +1623,6 @@ export function TaskList({
   const handleTaskUpdateSubmit = (status: TaskStatus | null, note: string) => {
     if (!taskUpdateContext) return;
     captureScroll();
-    trackActivity(profile.id);
     const { taskId, taskLabel, dateKey: ctxDate } = taskUpdateContext;
     const goalTitleForToast = taskUpdateContext.goalTitle;
     const goalDoneForToast = taskUpdateContext.goalDoneCount;

@@ -169,7 +169,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
     });
     setSelections(prev => ({ ...prev, [taskId]: status }));
     setAnsweredIds(prev => new Set([...prev, taskId]));
-  }, [profile.id, profile.name, today, allTasks]);
+  }, [profile.id, today, allTasks]);
 
   const markDoneToday = useCallback(() => {
     localStorage.setItem(`arbol-checkin-${profile.id}-${today}`, 'true');

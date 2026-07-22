@@ -165,7 +165,6 @@ export function calculateScopeProgress(profileId: string, dateKey: string): {
 } {
   const tasks = getVisibleTasksForDate(profileId, dateKey);
   let done = 0, inProgress = 0, notStarted = 0, blocked = 0;
-  let sum = 0;
 
   for (const t of tasks) {
     const status = getTaskStatus(profileId, t.id, dateKey);
@@ -175,11 +174,11 @@ export function calculateScopeProgress(profileId: string, dateKey: string): {
     if (status === 'done') done++;
     else if (status === 'inprogress') inProgress++;
     else notStarted++;
-    sum += taskStatusToPercent(status, isBlocked);
   }
 
   const countable = tasks.filter(t => getTaskStatus(profileId, t.id, dateKey) !== 'skipped');
-  const progress = countable.length > 0 ? Math.round(sum / countable.length) : 0;
+  // Binary done% — matches Dashboard + Live check-in chart help text ("already Done").
+  const progress = countable.length > 0 ? Math.round((done / countable.length) * 100) : 0;
   return { progress, doneTaskCount: done, inProgressTaskCount: inProgress, notStartedTaskCount: notStarted, blockedTaskCount: blocked };
 }
 
@@ -549,11 +548,31 @@ export function getTodayChartData(profileId: string, dateKey?: string): TodayCha
     .slice()
     .reverse();
   if (reports.length === 0) return [];
-  return reports.map((r, i) => ({
-    label: `Done ${i + 1}`,
+
+  const first = reports[0];
+  const updates = reports.map((r, i) => ({
+    label: `Update ${i + 1}`,
     progress: r.progressAtTime,
     momentum: r.momentumScore,
   }));
+
+  // Baseline so the first completion draws a visible line (not a single floating dot).
+  const startProgress = first.previousProgress;
+  const needsStart =
+    updates.length === 0
+    || startProgress !== updates[0].progress
+    || updates.length === 1;
+
+  if (!needsStart) return updates;
+
+  return [
+    {
+      label: 'Start',
+      progress: startProgress,
+      momentum: Math.min(startProgress, updates[0]?.momentum ?? startProgress),
+    },
+    ...updates,
+  ];
 }
 
 export function dispatchFeedbackUpdated() {

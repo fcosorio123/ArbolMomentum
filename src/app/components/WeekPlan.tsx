@@ -4,12 +4,13 @@ import { PageTour, PageTourButton, TOUR_KEYS, tourStorageKey, areToursDismissedF
 import { CheckCircleFilled, StarFilled, CloseOutlined } from '@ant-design/icons';
 import {
   getWeekPlanForProfile, getAllTasksForProfile, getTaskCategoriesForProfile,
-  getTaskStatus, setTaskStatus, isTaskActiveForDate,
+  getTaskStatus, isTaskActiveForDate,
   isTaskPermanentlyRemoved, getTodayKey, getDateKey, type Profile, type TaskStatus,
 } from '../data/profiles';
 import { getPersonalGoals, type PersonalGoal } from '../data/personalGoals';
 import { getActiveUserTasksForDate, getUserTasks, type UserTask } from '../data/userTasks';
 import { getTaskNote } from '../data/liveCheckInFeedback';
+import { applyTaskStatusUpdate } from '../data/taskStatusPipeline';
 import { truncateRemark, SKIPPED_BADGE, shouldShowRemark } from './taskCardDisplay';
 import { TaskCalendarButton } from './TaskCalendarButton';
 import { C } from '../data/colors';
@@ -99,13 +100,32 @@ export function WeekPlan({ profile }: Props) {
   const toggleTask = (day: string, taskId: string) => {
     const dk = dateKey(day);
     const cur = statuses[day]?.[taskId] ?? null;
+    const seed = getAllTasksForProfile(profile.id).find(t => t.id === taskId);
+    const user = getUserTasks(profile.id).find(t => t.id === taskId);
+    const label = seed?.label ?? user?.label ?? taskId;
     if (cur === 'skipped') {
-      setTaskStatus(profile.id, taskId, dk, null);
+      applyTaskStatusUpdate({
+        profileId: profile.id,
+        taskId,
+        status: null,
+        source: 'week_plan',
+        taskLabel: label,
+        previousStatus: cur,
+        dateKey: dk,
+      });
       setStatuses(prev => ({ ...prev, [day]: { ...prev[day], [taskId]: null } }));
       return;
     }
     const next: TaskStatus | null = cur === 'done' ? null : cur === 'inprogress' ? 'done' : 'inprogress';
-    setTaskStatus(profile.id, taskId, dk, next);
+    applyTaskStatusUpdate({
+      profileId: profile.id,
+      taskId,
+      status: next,
+      source: 'week_plan',
+      taskLabel: label,
+      previousStatus: cur,
+      dateKey: dk,
+    });
     setStatuses(prev => ({ ...prev, [day]: { ...prev[day], [taskId]: next } }));
   };
 
