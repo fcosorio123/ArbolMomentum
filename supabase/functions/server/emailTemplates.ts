@@ -22,14 +22,16 @@ export interface TemplateContext {
   pendingCount?: number;
   streak?: number;
   topTasks?: Array<{ label: string; goalTitle?: string }>;
+  /** Deep-link that opens the recipient's account (welcome / invite). */
+  inviteUrl?: string;
 }
 
 function appLink(): string {
   return getEmailConfig().appBaseUrl;
 }
 
-function ctaHtml(label = "Open Arbol Momentum"): string {
-  const url = appLink();
+function ctaHtml(label = "Open Arbol Momentum", href?: string): string {
+  const url = href || appLink();
   return `<p style="margin:24px 0;"><a href="${url}" style="background:#094067;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">${label}</a></p>`;
 }
 
@@ -42,18 +44,19 @@ export function buildEmailContent(
   ctx: TemplateContext,
 ): { subject: string; html: string; text: string } {
   const name = ctx.firstName || ctx.profileName?.split(" ")[0] || "there";
-  const link = appLink();
+  const link = ctx.inviteUrl || appLink();
 
   switch (type) {
     case "welcome":
       return {
-        subject: "Welcome to Arbol Momentum",
+        subject: "You're invited to Arbol Momentum",
         html: wrapHtml(`
           <h2 style="margin:0 0 12px;">Welcome, ${name}!</h2>
-          <p>You're set up to track habits, streaks, and daily tasks. Start with today's check-in to build momentum.</p>
-          ${ctaHtml("Start your first check-in")}
+          <p>Your Arbol Momentum account is ready. Use the button below to open <strong>your</strong> account and start today's check-in.</p>
+          <p style="color:#555;font-size:13px;">This personal link works for 30 days. If it expires, ask your admin to resend your invite.</p>
+          ${ctaHtml("Access your account", link)}
         `),
-        text: `Welcome, ${name}! You're set up to track habits, streaks, and daily tasks. Open the app: ${link}`,
+        text: `Welcome, ${name}! Your Arbol Momentum account is ready. Access your account: ${link}`,
       };
 
     case "smart_nudge": {

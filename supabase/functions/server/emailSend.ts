@@ -290,6 +290,22 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
   const streak = payload.streak ?? profileCtx.streak;
   const topTasks = payload.topTasks?.length ? payload.topTasks : profileCtx.topTasks;
   const firstName = profileName?.split(" ")[0];
+
+  let inviteUrl: string | undefined;
+  if (payload.type === "welcome" && targets[0]) {
+    try {
+      const { mintInviteToken } = await import("./inviteTokens.ts");
+      const minted = await mintInviteToken({
+        profileId: payload.profileId,
+        email: targets[0],
+        profileName,
+      });
+      inviteUrl = minted.url;
+    } catch (err) {
+      console.log("[EmailSend] Invite mint failed:", err);
+    }
+  }
+
   const content = buildEmailContent(payload.type, {
     profileName,
     firstName,
@@ -300,6 +316,7 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
     pendingCount,
     streak,
     topTasks,
+    inviteUrl,
   });
 
   const replyTo = settings.replyTo?.trim() || undefined;

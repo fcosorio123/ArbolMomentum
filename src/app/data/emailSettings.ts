@@ -345,3 +345,24 @@ export async function sendManualNudge(opts: {
     return { ok: false, reason: 'Could not send. Check your connection and try again.' };
   }
 }
+
+/**
+ * Admin: resend the account invite (welcome email with a fresh deep-link token).
+ * Always forced so it works even if welcome was already sent once.
+ */
+export async function resendAccountInvite(opts: {
+  profileId: string;
+  profileName?: string;
+  recipient?: string;
+  recipients?: string[];
+}): Promise<{ ok: boolean; reason?: string; sentTo?: string[] }> {
+  return sendManualNudge({
+    profileId: opts.profileId,
+    type: 'welcome',
+    profileName: opts.profileName,
+    recipient: opts.recipient,
+    recipients: opts.recipients,
+    title: 'Account invite',
+    body: 'Your invite to Arbol Momentum was resent. Use the button in the email to open your account.',
+  });
+}

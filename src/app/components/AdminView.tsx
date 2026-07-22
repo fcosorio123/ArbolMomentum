@@ -41,7 +41,7 @@ import {
 } from '../data/appSettings';
 import {
   fetchEmailSettings, saveEmailSettings, getEmailSettings,
-  sendTestEmail, sendManualNudge, fetchCronLastRun, isOperationalEmailLive,
+  sendTestEmail, sendManualNudge, resendAccountInvite, fetchCronLastRun, isOperationalEmailLive,
   type EmailSettings, type EmailTriggerMode, type SmartSlotsConfig,
   type CronLastRun,
   DEFAULT_SMART_SLOTS,
@@ -1895,6 +1895,8 @@ function SettingsTab() {
   const [manualRecipients, setManualRecipients] = useState('');
   const [manualSending, setManualSending] = useState(false);
   const [manualResult, setManualResult] = useState<string | null>(null);
+  const [inviteSending, setInviteSending] = useState(false);
+  const [inviteResult, setInviteResult] = useState<string | null>(null);
   const [cronLastRun, setCronLastRun] = useState<CronLastRun | null>(null);
   const [cronDetailsOpen, setCronDetailsOpen] = useState(false);
 
@@ -2029,6 +2031,30 @@ function SettingsTab() {
       }
     } else {
       setManualResult(result.reason ?? 'Send failed');
+    }
+  };
+
+  const handleResendInvite = async () => {
+    const profile = getOperativeProfiles().find(p => p.id === manualProfileId);
+    setInviteSending(true);
+    setInviteResult(null);
+    const list = manualRecipients.split(/[,;\s]+/).map(e => e.trim()).filter(Boolean);
+    if (list.length === 0) {
+      setInviteSending(false);
+      setInviteResult('Enter the user\'s email address first.');
+      return;
+    }
+    const result = await resendAccountInvite({
+      profileId: manualProfileId,
+      profileName: profile?.name,
+      recipients: list,
+    });
+    setInviteSending(false);
+    if (result.ok) {
+      setInviteResult(`Invite resent to ${(result.sentTo ?? list).join(', ')} ✓ — they can open their account from the email link.`);
+      if (list.length === 1) updateProfileEmail(manualProfileId, list[0]);
+    } else {
+      setInviteResult(result.reason ?? 'Invite send failed');
     }
   };
 
@@ -2373,6 +2399,43 @@ function SettingsTab() {
             />
           </div>
         ))}
+      </div>
+
+      <div style={cardStyle}>
+        <div style={labelStyle}>Resend account invite</div>
+        <div style={{ fontSize: 12, color: C.body, marginBottom: 8, lineHeight: 1.4 }}>
+          Sends a fresh welcome email with a personal link that opens that user&apos;s account
+          (bypasses the shared access code). Use for new or existing profiles that need the invite again.
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 12, color: C.body, marginBottom: 4 }}>Profile</div>
+          <Select
+            value={manualProfileId}
+            onChange={setManualProfileId}
+            style={{ width: '100%' }}
+            options={getOperativeProfiles().map(p => ({ value: p.id, label: p.name }))}
+          />
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 12, color: C.body, marginBottom: 4 }}>
+            Recipient email (auto-filled from profile)
+          </div>
+          <Input
+            value={manualRecipients}
+            onChange={e => setManualRecipients(e.target.value)}
+            placeholder="user@example.com"
+            style={{ ...inputStyle, marginTop: 6 }}
+          />
+        </div>
+        <Button
+          type="primary"
+          loading={inviteSending}
+          onClick={handleResendInvite}
+          style={{ marginTop: 12, borderRadius: 10, background: C.primary, border: 'none' }}
+        >
+          Resend invite
+        </Button>
+        {inviteResult && <div style={{ fontSize: 12, color: C.body, marginTop: 8 }}>{inviteResult}</div>}
       </div>
 
       <div style={cardStyle}>

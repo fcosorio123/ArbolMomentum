@@ -135,7 +135,11 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
         profileType,
         suggestions: profileType === 'seeded' ? suggestions : undefined,
       });
-      saveProfileEmail(profile.id, trimmedEmail, { profileName: profile.name });
+      saveProfileEmail(profile.id, trimmedEmail, {
+        profileName: profile.name,
+        sendWelcome: true,
+        forceWelcome: true,
+      });
       reset();
       onCreated(profile);
       onClose();

@@ -27,7 +27,7 @@ export function isValidProfileEmail(email: string): boolean {
 export function saveProfileEmail(
   profileId: string,
   email: string,
-  opts?: { profileName?: string; sendWelcome?: boolean },
+  opts?: { profileName?: string; sendWelcome?: boolean; forceWelcome?: boolean },
 ): { ok: boolean; error?: string } {
   const trimmed = email.trim();
   if (trimmed && !isValidProfileEmail(trimmed)) {
@@ -46,13 +46,17 @@ export function saveProfileEmail(
   scheduleSave(profileId);
   void saveToCloud(profileId);
 
-  if (trimmed && !hadEmail && opts?.sendWelcome !== false && isEmailTypeEnabled('welcomeEnabled')) {
-    requestEmailSend({
-      profileId,
-      type: 'welcome',
-      recipient: trimmed,
-      profileName: opts?.profileName,
-    });
+  if (trimmed && !hadEmail && opts?.sendWelcome !== false) {
+    const force = opts?.forceWelcome === true;
+    if (force || isEmailTypeEnabled('welcomeEnabled')) {
+      requestEmailSend({
+        profileId,
+        type: 'welcome',
+        recipient: trimmed,
+        profileName: opts?.profileName,
+        force,
+      });
+    }
   }
 
   return { ok: true };

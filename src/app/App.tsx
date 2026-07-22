@@ -46,6 +46,11 @@ import {
   getProfileById, type Profile, type Badge,
   isProfileArchived, clearStoredActiveProfile, PROFILE_ARCHIVE_CHANGED,
 } from './data/profiles';
+import {
+  readInviteTokenFromUrl,
+  clearInviteFromUrl,
+  redeemInviteToken,
+} from './data/inviteAccess';
 import { C } from './data/colors';
 
 type Tab = 'home' | 'goals' | 'tasks' | 'week' | 'month' | 'calendar' | 'reminders' | 'profile';
@@ -118,6 +123,10 @@ export default function App() {
     } catch {}
     return false;
   });
+  const [inviteBoot, setInviteBoot] = useState<'idle' | 'pending' | 'error'>(() => (
+    readInviteTokenFromUrl() ? 'pending' : 'idle'
+  ));
+  const [inviteError, setInviteError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [tasksInitialView, setTasksInitialView] = useState<'today' | 'all' | 'month'>('today');
   const [showAdmin, setShowAdmin] = useState(false);
@@ -153,6 +162,40 @@ export default function App() {
   }, []);
 
   useEffect(() => { fetchAppSettings(); fetchEmailSettings(); fetchLiveCheckInSettings(); }, []);
+
+  // Account invite deep-link: /?invite=TOKEN → unlock + open that profile
+  useEffect(() => {
+    const token = readInviteTokenFromUrl();
+    if (!token) return;
+    let cancelled = false;
+    setInviteBoot('pending');
+    setInviteError(null);
+    (async () => {
+      const result = await redeemInviteToken(token);
+      if (cancelled) return;
+      if (!result.ok || !result.profile) {
+        setInviteBoot('error');
+        const msg =
+          result.reason === 'expired' ? 'This invite link has expired. Ask your admin to resend your invite.'
+          : result.reason === 'profile_unavailable' ? 'Your account was found, but is not available on this device yet. Try again in a moment or ask your admin to resend.'
+          : 'This invite link is invalid. Ask your admin to resend your invite.';
+        setInviteError(msg);
+        return;
+      }
+      clearInviteFromUrl();
+      try { sessionStorage.setItem(SELECTOR_UNLOCK_KEY, 'true'); } catch {}
+      try { localStorage.setItem('arbol-active-profile', result.profile.id); } catch {}
+      setProfileSelectorUnlocked(true);
+      setActiveProfile(result.profile);
+      setActiveTab('home');
+      setInviteBoot('idle');
+    })().catch(() => {
+      if (cancelled) return;
+      setInviteBoot('error');
+      setInviteError('Could not open your account. Check your connection and try again.');
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const onArchiveChanged = (event: Event) => {
@@ -639,6 +682,51 @@ export default function App() {
   };
 
   if (!activeProfile) {
+    if (inviteBoot === 'pending' || inviteBoot === 'error') {
+      return (
+        <ConfigProvider theme={arbolTheme}>
+          <AntdApp message={{ maxCount: 3, duration: 2.5 }}>
+            <div style={{
+              minHeight: '100dvh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 'max(24px, env(safe-area-inset-top, 0px)) 24px max(24px, env(safe-area-inset-bottom, 0px))',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+            }}>
+              <div style={{
+                width: '100%', maxWidth: 400, background: C.bgCard, borderRadius: 20,
+                border: `1.5px solid ${C.border}`, padding: '28px 24px', textAlign: 'center',
+              }}>
+                <div style={{ fontSize: 28, marginBottom: 12 }}>🌿</div>
+                <h2 style={{ margin: '0 0 10px', fontSize: 18, fontWeight: 800, color: C.headline }}>
+                  {inviteBoot === 'pending' ? 'Opening your account…' : 'Invite link issue'}
+                </h2>
+                <p style={{ margin: 0, fontSize: 14, color: C.body, lineHeight: 1.5 }}>
+                  {inviteBoot === 'pending'
+                    ? 'Hang tight — we’re signing you into the account from your invitation email.'
+                    : (inviteError ?? 'This invite could not be opened.')}
+                </p>
+                {inviteBoot === 'error' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearInviteFromUrl();
+                      setInviteBoot('idle');
+                      setInviteError(null);
+                    }}
+                    style={{
+                      marginTop: 18, minHeight: 44, padding: '10px 16px', borderRadius: 12,
+                      border: `1px solid ${C.border}`, background: C.bgAlt, color: C.headline,
+                      fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                    }}
+                  >
+                    Continue to sign-in
+                  </button>
+                )}
+              </div>
+            </div>
+          </AntdApp>
+        </ConfigProvider>
+      );
+    }
     if (!profileSelectorUnlocked) {
       return (
         <ConfigProvider theme={arbolTheme}>

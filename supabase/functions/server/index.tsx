@@ -214,6 +214,23 @@ app.post("/send-test-email", async (c) => {
   }
 });
 
+// Redeem account invite deep-link (?invite=TOKEN)
+app.post("/redeem-invite", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const token = typeof body?.token === "string" ? body.token : "";
+    const { redeemInviteToken } = await import("./inviteTokens.ts");
+    const result = await redeemInviteToken(token);
+    if (!result.ok) {
+      return c.json(result, result.reason === "expired" ? 410 : 400);
+    }
+    return c.json(result);
+  } catch (err) {
+    console.log("[RedeemInvite] Error:", err);
+    return c.json({ ok: false, reason: String(err) }, 500);
+  }
+});
+
 // Cron: scheduled email nudges for all profiles (Authorization: Bearer CRON_SECRET)
 app.post("/run-daily-email-nudges", async (c) => {
   try {
