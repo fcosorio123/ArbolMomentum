@@ -13,6 +13,7 @@ import {
   normalizeRosterMeta,
   isCustomProfileId,
 } from './profileRoster';
+import { ensureMomentumStarterSeed } from './momentumStarterSeed';
 
 export type { CustomProfileType, RosterProfileMeta as CustomProfileMeta };
 
@@ -96,9 +97,8 @@ function slugify(name: string): string {
   return slug.slice(0, 28) || 'profile';
 }
 
-function initializeEmptyGoals(profileId: string): void {
-  savePersonalGoals(profileId, []);
-  localStorage.setItem(goalsVersionKey(profileId), 'v5-2026-06-09');
+function initializeGoalsVersion(profileId: string): void {
+  localStorage.setItem(goalsVersionKey(profileId), 'v6-2026-07-13');
 }
 
 export function createCustomProfile(input: CreateProfileInput): Profile {
@@ -119,7 +119,7 @@ export function createCustomProfile(input: CreateProfileInput): Profile {
     joinedWeek: 1,
     completionRate: 0,
     bio: input.profileType === 'fresh'
-      ? 'A fresh profile - add your own goals and tasks.'
+      ? 'Starter Momentum goal and tasks to learn the loop - then add your own.'
       : 'Profile created with personalized goal and task suggestions.',
     profileType: input.profileType,
     createdAt: Date.now(),
@@ -129,7 +129,8 @@ export function createCustomProfile(input: CreateProfileInput): Profile {
 
   if (input.profileType === 'fresh') {
     registerFreshProfileId(id);
-    initializeEmptyGoals(id);
+    savePersonalGoals(id, []);
+    initializeGoalsVersion(id);
   } else if (input.suggestions?.length) {
     for (const group of input.suggestions) {
       if (!group.selected) continue;
@@ -149,7 +150,13 @@ export function createCustomProfile(input: CreateProfileInput): Profile {
         });
       }
     }
+  } else {
+    savePersonalGoals(id, []);
+    initializeGoalsVersion(id);
   }
+
+  // Authoritative Momentum starter seed (idempotent; preserves AI/user goals above).
+  ensureMomentumStarterSeed(id);
 
   // Persist roster + per-profile backup so other devices can discover this id.
   import('./cloudBackup').then(({ registerCustomProfileToCloud, saveToCloud }) => {

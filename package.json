@@ -26,6 +26,8 @@
     "test:task-progress": "npx tsx scripts/test-task-progress-pipeline.ts",
     "test:task-demotion": "npx tsx scripts/test-task-status-demotion.ts",
     "test:profile-roster": "npx tsx scripts/test-profile-roster.ts",
+    "test:momentum-starter": "npx tsx scripts/test-momentum-starter-seed.ts",
+    "backfill:momentum-starter": "node scripts/backfill-momentum-starter-seed.mjs",
     "test:surgical-ux": "npm run test:seed-deletion && npm run test:today-hierarchy && npm run test:feedback-interest && npm run test:task-focus",
     "test:progress-pipeline": "npm run test:task-progress && npm run test:task-demotion && npm run test:task-focus"
   },

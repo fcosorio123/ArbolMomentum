@@ -173,7 +173,7 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
               <div style={{ fontSize: 22, marginBottom: 8 }}>🌱</div>
               <div style={{ fontWeight: 700, fontSize: 15, color: C.headline }}>Fresh Profile</div>
               <div style={{ fontSize: 12, color: C.body, marginTop: 4 }}>
-                Empty slate - no goals or tasks. Build everything yourself.
+                Starter Momentum goal and 3 tasks - then add your own.
               </div>
             </button>
             <button type="button" style={card} onClick={() => handlePickType('seeded')}>
