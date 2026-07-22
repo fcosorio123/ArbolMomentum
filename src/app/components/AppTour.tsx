@@ -507,7 +507,7 @@ function injectTourStyles() {
     }
     .arbol-tour-skip-btn {
       background: none; border: none; padding: 0;
-      font-size: 12px; font-weight: 600; color: #52A7CC;
+      font-size: 12px; font-weight: 600; color: #56514B;
       cursor: pointer;
     }
     .arbol-tour-skip-btn:hover { color: #5f6c7b; }

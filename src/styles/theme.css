@@ -2,43 +2,43 @@
 
 :root {
   --font-size: 16px;
-  /* Arbol Momentum — colors only; geometry tokens unchanged */
+  /* Arbol Momentum — high-contrast, non-blue chrome */
   --background: #FCF4F0;
-  --foreground: #27272A;
+  --foreground: #18181B;
   --card: #FFFFFF;
-  --card-foreground: #27272A;
+  --card-foreground: #18181B;
   --popover: #FFFFFF;
-  --popover-foreground: #27272A;
+  --popover-foreground: #18181B;
   --primary: #8E1533;
   --primary-foreground: #FFFFFF;
-  --secondary: #F4E8EB;
-  --secondary-foreground: #182F53;
+  --secondary: #F4F4F5;
+  --secondary-foreground: #27272A;
   --muted: #F4F4F5;
-  --muted-foreground: #595959;
-  --accent: #F9F3F5;
-  --accent-foreground: #182F53;
+  --muted-foreground: #3F3F46;
+  --accent: #FFF7EC;
+  --accent-foreground: #27272A;
   --destructive: #A72D1A;
   --destructive-foreground: #FFFFFF;
-  --border: rgba(39, 39, 42, 0.10);
+  --border: rgba(24, 24, 27, 0.14);
   --input: transparent;
-  --input-background: #F9F3F5;
+  --input-background: #FFF7EC;
   --switch-background: #CCCCCC;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
   --ring: #8E1533;
   --chart-1: #8E1533;
-  --chart-2: #0096D1;
+  --chart-2: #550D0E;
   --chart-3: #29823B;
   --chart-4: #E9A100;
-  --chart-5: #182F53;
+  --chart-5: #56514B;
   --radius: 0.625rem;
-  --sidebar: #182F53;
+  --sidebar: #550D1F;
   --sidebar-foreground: #FFFFFF;
   --sidebar-primary: #8E1533;
   --sidebar-primary-foreground: #FFFFFF;
   --sidebar-accent: #6B1026;
   --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: rgba(255, 255, 255, 0.12);
+  --sidebar-border: rgba(255, 255, 255, 0.14);
   --sidebar-ring: #8E1533;
 }
 

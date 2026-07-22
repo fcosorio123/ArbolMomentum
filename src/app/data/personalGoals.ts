@@ -1550,9 +1550,9 @@ export function getChecklistProgress(profileId: string, goal: PersonalGoal): { c
 // ──────────────────────────────────────────────
 
 export const MILESTONE_CONFIG: Record<MilestoneLevel, { color: string; icon: string; label: string }> = {
-  light: { color: '#52A7CC', icon: '🌱', label: 'Light' },
+  light: { color: '#56514B', icon: '🌱', label: 'Light' },
   medium: { color: '#8E1533', icon: '⚡', label: 'Medium' },
-  'medium-high': { color: '#182F53', icon: '🎯', label: 'Medium-High' },
+  'medium-high': { color: '#550D1F', icon: '🎯', label: 'Medium-High' },
   hard: { color: '#A72D1A', icon: '💪', label: 'Hard' },
   epic: { color: '#f5d020', icon: '🏆', label: 'Epic' },
 };

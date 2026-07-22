@@ -21,7 +21,7 @@ export function CelebrationModal({ open, streak, newBadges, onClose, onViewWeek 
       particleCount: 140,
       spread: 90,
       origin: { y: 0.55 },
-      colors: ['#8E1533', '#182F53', '#E9A100', '#A72D1A', '#52A7CC', '#ffffff'],
+      colors: ['#8E1533', '#550D1F', '#E9A100', '#A72D1A', '#56514B', '#ffffff'],
     });
     const t = setTimeout(() => {
       confetti({

@@ -193,7 +193,7 @@ export default function App() {
     setLink('manifest', `${appBase}manifest.json`);
 
     // Universal PWA meta
-    setMeta('theme-color', '#182F53');
+    setMeta('theme-color', '#550D1F');
     setMeta('color-scheme', 'light');
     setMeta('application-name', 'Momentum');
 
@@ -217,7 +217,7 @@ export default function App() {
 
       // Gradient background
       const grad = ctx.createLinearGradient(0, 0, size, size);
-      grad.addColorStop(0, '#182F53');
+      grad.addColorStop(0, '#550D1F');
       grad.addColorStop(1, C.primaryPressed);
       ctx.fillStyle = grad;
 
@@ -275,7 +275,7 @@ export default function App() {
       display: 'standalone',
       orientation: 'portrait-primary',
       background_color: '#f0f4f8',
-      theme_color: '#182F53',
+      theme_color: '#550D1F',
       icons: [
         { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any' },
         { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },

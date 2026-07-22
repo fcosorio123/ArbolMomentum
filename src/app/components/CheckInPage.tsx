@@ -96,7 +96,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
     goals.forEach(g => {
       goalMeta[g.id] = { title: g.title, deepWhy: g.deepWhy, accentColor: goalAccent(g.id) };
     });
-    goalMeta.__routines__ = { title: 'Routines', accentColor: '#52A7CC' };
+    goalMeta.__routines__ = { title: 'Routines', accentColor: '#56514B' };
 
     const flat: FlatTask[] = rows.map(r => {
       const goalId = r.goalId ?? '__routines__';

@@ -163,7 +163,7 @@ export function WeekPlan({ profile }: Props) {
   const STATUS_META: Record<TaskStatus | 'null', { dot: string; color: string; label: string }> = {
     inprogress: { dot: '◑', color: '#E9A100', label: 'In Progress' },
     done:       { dot: '●', color: C.primary, label: 'Done' },
-    skipped:    { dot: '✕', color: '#52A7CC', label: 'Skipped' },
+    skipped:    { dot: '✕', color: '#56514B', label: 'Skipped' },
     null:       { dot: '○', color: C.secondary, label: 'Not started' },
   };
 

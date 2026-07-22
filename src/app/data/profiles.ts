@@ -263,7 +263,7 @@ export const TASK_CATEGORIES: TaskCategory[] = [
     id: 'main-priorities',
     label: 'Top Priorities',
     icon: '⭐',
-    color: '#182F53',
+    color: '#550D1F',
     tasks: [
       { id: 'mp-1', label: "Check today's top priorities", timeOfDay: 'morning', type: 'priority', category: 'main-priorities' },
       { id: 'mp-2', label: 'Send follow-up messages',      timeOfDay: 'morning', type: 'priority', category: 'main-priorities' },
@@ -291,7 +291,7 @@ export const TASK_CATEGORIES: TaskCategory[] = [
     id: 'wellness',
     label: 'Healthy Living',
     icon: '🧘',
-    color: '#52A7CC',
+    color: '#56514B',
     tasks: [
       { id: 'wl-1', label: '10-minute stretch',              timeOfDay: 'morning', type: 'routine', category: 'wellness' },
       { id: 'wl-2', label: 'Drink a full glass of water',    timeOfDay: 'morning', type: 'routine', category: 'wellness' },
@@ -325,7 +325,7 @@ const YESA_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'y-health-mon', label: 'Healthy Living', icon: '🌿', color: '#52A7CC', goalId: 'yesa-healthy-lifestyle',
+      id: 'y-health-mon', label: 'Healthy Living', icon: '🌿', color: '#56514B', goalId: 'yesa-healthy-lifestyle',
       tasks: [
         { id: 'yesa-mon-7', label: 'Eat a protein-rich meal today', timeOfDay: 'morning', type: 'routine', category: 'y-health-mon' },
         { id: 'yesa-mon-8', label: 'Sleep by midnight', timeOfDay: 'evening', type: 'goal', category: 'y-health-mon' },
@@ -349,7 +349,7 @@ const YESA_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'y-job-tue', label: 'Career', icon: '🚀', color: '#182F53', goalId: 'yesa-stable-job',
+      id: 'y-job-tue', label: 'Career', icon: '🚀', color: '#550D1F', goalId: 'yesa-stable-job',
       tasks: [
         { id: 'yesa-tue-6', label: 'Apply to 2-3 jobs', timeOfDay: 'morning', type: 'goal', category: 'y-job-tue', valueType: 'opportunity', estimatedValue: 2, valueUnit: 'opportunities' },
       ],
@@ -373,7 +373,7 @@ const YESA_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'y-health-wed', label: 'Healthy Living', icon: '🌿', color: '#52A7CC', goalId: 'yesa-healthy-lifestyle',
+      id: 'y-health-wed', label: 'Healthy Living', icon: '🌿', color: '#56514B', goalId: 'yesa-healthy-lifestyle',
       tasks: [
         { id: 'yesa-wed-7', label: 'High-protein recovery meal after session', timeOfDay: 'evening', type: 'routine', category: 'y-health-wed' },
         { id: 'yesa-wed-8', label: 'Reflect on the day - 5 min journal', timeOfDay: 'evening', type: 'goal', category: 'y-health-wed' },
@@ -382,7 +382,7 @@ const YESA_BY_DAY: Record<string, TaskCategory[]> = {
   ],
   Thu: [
     {
-      id: 'y-recover-thu', label: 'Active Recovery', icon: '🧘', color: '#52A7CC', goalId: 'yesa-healthy-lifestyle',
+      id: 'y-recover-thu', label: 'Active Recovery', icon: '🧘', color: '#56514B', goalId: 'yesa-healthy-lifestyle',
       tasks: [
         { id: 'yesa-thu-1', label: 'Yoga or gentle mobility - 20 min', timeOfDay: 'morning', type: 'goal', category: 'y-recover-thu', valueType: 'health', estimatedValue: 100, valueUnit: 'cal' },
         { id: 'yesa-thu-2', label: 'Drink water & eat well today (rest day)', timeOfDay: 'morning', type: 'routine', category: 'y-recover-thu' },
@@ -397,7 +397,7 @@ const YESA_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'y-job-thu', label: 'Career', icon: '🚀', color: '#182F53', goalId: 'yesa-stable-job',
+      id: 'y-job-thu', label: 'Career', icon: '🚀', color: '#550D1F', goalId: 'yesa-stable-job',
       tasks: [
         { id: 'yesa-thu-6', label: 'Practice interview questions', timeOfDay: 'evening', type: 'routine', category: 'y-job-thu' },
       ],
@@ -420,7 +420,7 @@ const YESA_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'y-health-fri', label: 'Healthy Living', icon: '🌿', color: '#52A7CC', goalId: 'yesa-healthy-lifestyle',
+      id: 'y-health-fri', label: 'Healthy Living', icon: '🌿', color: '#56514B', goalId: 'yesa-healthy-lifestyle',
       tasks: [
         { id: 'yesa-fri-6', label: 'Plan weekend meals', timeOfDay: 'evening', type: 'routine', category: 'y-health-fri' },
         { id: 'yesa-fri-7', label: 'Plan tomorrow\'s top 3', timeOfDay: 'evening', type: 'priority', category: 'y-health-fri' },
@@ -437,14 +437,14 @@ const YESA_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'y-job-sat', label: 'Career', icon: '🚀', color: '#182F53', goalId: 'yesa-stable-job',
+      id: 'y-job-sat', label: 'Career', icon: '🚀', color: '#550D1F', goalId: 'yesa-stable-job',
       tasks: [
         { id: 'yesa-sat-4', label: 'Apply to 2-3 jobs', timeOfDay: 'morning', type: 'goal', category: 'y-job-sat', valueType: 'opportunity', estimatedValue: 2, valueUnit: 'opportunities' },
         { id: 'yesa-sat-5', label: 'Update LinkedIn or resume', timeOfDay: 'morning', type: 'routine', category: 'y-job-sat' },
       ],
     },
     {
-      id: 'y-health-sat', label: 'Healthy Living', icon: '🌿', color: '#52A7CC', goalId: 'yesa-healthy-lifestyle',
+      id: 'y-health-sat', label: 'Healthy Living', icon: '🌿', color: '#56514B', goalId: 'yesa-healthy-lifestyle',
       tasks: [
         { id: 'yesa-sat-6', label: 'Rest & recharge', timeOfDay: 'evening', type: 'routine', category: 'y-health-sat' },
         { id: 'yesa-sat-7', label: 'No screens 30 min before bed', timeOfDay: 'evening', type: 'goal', category: 'y-health-sat' },
@@ -453,7 +453,7 @@ const YESA_BY_DAY: Record<string, TaskCategory[]> = {
   ],
   Sun: [
     {
-      id: 'y-planning-sun', label: 'Weekly Review & Planning', icon: '📋', color: '#182F53', goalId: 'yesa-stable-job',
+      id: 'y-planning-sun', label: 'Weekly Review & Planning', icon: '📋', color: '#550D1F', goalId: 'yesa-stable-job',
       tasks: [
         { id: 'yesa-sun-1', label: 'Review last week - what went well?', timeOfDay: 'morning', type: 'goal', category: 'y-planning-sun' },
         { id: 'yesa-sun-2', label: 'Plan next week\'s climbing sessions', timeOfDay: 'morning', type: 'priority', category: 'y-planning-sun' },
@@ -461,7 +461,7 @@ const YESA_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'y-health-sun', label: 'Healthy Living', icon: '🌿', color: '#52A7CC', goalId: 'yesa-healthy-lifestyle',
+      id: 'y-health-sun', label: 'Healthy Living', icon: '🌿', color: '#56514B', goalId: 'yesa-healthy-lifestyle',
       tasks: [
         { id: 'yesa-sun-4', label: 'Meal prep for the week', timeOfDay: 'morning', type: 'routine', category: 'y-health-sun' },
         { id: 'yesa-sun-5', label: 'Rest - full recovery day', timeOfDay: 'evening', type: 'routine', category: 'y-health-sun' },
@@ -484,7 +484,7 @@ const KYLE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'k-career-mon', label: 'Career', icon: '🚀', color: '#182F53', goalId: 'kyle-emergency-fund',
+      id: 'k-career-mon', label: 'Career', icon: '🚀', color: '#550D1F', goalId: 'kyle-emergency-fund',
       tasks: [
         { id: 'kyle-mon-3', label: 'Apply to 3–5 jobs', timeOfDay: 'morning', type: 'priority', category: 'k-career-mon', valueType: 'opportunity', estimatedValue: 4, valueUnit: 'opportunities' },
         { id: 'kyle-mon-4', label: 'Update LinkedIn profile', timeOfDay: 'morning', type: 'goal', category: 'k-career-mon' },
@@ -499,7 +499,7 @@ const KYLE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'k-evening-mon', label: 'Healthy Living', icon: '🌙', color: '#52A7CC', goalId: 'kyle-emergency-fund',
+      id: 'k-evening-mon', label: 'Healthy Living', icon: '🌙', color: '#56514B', goalId: 'kyle-emergency-fund',
       tasks: [
         { id: 'kyle-mon-8', label: 'Review HR notes', timeOfDay: 'evening', type: 'routine', category: 'k-evening-mon' },
         { id: 'kyle-mon-9', label: 'Track graduation requirements', timeOfDay: 'evening', type: 'priority', category: 'k-evening-mon' },
@@ -516,7 +516,7 @@ const KYLE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'k-career-tue', label: 'Career', icon: '🚀', color: '#182F53', goalId: 'kyle-emergency-fund',
+      id: 'k-career-tue', label: 'Career', icon: '🚀', color: '#550D1F', goalId: 'kyle-emergency-fund',
       tasks: [
         { id: 'kyle-tue-3', label: 'Apply to 3–5 jobs', timeOfDay: 'morning', type: 'priority', category: 'k-career-tue', valueType: 'opportunity', estimatedValue: 4, valueUnit: 'opportunities' },
         { id: 'kyle-tue-4', label: 'Update job application tracker', timeOfDay: 'morning', type: 'routine', category: 'k-career-tue' },
@@ -531,7 +531,7 @@ const KYLE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'k-evening-tue', label: 'Healthy Living', icon: '🌙', color: '#52A7CC', goalId: 'kyle-emergency-fund',
+      id: 'k-evening-tue', label: 'Healthy Living', icon: '🌙', color: '#56514B', goalId: 'kyle-emergency-fund',
       tasks: [
         { id: 'kyle-tue-8', label: 'Review HR notes', timeOfDay: 'evening', type: 'routine', category: 'k-evening-tue' },
         { id: 'kyle-tue-9', label: 'Work on graduation requirements', timeOfDay: 'evening', type: 'priority', category: 'k-evening-tue' },
@@ -548,7 +548,7 @@ const KYLE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'k-career-wed', label: 'Career', icon: '🚀', color: '#182F53', goalId: 'kyle-emergency-fund',
+      id: 'k-career-wed', label: 'Career', icon: '🚀', color: '#550D1F', goalId: 'kyle-emergency-fund',
       tasks: [
         { id: 'kyle-wed-3', label: 'Apply to 3–5 jobs', timeOfDay: 'morning', type: 'priority', category: 'k-career-wed', valueType: 'opportunity', estimatedValue: 4, valueUnit: 'opportunities' },
         { id: 'kyle-wed-4', label: 'Research companies to apply to', timeOfDay: 'morning', type: 'routine', category: 'k-career-wed' },
@@ -564,7 +564,7 @@ const KYLE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'k-evening-wed', label: 'Healthy Living', icon: '🌙', color: '#52A7CC', goalId: 'kyle-emergency-fund',
+      id: 'k-evening-wed', label: 'Healthy Living', icon: '🌙', color: '#56514B', goalId: 'kyle-emergency-fund',
       tasks: [
         { id: 'kyle-wed-9', label: 'Review HR study materials', timeOfDay: 'evening', type: 'routine', category: 'k-evening-wed' },
         { id: 'kyle-wed-10', label: 'Check graduation checklist', timeOfDay: 'evening', type: 'priority', category: 'k-evening-wed' },
@@ -580,7 +580,7 @@ const KYLE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'k-career-thu', label: 'Career', icon: '🚀', color: '#182F53', goalId: 'kyle-emergency-fund',
+      id: 'k-career-thu', label: 'Career', icon: '🚀', color: '#550D1F', goalId: 'kyle-emergency-fund',
       tasks: [
         { id: 'kyle-thu-3', label: 'Apply to 3–5 jobs', timeOfDay: 'morning', type: 'priority', category: 'k-career-thu', valueType: 'opportunity', estimatedValue: 4, valueUnit: 'opportunities' },
         { id: 'kyle-thu-4', label: 'Follow up on applications', timeOfDay: 'morning', type: 'routine', category: 'k-career-thu' },
@@ -595,7 +595,7 @@ const KYLE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'k-evening-thu', label: 'Healthy Living', icon: '🌙', color: '#52A7CC', goalId: 'kyle-emergency-fund',
+      id: 'k-evening-thu', label: 'Healthy Living', icon: '🌙', color: '#56514B', goalId: 'kyle-emergency-fund',
       tasks: [
         { id: 'kyle-thu-8', label: 'Review HR notes', timeOfDay: 'evening', type: 'routine', category: 'k-evening-thu' },
         { id: 'kyle-thu-9', label: 'Work on thesis/projects', timeOfDay: 'evening', type: 'priority', category: 'k-evening-thu' },
@@ -612,7 +612,7 @@ const KYLE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'k-career-fri', label: 'Career', icon: '🚀', color: '#182F53', goalId: 'kyle-emergency-fund',
+      id: 'k-career-fri', label: 'Career', icon: '🚀', color: '#550D1F', goalId: 'kyle-emergency-fund',
       tasks: [
         { id: 'kyle-fri-3', label: 'Apply to 3–5 jobs', timeOfDay: 'morning', type: 'priority', category: 'k-career-fri', valueType: 'opportunity', estimatedValue: 4, valueUnit: 'opportunities' },
         { id: 'kyle-fri-4', label: 'Improve resume this week', timeOfDay: 'morning', type: 'goal', category: 'k-career-fri' },
@@ -628,7 +628,7 @@ const KYLE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'k-evening-fri', label: 'Healthy Living', icon: '🌙', color: '#52A7CC', goalId: 'kyle-emergency-fund',
+      id: 'k-evening-fri', label: 'Healthy Living', icon: '🌙', color: '#56514B', goalId: 'kyle-emergency-fund',
       tasks: [
         { id: 'kyle-fri-9', label: 'Light study review', timeOfDay: 'evening', type: 'routine', category: 'k-evening-fri' },
         { id: 'kyle-fri-10', label: 'Plan weekend study schedule', timeOfDay: 'evening', type: 'routine', category: 'k-evening-fri' },
@@ -651,7 +651,7 @@ const KYLE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'k-evening-sat', label: 'Healthy Living', icon: '🌙', color: '#52A7CC', goalId: 'kyle-emergency-fund',
+      id: 'k-evening-sat', label: 'Healthy Living', icon: '🌙', color: '#56514B', goalId: 'kyle-emergency-fund',
       tasks: [
         { id: 'kyle-sat-5', label: 'Hobby time / relax', timeOfDay: 'evening', type: 'routine', category: 'k-evening-sat' },
         { id: 'kyle-sat-6', label: 'Light review only', timeOfDay: 'evening', type: 'routine', category: 'k-evening-sat' },
@@ -660,7 +660,7 @@ const KYLE_BY_DAY: Record<string, TaskCategory[]> = {
   ],
   Sun: [
     {
-      id: 'k-planning-sun', label: 'Planning', icon: '📋', color: '#182F53', goalId: 'kyle-graduation',
+      id: 'k-planning-sun', label: 'Planning', icon: '📋', color: '#550D1F', goalId: 'kyle-graduation',
       tasks: [
         { id: 'kyle-sun-1', label: 'Plan next week study topics', timeOfDay: 'morning', type: 'priority', category: 'k-planning-sun' },
         { id: 'kyle-sun-2', label: 'Review graduation checklist', timeOfDay: 'morning', type: 'priority', category: 'k-planning-sun' },
@@ -675,7 +675,7 @@ const KYLE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'k-rest-sun', label: 'Healthy Living', icon: '🌿', color: '#52A7CC', goalId: 'kyle-emergency-fund',
+      id: 'k-rest-sun', label: 'Healthy Living', icon: '🌿', color: '#56514B', goalId: 'kyle-emergency-fund',
       tasks: [
         { id: 'kyle-sun-6', label: 'Light HR review only', timeOfDay: 'evening', type: 'routine', category: 'k-rest-sun' },
         { id: 'kyle-sun-7', label: 'Rest and recharge', timeOfDay: 'evening', type: 'routine', category: 'k-rest-sun' },
@@ -692,7 +692,7 @@ const JOHN_CATEGORIES: TaskCategory[] = [
     id: 'j-priorities',
     label: 'Top Priorities',
     icon: '⭐',
-    color: '#182F53',
+    color: '#550D1F',
     goalId: 'john-priorities',
     tasks: [
       { id: 'john-1', label: 'Cook Carbonara for girlfriend & family',              timeOfDay: 'morning', type: 'goal',     category: 'j-priorities' },
@@ -716,7 +716,7 @@ const JOHN_CATEGORIES: TaskCategory[] = [
     id: 'j-wellness',
     label: 'Healthy Living',
     icon: '🧘',
-    color: '#52A7CC',
+    color: '#56514B',
     goalId: 'john-wellness',
     tasks: [
       { id: 'john-4', label: 'Get a haircut',                                      timeOfDay: 'morning', type: 'goal',     category: 'j-wellness' },
@@ -730,7 +730,7 @@ const JOHN_CATEGORIES: TaskCategory[] = [
 const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
   Mon: [
     {
-      id: 'j-morning-mon', label: 'Healthy Living', icon: '🌅', color: '#52A7CC',
+      id: 'j-morning-mon', label: 'Healthy Living', icon: '🌅', color: '#56514B',
       goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-mon-1', label: 'Wake up & light stretching', timeOfDay: 'morning', type: 'routine', category: 'j-morning-mon' },
@@ -739,7 +739,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'j-work-mon', label: 'Finance', icon: '💼', color: '#182F53',
+      id: 'j-work-mon', label: 'Finance', icon: '💼', color: '#550D1F',
       goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-mon-4', label: 'Drink water consistently', timeOfDay: 'morning', type: 'routine', category: 'j-work-mon' },
@@ -768,7 +768,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
   ],
   Tue: [
     {
-      id: 'j-morning-tue', label: 'Healthy Living', icon: '🌅', color: '#52A7CC',
+      id: 'j-morning-tue', label: 'Healthy Living', icon: '🌅', color: '#56514B',
       goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-tue-1', label: 'Wake up & light stretching', timeOfDay: 'morning', type: 'routine', category: 'j-morning-tue' },
@@ -777,7 +777,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'j-work-tue', label: 'Finance', icon: '💼', color: '#182F53',
+      id: 'j-work-tue', label: 'Finance', icon: '💼', color: '#550D1F',
       goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-tue-4', label: 'Drink water consistently', timeOfDay: 'morning', type: 'routine', category: 'j-work-tue' },
@@ -806,7 +806,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
   ],
   Wed: [
     {
-      id: 'j-morning-wed', label: 'Healthy Living', icon: '🌅', color: '#52A7CC',
+      id: 'j-morning-wed', label: 'Healthy Living', icon: '🌅', color: '#56514B',
       goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-wed-1', label: 'Wake up & light stretching', timeOfDay: 'morning', type: 'routine', category: 'j-morning-wed' },
@@ -815,7 +815,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'j-work-wed', label: 'Finance', icon: '💼', color: '#182F53',
+      id: 'j-work-wed', label: 'Finance', icon: '💼', color: '#550D1F',
       goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-wed-4', label: 'Drink water consistently', timeOfDay: 'morning', type: 'routine', category: 'j-work-wed' },
@@ -845,7 +845,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
   ],
   Thu: [
     {
-      id: 'j-morning-thu', label: 'Healthy Living', icon: '🌅', color: '#52A7CC',
+      id: 'j-morning-thu', label: 'Healthy Living', icon: '🌅', color: '#56514B',
       goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-thu-1', label: 'Wake up & light stretching', timeOfDay: 'morning', type: 'routine', category: 'j-morning-thu' },
@@ -854,7 +854,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'j-work-thu', label: 'Finance', icon: '💼', color: '#182F53',
+      id: 'j-work-thu', label: 'Finance', icon: '💼', color: '#550D1F',
       goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-thu-4', label: 'Drink water consistently', timeOfDay: 'morning', type: 'routine', category: 'j-work-thu' },
@@ -883,7 +883,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
   ],
   Fri: [
     {
-      id: 'j-morning-fri', label: 'Healthy Living', icon: '🌅', color: '#52A7CC',
+      id: 'j-morning-fri', label: 'Healthy Living', icon: '🌅', color: '#56514B',
       goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-fri-1', label: 'Wake up & light stretching', timeOfDay: 'morning', type: 'routine', category: 'j-morning-fri' },
@@ -892,7 +892,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'j-work-fri', label: 'Finance', icon: '💼', color: '#182F53',
+      id: 'j-work-fri', label: 'Finance', icon: '💼', color: '#550D1F',
       goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-fri-4', label: 'Drink water consistently', timeOfDay: 'morning', type: 'routine', category: 'j-work-fri' },
@@ -922,7 +922,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
   ],
   Sat: [
     {
-      id: 'j-morning-sat', label: 'Fitness & Health', icon: '🚶', color: '#52A7CC',
+      id: 'j-morning-sat', label: 'Fitness & Health', icon: '🚶', color: '#56514B',
       goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-sat-1', label: 'Morning walk at 5:30 AM', timeOfDay: 'morning', type: 'priority', category: 'j-morning-sat' },
@@ -949,7 +949,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
   ],
   Sun: [
     {
-      id: 'j-morning-sun', label: 'Fitness & Health', icon: '🚶', color: '#52A7CC',
+      id: 'j-morning-sun', label: 'Fitness & Health', icon: '🚶', color: '#56514B',
       goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-sun-1', label: 'Morning walk at 5:30 AM', timeOfDay: 'morning', type: 'priority', category: 'j-morning-sun' },
@@ -957,7 +957,7 @@ const JUDE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'j-weekend-sun', label: 'Planning', icon: '📋', color: '#182F53',
+      id: 'j-weekend-sun', label: 'Planning', icon: '📋', color: '#550D1F',
       goalId: 'jude-travel-fund',
       tasks: [
         { id: 'jude-sun-3', label: 'Review weekly savings progress', timeOfDay: 'morning', type: 'goal', category: 'j-weekend-sun' },
@@ -992,7 +992,7 @@ const RAFAEL_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'r-wellness-mon', label: 'Healthy Living', icon: '🧘', color: '#52A7CC', goalId: 'rafael-healthy-living',
+      id: 'r-wellness-mon', label: 'Healthy Living', icon: '🧘', color: '#56514B', goalId: 'rafael-healthy-living',
       tasks: [
         { id: 'rafael-mon-3', label: 'Exercise', timeOfDay: 'evening', type: 'routine', category: 'r-wellness-mon' },
       ],
@@ -1008,7 +1008,7 @@ const RAFAEL_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'r-wellness-tue', label: 'Healthy Living', icon: '🧘', color: '#52A7CC', goalId: 'rafael-healthy-living',
+      id: 'r-wellness-tue', label: 'Healthy Living', icon: '🧘', color: '#56514B', goalId: 'rafael-healthy-living',
       tasks: [
         { id: 'rafael-tue-3', label: 'Exercise', timeOfDay: 'evening', type: 'routine', category: 'r-wellness-tue' },
       ],
@@ -1049,7 +1049,7 @@ const RAFAEL_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'r-wellness-fri', label: 'Healthy Living', icon: '🧘', color: '#52A7CC', goalId: 'rafael-healthy-living',
+      id: 'r-wellness-fri', label: 'Healthy Living', icon: '🧘', color: '#56514B', goalId: 'rafael-healthy-living',
       tasks: [
         { id: 'rafael-fri-5', label: 'Exercise', timeOfDay: 'evening', type: 'routine', category: 'r-wellness-fri' },
       ],
@@ -1066,7 +1066,7 @@ const RAFAEL_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'r-wellness-sat', label: 'Healthy Living', icon: '🧘', color: '#52A7CC', goalId: 'rafael-healthy-living',
+      id: 'r-wellness-sat', label: 'Healthy Living', icon: '🧘', color: '#56514B', goalId: 'rafael-healthy-living',
       tasks: [
         { id: 'rafael-sat-5', label: 'Exercise', timeOfDay: 'evening', type: 'routine', category: 'r-wellness-sat' },
       ],
@@ -1086,7 +1086,7 @@ const RAFAEL_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'r-wellness-sun', label: 'Healthy Living', icon: '🧘', color: '#52A7CC', goalId: 'rafael-healthy-living',
+      id: 'r-wellness-sun', label: 'Healthy Living', icon: '🧘', color: '#56514B', goalId: 'rafael-healthy-living',
       tasks: [
         { id: 'rafael-sun-3', label: 'Exercise', timeOfDay: 'evening', type: 'routine', category: 'r-wellness-sun' },
       ],
@@ -1114,13 +1114,13 @@ const FAVIO_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'fav-neck-mon', label: 'Neck Reset', icon: '🧘', color: '#52A7CC', goalId: 'favio-neck-balance',
+      id: 'fav-neck-mon', label: 'Neck Reset', icon: '🧘', color: '#56514B', goalId: 'favio-neck-balance',
       tasks: [
         { id: 'fav-mon-8', label: '5-min Neck Reset (chin tucks + shoulder blade squeezes)', timeOfDay: 'morning', type: 'routine', category: 'fav-neck-mon' },
       ],
     },
     {
-      id: 'fav-mb-mon', label: 'Mental Balance', icon: '🌙', color: '#182F53', goalId: 'favio-founder-performance',
+      id: 'fav-mb-mon', label: 'Mental Balance', icon: '🌙', color: '#550D1F', goalId: 'favio-founder-performance',
       tasks: [
         { id: 'fav-mon-9', label: 'Intentional time with wife', timeOfDay: 'evening', type: 'priority', category: 'fav-mb-mon' },
         { id: 'fav-mon-10', label: 'No intense work 1 hr before bed', timeOfDay: 'evening', type: 'routine', category: 'fav-mb-mon' },
@@ -1147,13 +1147,13 @@ const FAVIO_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'fav-neck-tue', label: 'Neck Reset', icon: '🧘', color: '#52A7CC', goalId: 'favio-neck-balance',
+      id: 'fav-neck-tue', label: 'Neck Reset', icon: '🧘', color: '#56514B', goalId: 'favio-neck-balance',
       tasks: [
         { id: 'fav-tue-7', label: '5-min Neck Reset (chin tucks + shoulder blade squeezes)', timeOfDay: 'morning', type: 'routine', category: 'fav-neck-tue' },
       ],
     },
     {
-      id: 'fav-mb-tue', label: 'Mental Balance', icon: '🌙', color: '#182F53', goalId: 'favio-founder-performance',
+      id: 'fav-mb-tue', label: 'Mental Balance', icon: '🌙', color: '#550D1F', goalId: 'favio-founder-performance',
       tasks: [
         { id: 'fav-tue-8', label: '30-min personal / startup project', timeOfDay: 'morning', type: 'goal', category: 'fav-mb-tue' },
         { id: 'fav-tue-9', label: 'Intentional time with wife', timeOfDay: 'evening', type: 'priority', category: 'fav-mb-tue' },
@@ -1180,13 +1180,13 @@ const FAVIO_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'fav-neck-wed', label: 'Neck Reset', icon: '🧘', color: '#52A7CC', goalId: 'favio-neck-balance',
+      id: 'fav-neck-wed', label: 'Neck Reset', icon: '🧘', color: '#56514B', goalId: 'favio-neck-balance',
       tasks: [
         { id: 'fav-wed-6', label: '5-min Neck Reset (chin tucks + shoulder blade squeezes)', timeOfDay: 'morning', type: 'routine', category: 'fav-neck-wed' },
       ],
     },
     {
-      id: 'fav-mb-wed', label: 'Mental Balance & Home', icon: '🏡', color: '#182F53', goalId: 'favio-neck-balance',
+      id: 'fav-mb-wed', label: 'Mental Balance & Home', icon: '🏡', color: '#550D1F', goalId: 'favio-neck-balance',
       tasks: [
         { id: 'fav-wed-7', label: 'Meaningful time with wife (deeper block)', timeOfDay: 'evening', type: 'priority', category: 'fav-mb-wed' },
         { id: 'fav-wed-8', label: 'Home task (small)', timeOfDay: 'evening', type: 'routine', category: 'fav-mb-wed' },
@@ -1213,13 +1213,13 @@ const FAVIO_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'fav-neck-thu', label: 'Neck Reset', icon: '🧘', color: '#52A7CC', goalId: 'favio-neck-balance',
+      id: 'fav-neck-thu', label: 'Neck Reset', icon: '🧘', color: '#56514B', goalId: 'favio-neck-balance',
       tasks: [
         { id: 'fav-thu-7', label: '5-min Neck Reset (chin tucks + shoulder blade squeezes)', timeOfDay: 'morning', type: 'routine', category: 'fav-neck-thu' },
       ],
     },
     {
-      id: 'fav-mb-thu', label: 'Mental Balance', icon: '🥁', color: '#182F53', goalId: 'favio-founder-performance',
+      id: 'fav-mb-thu', label: 'Mental Balance', icon: '🥁', color: '#550D1F', goalId: 'favio-founder-performance',
       tasks: [
         { id: 'fav-thu-8', label: 'Drums session (20–30 min)', timeOfDay: 'evening', type: 'goal', category: 'fav-mb-thu' },
         { id: 'fav-thu-9', label: 'Intentional time with wife', timeOfDay: 'evening', type: 'priority', category: 'fav-mb-thu' },
@@ -1247,13 +1247,13 @@ const FAVIO_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'fav-neck-fri', label: 'Neck Reset', icon: '🧘', color: '#52A7CC', goalId: 'favio-neck-balance',
+      id: 'fav-neck-fri', label: 'Neck Reset', icon: '🧘', color: '#56514B', goalId: 'favio-neck-balance',
       tasks: [
         { id: 'fav-fri-7', label: '5-min Neck Reset (chin tucks + shoulder blade squeezes)', timeOfDay: 'morning', type: 'routine', category: 'fav-neck-fri' },
       ],
     },
     {
-      id: 'fav-mb-fri', label: 'Mental Balance', icon: '😂', color: '#182F53', goalId: 'favio-founder-performance',
+      id: 'fav-mb-fri', label: 'Mental Balance', icon: '😂', color: '#550D1F', goalId: 'favio-founder-performance',
       tasks: [
         { id: 'fav-fri-8', label: 'Comedy night / stress relief', timeOfDay: 'evening', type: 'goal', category: 'fav-mb-fri' },
         { id: 'fav-fri-9', label: 'Intentional time with wife', timeOfDay: 'evening', type: 'priority', category: 'fav-mb-fri' },
@@ -1279,13 +1279,13 @@ const FAVIO_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'fav-neck-sat', label: 'Neck Reset', icon: '🧘', color: '#52A7CC', goalId: 'favio-neck-balance',
+      id: 'fav-neck-sat', label: 'Neck Reset', icon: '🧘', color: '#56514B', goalId: 'favio-neck-balance',
       tasks: [
         { id: 'fav-sat-6', label: '5-min Neck Reset (chin tucks + shoulder blade squeezes)', timeOfDay: 'morning', type: 'routine', category: 'fav-neck-sat' },
       ],
     },
     {
-      id: 'fav-mb-sat', label: 'Social & Balance', icon: '👥', color: '#182F53', goalId: 'favio-neck-balance',
+      id: 'fav-mb-sat', label: 'Social & Balance', icon: '👥', color: '#550D1F', goalId: 'favio-neck-balance',
       tasks: [
         { id: 'fav-sat-7', label: 'Social time (friends / family)', timeOfDay: 'evening', type: 'goal', category: 'fav-mb-sat' },
         { id: 'fav-sat-8', label: 'Intentional time with wife', timeOfDay: 'evening', type: 'priority', category: 'fav-mb-sat' },
@@ -1312,13 +1312,13 @@ const FAVIO_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'fav-neck-sun', label: 'Neck Reset', icon: '🧘', color: '#52A7CC', goalId: 'favio-neck-balance',
+      id: 'fav-neck-sun', label: 'Neck Reset', icon: '🧘', color: '#56514B', goalId: 'favio-neck-balance',
       tasks: [
         { id: 'fav-sun-8', label: '5-min Neck Reset (chin tucks + shoulder blade squeezes)', timeOfDay: 'morning', type: 'routine', category: 'fav-neck-sun' },
       ],
     },
     {
-      id: 'fav-mb-sun', label: 'Weekly Review & Balance', icon: '📋', color: '#182F53', goalId: 'favio-founder-performance',
+      id: 'fav-mb-sun', label: 'Weekly Review & Balance', icon: '📋', color: '#550D1F', goalId: 'favio-founder-performance',
       tasks: [
         { id: 'fav-sun-9', label: 'Weekly review (goals + scoreboard)', timeOfDay: 'morning', type: 'priority', category: 'fav-mb-sun' },
         { id: 'fav-sun-10', label: 'Meaningful time with wife', timeOfDay: 'evening', type: 'priority', category: 'fav-mb-sun' },
@@ -1336,7 +1336,7 @@ const FAVIO_BY_DAY: Record<string, TaskCategory[]> = {
 const ROI_BY_DAY: Record<string, TaskCategory[]> = {
   Mon: [
     {
-      id: 'roi-mobility-mon', label: 'Neck & Shoulder Mobility', icon: '🧘', color: '#52A7CC', goalId: 'roi-healthy-mind-body',
+      id: 'roi-mobility-mon', label: 'Neck & Shoulder Mobility', icon: '🧘', color: '#56514B', goalId: 'roi-healthy-mind-body',
       tasks: [
         { id: 'roi-mon-1', label: 'Neck circles & chin tucks - 5 min', timeOfDay: 'morning', type: 'routine', category: 'roi-mobility-mon' },
         { id: 'roi-mon-2', label: 'Shoulder rolls & cross-body stretch', timeOfDay: 'morning', type: 'routine', category: 'roi-mobility-mon' },
@@ -1350,7 +1350,7 @@ const ROI_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'roi-hydrate-mon', label: 'Hydration', icon: '💧', color: '#182F53', goalId: 'roi-healthy-mind-body',
+      id: 'roi-hydrate-mon', label: 'Hydration', icon: '💧', color: '#550D1F', goalId: 'roi-healthy-mind-body',
       tasks: [
         { id: 'roi-mon-5', label: 'Drink 2–3 L water today', timeOfDay: 'morning', type: 'routine', category: 'roi-hydrate-mon' },
         { id: 'roi-mon-6', label: 'No sugary drinks today', timeOfDay: 'evening', type: 'goal', category: 'roi-hydrate-mon' },
@@ -1375,7 +1375,7 @@ const ROI_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'roi-hydrate-tue', label: 'Hydration', icon: '💧', color: '#182F53', goalId: 'roi-healthy-mind-body',
+      id: 'roi-hydrate-tue', label: 'Hydration', icon: '💧', color: '#550D1F', goalId: 'roi-healthy-mind-body',
       tasks: [
         { id: 'roi-tue-7', label: 'Drink 2–3 L water today', timeOfDay: 'morning', type: 'routine', category: 'roi-hydrate-tue' },
       ],
@@ -1397,7 +1397,7 @@ const ROI_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'roi-hydrate-wed', label: 'Hydration', icon: '💧', color: '#182F53', goalId: 'roi-healthy-mind-body',
+      id: 'roi-hydrate-wed', label: 'Hydration', icon: '💧', color: '#550D1F', goalId: 'roi-healthy-mind-body',
       tasks: [
         { id: 'roi-wed-5', label: 'Drink 2–3 L water today', timeOfDay: 'morning', type: 'routine', category: 'roi-hydrate-wed' },
       ],
@@ -1405,7 +1405,7 @@ const ROI_BY_DAY: Record<string, TaskCategory[]> = {
   ],
   Thu: [
     {
-      id: 'roi-mobility-thu', label: 'Neck & Shoulder Mobility', icon: '🧘', color: '#52A7CC', goalId: 'roi-healthy-mind-body',
+      id: 'roi-mobility-thu', label: 'Neck & Shoulder Mobility', icon: '🧘', color: '#56514B', goalId: 'roi-healthy-mind-body',
       tasks: [
         { id: 'roi-thu-1', label: 'Neck stretch & shoulder mobility flow', timeOfDay: 'morning', type: 'routine', category: 'roi-mobility-thu' },
         { id: 'roi-thu-2', label: 'Foam roll upper back - 5 min', timeOfDay: 'morning', type: 'routine', category: 'roi-mobility-thu' },
@@ -1420,7 +1420,7 @@ const ROI_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'roi-hydrate-thu', label: 'Hydration', icon: '💧', color: '#182F53', goalId: 'roi-healthy-mind-body',
+      id: 'roi-hydrate-thu', label: 'Hydration', icon: '💧', color: '#550D1F', goalId: 'roi-healthy-mind-body',
       tasks: [
         { id: 'roi-thu-6', label: 'Drink 2–3 L water today', timeOfDay: 'morning', type: 'routine', category: 'roi-hydrate-thu' },
       ],
@@ -1442,7 +1442,7 @@ const ROI_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'roi-hydrate-fri', label: 'Hydration', icon: '💧', color: '#182F53', goalId: 'roi-healthy-mind-body',
+      id: 'roi-hydrate-fri', label: 'Hydration', icon: '💧', color: '#550D1F', goalId: 'roi-healthy-mind-body',
       tasks: [
         { id: 'roi-fri-5', label: 'Drink 2–3 L water today', timeOfDay: 'morning', type: 'routine', category: 'roi-hydrate-fri' },
         { id: 'roi-fri-6', label: 'Eat a clean, high-protein meal', timeOfDay: 'evening', type: 'goal', category: 'roi-hydrate-fri' },
@@ -1458,14 +1458,14 @@ const ROI_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'roi-boulder-sat', label: 'Bouldering', icon: '🧗', color: '#182F53', goalId: 'roi-healthy-mind-body',
+      id: 'roi-boulder-sat', label: 'Bouldering', icon: '🧗', color: '#550D1F', goalId: 'roi-healthy-mind-body',
       tasks: [
         { id: 'roi-sat-3', label: 'Bouldering session - 1 hr', timeOfDay: 'morning', type: 'goal', category: 'roi-boulder-sat', valueType: 'health', estimatedValue: 400, valueUnit: 'cal' },
         { id: 'roi-sat-4', label: 'Work on one project problem', timeOfDay: 'morning', type: 'priority', category: 'roi-boulder-sat' },
       ],
     },
     {
-      id: 'roi-hydrate-sat', label: 'Hydration & Recovery', icon: '💧', color: '#52A7CC', goalId: 'roi-healthy-mind-body',
+      id: 'roi-hydrate-sat', label: 'Hydration & Recovery', icon: '💧', color: '#56514B', goalId: 'roi-healthy-mind-body',
       tasks: [
         { id: 'roi-sat-5', label: 'Drink 3+ L water (active day)', timeOfDay: 'morning', type: 'routine', category: 'roi-hydrate-sat' },
         { id: 'roi-sat-6', label: 'High-protein recovery meal', timeOfDay: 'evening', type: 'routine', category: 'roi-hydrate-sat' },
@@ -1482,7 +1482,7 @@ const ROI_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'roi-review-sun', label: 'Weekly Review & Health', icon: '📋', color: '#182F53', goalId: 'roi-healthy-mind-body',
+      id: 'roi-review-sun', label: 'Weekly Review & Health', icon: '📋', color: '#550D1F', goalId: 'roi-healthy-mind-body',
       tasks: [
         { id: 'roi-sun-3', label: 'Review this week\'s fitness activity', timeOfDay: 'morning', type: 'goal', category: 'roi-review-sun' },
         { id: 'roi-sun-4', label: 'Plan next week\'s workouts', timeOfDay: 'morning', type: 'priority', category: 'roi-review-sun' },
@@ -1499,7 +1499,7 @@ const ROI_BY_DAY: Record<string, TaskCategory[]> = {
 const EUNICE_BY_DAY: Record<string, TaskCategory[]> = {
   Mon: [
     {
-      id: 'eu-morning-mon', label: 'Morning Routine', icon: '🌅', color: '#52A7CC', goalId: 'eunice-strava',
+      id: 'eu-morning-mon', label: 'Morning Routine', icon: '🌅', color: '#56514B', goalId: 'eunice-strava',
       tasks: [
         { id: 'eu-mon-1', label: 'Walk the dog', timeOfDay: 'morning', type: 'priority', category: 'eu-morning-mon', valueType: 'health', estimatedValue: 120, valueUnit: 'cal' },
         { id: 'eu-mon-2', label: 'Stretching - 10 min', timeOfDay: 'morning', type: 'routine', category: 'eu-morning-mon' },
@@ -1520,7 +1520,7 @@ const EUNICE_BY_DAY: Record<string, TaskCategory[]> = {
   ],
   Tue: [
     {
-      id: 'eu-morning-tue', label: 'Morning Routine', icon: '🌅', color: '#52A7CC',
+      id: 'eu-morning-tue', label: 'Morning Routine', icon: '🌅', color: '#56514B',
       tasks: [
         { id: 'eu-tue-1', label: 'Walk the dog', timeOfDay: 'morning', type: 'priority', category: 'eu-morning-tue', valueType: 'health', estimatedValue: 120, valueUnit: 'cal' },
         { id: 'eu-tue-2', label: 'Stretching - 10 min', timeOfDay: 'morning', type: 'routine', category: 'eu-morning-tue' },
@@ -1546,7 +1546,7 @@ const EUNICE_BY_DAY: Record<string, TaskCategory[]> = {
   ],
   Wed: [
     {
-      id: 'eu-morning-wed', label: 'Morning Routine', icon: '🌅', color: '#52A7CC', goalId: 'eunice-strava',
+      id: 'eu-morning-wed', label: 'Morning Routine', icon: '🌅', color: '#56514B', goalId: 'eunice-strava',
       tasks: [
         { id: 'eu-wed-1', label: 'Walk the dog', timeOfDay: 'morning', type: 'priority', category: 'eu-morning-wed', valueType: 'health', estimatedValue: 120, valueUnit: 'cal' },
         { id: 'eu-wed-2', label: 'Stretching - 10 min', timeOfDay: 'morning', type: 'routine', category: 'eu-morning-wed' },
@@ -1567,7 +1567,7 @@ const EUNICE_BY_DAY: Record<string, TaskCategory[]> = {
   ],
   Thu: [
     {
-      id: 'eu-morning-thu', label: 'Morning Routine', icon: '🌅', color: '#52A7CC',
+      id: 'eu-morning-thu', label: 'Morning Routine', icon: '🌅', color: '#56514B',
       tasks: [
         { id: 'eu-thu-1', label: 'Walk the dog', timeOfDay: 'morning', type: 'priority', category: 'eu-morning-thu', valueType: 'health', estimatedValue: 120, valueUnit: 'cal' },
         { id: 'eu-thu-2', label: 'Stretching - 10 min', timeOfDay: 'morning', type: 'routine', category: 'eu-morning-thu' },
@@ -1594,7 +1594,7 @@ const EUNICE_BY_DAY: Record<string, TaskCategory[]> = {
   ],
   Fri: [
     {
-      id: 'eu-morning-fri', label: 'Morning Routine', icon: '🌅', color: '#52A7CC', goalId: 'eunice-strava',
+      id: 'eu-morning-fri', label: 'Morning Routine', icon: '🌅', color: '#56514B', goalId: 'eunice-strava',
       tasks: [
         { id: 'eu-fri-1', label: 'Walk the dog', timeOfDay: 'morning', type: 'priority', category: 'eu-morning-fri', valueType: 'health', estimatedValue: 120, valueUnit: 'cal' },
         { id: 'eu-fri-2', label: 'Stretching - 10 min', timeOfDay: 'morning', type: 'routine', category: 'eu-morning-fri' },
@@ -1615,7 +1615,7 @@ const EUNICE_BY_DAY: Record<string, TaskCategory[]> = {
   ],
   Sat: [
     {
-      id: 'eu-morning-sat', label: 'Morning Routine', icon: '🌅', color: '#52A7CC',
+      id: 'eu-morning-sat', label: 'Morning Routine', icon: '🌅', color: '#56514B',
       tasks: [
         { id: 'eu-sat-1', label: 'Walk the dog', timeOfDay: 'morning', type: 'priority', category: 'eu-morning-sat', valueType: 'health', estimatedValue: 120, valueUnit: 'cal' },
         { id: 'eu-sat-2', label: 'Stretching & meditation - 15 min', timeOfDay: 'morning', type: 'routine', category: 'eu-morning-sat' },
@@ -1629,7 +1629,7 @@ const EUNICE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'eu-resto-sat', label: 'Weekend Restaurant', icon: '🍽️', color: '#182F53', goalId: 'eunice-restaurant',
+      id: 'eu-resto-sat', label: 'Weekend Restaurant', icon: '🍽️', color: '#550D1F', goalId: 'eunice-restaurant',
       tasks: [
         { id: 'eu-sat-5', label: 'Discover & visit a new restaurant', timeOfDay: 'evening', type: 'goal', category: 'eu-resto-sat' },
         { id: 'eu-sat-6', label: 'Write a short review or memory note', timeOfDay: 'evening', type: 'routine', category: 'eu-resto-sat' },
@@ -1645,7 +1645,7 @@ const EUNICE_BY_DAY: Record<string, TaskCategory[]> = {
   ],
   Sun: [
     {
-      id: 'eu-morning-sun', label: 'Morning Routine', icon: '🌅', color: '#52A7CC',
+      id: 'eu-morning-sun', label: 'Morning Routine', icon: '🌅', color: '#56514B',
       tasks: [
         { id: 'eu-sun-1', label: 'Walk the dog', timeOfDay: 'morning', type: 'priority', category: 'eu-morning-sun', valueType: 'health', estimatedValue: 120, valueUnit: 'cal' },
         { id: 'eu-sun-2', label: 'Stretching & meditation - 15 min', timeOfDay: 'morning', type: 'routine', category: 'eu-morning-sun' },
@@ -1659,7 +1659,7 @@ const EUNICE_BY_DAY: Record<string, TaskCategory[]> = {
       ],
     },
     {
-      id: 'eu-resto-sun', label: 'Weekend Restaurant', icon: '🍽️', color: '#182F53', goalId: 'eunice-restaurant',
+      id: 'eu-resto-sun', label: 'Weekend Restaurant', icon: '🍽️', color: '#550D1F', goalId: 'eunice-restaurant',
       tasks: [
         { id: 'eu-sun-5', label: 'Explore a new restaurant or café', timeOfDay: 'evening', type: 'goal', category: 'eu-resto-sun' },
       ],

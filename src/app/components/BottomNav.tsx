@@ -46,7 +46,7 @@ export function BottomNav({ activeTab, onChange, pendingCount = 0, isDesktop = f
           <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: -0.5 }}>
             🌿 Arbol
           </div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 3, letterSpacing: 0.5 }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)', marginTop: 3, letterSpacing: 0.5 }}>
             MOMENTUM
           </div>
         </div>
@@ -65,7 +65,7 @@ export function BottomNav({ activeTab, onChange, pendingCount = 0, isDesktop = f
                   borderRadius: 10,
                   background: active ? 'rgba(142,21,51,0.18)' : 'transparent',
                   border: 'none', cursor: 'pointer',
-                  color: active ? '#fff' : 'rgba(255,255,255,0.5)',
+                  color: active ? '#fff' : 'rgba(255,255,255,0.78)',
                   fontSize: 14, fontWeight: active ? 600 : 400,
                   transition: 'all 0.15s',
                   width: '100%', textAlign: 'left',
@@ -102,7 +102,7 @@ export function BottomNav({ activeTab, onChange, pendingCount = 0, isDesktop = f
 
         {/* Footer */}
         <div style={{ padding: '20px 24px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', lineHeight: 1.6 }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6 }}>
             Arbol Momentum<br />Your daily companion
           </div>
         </div>

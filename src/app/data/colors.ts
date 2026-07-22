@@ -1,10 +1,11 @@
 /**
  * Canonical Arbol Momentum color tokens.
- * Source of truth mirrored from arbol-ui:
- *   - tailwind.config.mjs (brand / secondary / extended / semantic / focus)
- *   - lara-light-indigo/_variables.scss (neutral shade scale)
+ * Mirrored from arbol-ui (tailwind.config.mjs + lara-light-indigo/_variables.scss).
  *
- * Prefer importing from this module over raw hex values.
+ * Product rules for Momentum:
+ * - No blue/cyan chrome (storm-blue / frozen-wave / fresh-guacamole navy are not used in UI).
+ * - Dark surfaces use maroon/primary-dark; text uses Arbol neutral scale for AA contrast.
+ * - Semantic green / warning / error retain meaning.
  */
 
 /** Brand primary scale */
@@ -22,9 +23,10 @@ export const ARBOL_PRIMARY = {
   tint: '#F9F3F5',
 } as const;
 
-/** Supporting brand */
+/** Supporting brand (UI chrome avoids blues) */
 export const ARBOL_SUPPORT = {
   maroonOak: '#550D0E',
+  /** Kept for reference only — do not use in Momentum chrome */
   stormBlue: '#0096D1',
   frozenWave: '#52A7CC',
   freshGuacamole: '#182F53',
@@ -38,7 +40,7 @@ export const ARBOL_WARM = {
   majesticBeige: '#DFD7CC',
 } as const;
 
-/** Neutrals (PrimeNG shade scale + extras) */
+/** Neutrals */
 export const ARBOL_NEUTRAL = {
   white: '#FFFFFF',
   surfaceSubtle: '#FAFAFA',
@@ -59,17 +61,19 @@ export const ARBOL_NEUTRAL = {
 
 /** Semantic */
 export const ARBOL_SEMANTIC = {
-  infoFg: '#017AAD',
-  infoBg: '#E5F5FC',
+  /** Informational chrome uses charcoal — not cyan — so Momentum stays non-blue */
+  infoFg: '#56514B',
+  infoBg: '#F4F4F5',
   successFg: '#29823B',
   successBg: '#EAF3EB',
   warningFg: '#E9A100',
+  /** Darker warning text for AA on light warning surfaces */
+  warningText: '#875700',
   warningBg: '#FDF6E5',
   errorFg: '#A72D1A',
   errorBg: '#FCEAEA',
 } as const;
 
-/** Accessibility focus */
 export const ARBOL_FOCUS = {
   brand: '#8E1533',
   inner: '#101213',
@@ -77,18 +81,17 @@ export const ARBOL_FOCUS = {
 } as const;
 
 /**
- * Goal / category accent cycle — Arbol palette only.
- * Keeps goals distinguishable without stock indigo/violet or overusing primary.
+ * Goal / category accents — warm + brand + semantic only (no blue/cyan).
  */
 export const GOAL_ACCENT_COLORS = [
   ARBOL_PRIMARY.DEFAULT,
-  ARBOL_SUPPORT.stormBlue,
   ARBOL_SEMANTIC.successFg,
-  ARBOL_SUPPORT.freshGuacamole,
-  ARBOL_SEMANTIC.warningFg,
-  ARBOL_SEMANTIC.errorFg,
   ARBOL_SUPPORT.maroonOak,
-  ARBOL_SUPPORT.frozenWave,
+  ARBOL_SEMANTIC.errorFg,
+  ARBOL_SEMANTIC.warningFg,
+  ARBOL_NEUTRAL.textStrongest,
+  '#DEA81C',
+  ARBOL_PRIMARY[400],
 ] as const;
 
 export function accentColorForId(id: string): string {
@@ -97,51 +100,43 @@ export function accentColorForId(id: string): string {
 }
 
 /**
- * App-wide runtime palette (legacy `C` API).
- * Components already import `C`; values now resolve to Arbol roles.
+ * App-wide runtime palette (`C`).
+ * Contrast targets: body/secondary text ≥ AA on linen/white; white text on maroon chrome.
  */
 export const C = {
-  /** Page background — warm linen, low emphasis */
   bg: ARBOL_WARM.linen,
-  /** Cards / elevated surfaces */
   bgCard: ARBOL_NEUTRAL.white,
-  /** Subtle tinted surface (was light blue) */
-  bgAlt: ARBOL_PRIMARY.tint,
-  /** Stronger tinted surface */
+  /** Subtle surface — warm beige, not pink-washed (better text contrast) */
+  bgAlt: ARBOL_WARM.wildOats,
   bgAlt2: ARBOL_PRIMARY.light,
-  /** Dark brand text / sidebar — Fresh Guacamole (not burgundy fill) */
-  headline: ARBOL_SUPPORT.freshGuacamole,
-  /** Body / secondary copy */
-  body: ARBOL_NEUTRAL.textSecondary,
-  /** Primary CTA / selection / focus brand */
+  /** Dark chrome / sidebar / headlines on light — maroon, not navy */
+  headline: ARBOL_PRIMARY.dark,
+  /** Primary readable body copy */
+  body: ARBOL_NEUTRAL.textStrongSecondary,
   primary: ARBOL_PRIMARY.DEFAULT,
-  /** Primary hover */
   primaryDark: ARBOL_PRIMARY.hover,
-  /** Primary pressed / gradient end */
   primaryPressed: ARBOL_PRIMARY.pressed,
-  /** Muted secondary (icons, inactive) */
-  secondary: ARBOL_NEUTRAL.disabled,
-  /** Destructive / tertiary alert */
+  /**
+   * Secondary labels / inactive icons on light surfaces.
+   * Heavy charcoal (not zinc-400) so text stays readable on linen.
+   */
+  secondary: ARBOL_NEUTRAL.heavyCharcoal,
+  /** Truly disabled / decorative only */
+  muted: ARBOL_NEUTRAL.disabled,
   tertiary: ARBOL_SEMANTIC.errorFg,
-  /** Streak / attention / warning accents */
   streak: ARBOL_SEMANTIC.warningFg,
-  /** Success */
+  /** Readable warning copy on light yellow */
+  streakText: ARBOL_SEMANTIC.warningText,
   success: ARBOL_SEMANTIC.successFg,
   successBg: ARBOL_SEMANTIC.successBg,
-  /** Info */
   info: ARBOL_SEMANTIC.infoFg,
   infoBg: ARBOL_SEMANTIC.infoBg,
-  /** Warning surfaces */
   warningBg: ARBOL_SEMANTIC.warningBg,
-  /** Error surfaces */
   errorBg: ARBOL_SEMANTIC.errorBg,
-  /** Borders — neutral, not blue-tinted */
-  border: 'rgba(39,39,42,0.10)',
-  borderStrong: 'rgba(39,39,42,0.18)',
-  /** Shadows — geometry unchanged; color remapped to neutral */
-  shadow: '0 2px 16px rgba(39,39,42,0.08)',
-  shadowMd: '0 4px 24px rgba(39,39,42,0.12)',
-  /** Focus ring color only */
+  border: 'rgba(24,24,27,0.14)',
+  borderStrong: 'rgba(24,24,27,0.22)',
+  shadow: '0 2px 16px rgba(24,24,27,0.10)',
+  shadowMd: '0 4px 24px rgba(24,24,27,0.14)',
   focus: ARBOL_FOCUS.brand,
   focusOuter: ARBOL_FOCUS.outer,
 } as const;

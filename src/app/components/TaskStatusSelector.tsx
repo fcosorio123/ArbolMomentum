@@ -60,7 +60,7 @@ export function TaskStatusSelector({ value, onChange }: Props) {
 
 export const TASK_STATUS_DISPLAY = {
   null: { label: 'Not started', color: C.secondary, bg: C.bgAlt },
-  inprogress: { label: 'In Progress', color: '#E9A100', bg: '#fff8ee' },
-  done: { label: 'Done', color: '#29823B', bg: '#ecfdf5' },
-  skipped: { label: 'Skipped', color: '#52A7CC', bg: '#f4f7fa' },
+  inprogress: { label: 'In Progress', color: C.streakText, bg: C.warningBg },
+  done: { label: 'Done', color: C.success, bg: C.successBg },
+  skipped: { label: 'Skipped', color: C.secondary, bg: C.bgAlt },
 } as const;

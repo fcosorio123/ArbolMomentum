@@ -451,13 +451,13 @@ export function Dashboard({
         if (bannerState === 'yellow') {
           return (
             <div data-tour-id="home-banner" style={{
-              background: '#E9A10010', border: '1.5px solid #E9A10030',
+              background: C.warningBg, border: `1.5px solid ${C.streak}55`,
               borderRadius: 18, padding: '14px 16px', marginBottom: 16,
               display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
             }}>
               <span style={{ fontSize: 22, flexShrink: 0 }}>🟡</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#E9A100', marginBottom: 2 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: C.streakText, marginBottom: 2 }}>
                   {checkedIn
                     ? "You've checked in, but still have tasks to complete"
                     : 'Progress saved - keep going on your remaining tasks'}
@@ -470,7 +470,7 @@ export function Dashboard({
               </div>
               {onNavigateTasks && (
                 <button onClick={onNavigateTasks} style={{
-                  background: '#E9A100', border: 'none', borderRadius: 10,
+                  background: C.streakText, border: 'none', borderRadius: 10,
                   padding: '8px 12px', color: '#fff', fontWeight: 700, fontSize: 12,
                   cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
                 }}>View Tasks</button>

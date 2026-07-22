@@ -28,7 +28,7 @@ function ConfettiBurst() {
 
     const W = canvas.width = canvas.offsetWidth;
     const H = canvas.height = canvas.offsetHeight;
-    const COLORS = ['#182F53', '#8E1533', '#A72D1A', '#E9A100', '#29823B', '#FFD337'];
+    const COLORS = ['#550D1F', '#8E1533', '#A72D1A', '#E9A100', '#29823B', '#FFD337'];
 
     const particles = Array.from({ length: 48 }, () => ({
       x: W / 2 + (Math.random() - 0.5) * 60,
