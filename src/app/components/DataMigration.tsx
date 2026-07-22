@@ -351,14 +351,14 @@ export function DataMigration({ onClose }: { onClose: () => void }) {
         {result && (
           <div>
             <div style={{
-              background: result.errors.length > 0 ? `${C.streak}15` : `#22c55e15`,
-              border: `1.5px solid ${result.errors.length > 0 ? C.streak : '#22c55e'}`,
+              background: result.errors.length > 0 ? `${C.streak}15` : `#29823B15`,
+              border: `1.5px solid ${result.errors.length > 0 ? C.streak : '#29823B'}`,
               borderRadius: 12, padding: 20, marginBottom: 20, textAlign: 'center',
             }}>
               {result.errors.length === 0 ? (
                 <>
-                  <CheckCircleOutlined style={{ fontSize: 48, color: '#22c55e', marginBottom: 12 }} />
-                  <h3 style={{ margin: 0, fontSize: 18, color: '#22c55e' }}>
+                  <CheckCircleOutlined style={{ fontSize: 48, color: '#29823B', marginBottom: 12 }} />
+                  <h3 style={{ margin: 0, fontSize: 18, color: '#29823B' }}>
                     Migration Successful!
                   </h3>
                   <p style={{ margin: '8px 0 0', fontSize: 16, fontWeight: 700, color: C.headline }}>

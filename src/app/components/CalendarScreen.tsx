@@ -176,11 +176,11 @@ export function CalendarScreen({ profile, onOpenReminders, onProductTour }: Prop
       <div
         data-tour-id="calendar-hero"
         style={{
-          background: `linear-gradient(135deg, ${C.headline}, #1a6da8)`,
+          background: `linear-gradient(135deg, ${C.headline}, ${C.primaryPressed})`,
           borderRadius: 16,
           padding: '18px 16px',
           marginBottom: 16,
-          boxShadow: '0 4px 20px rgba(9,64,103,0.22)',
+          boxShadow: '0 4px 20px rgba(39,39,42,0.22)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>

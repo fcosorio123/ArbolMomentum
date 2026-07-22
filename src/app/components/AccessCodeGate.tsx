@@ -39,7 +39,7 @@ export function AccessCodeGate({ onUnlock, onCancel }: Props) {
         width: '100%', maxWidth: 360,
         background: C.bgCard, borderRadius: 24,
         border: `1.5px solid ${C.border}`,
-        boxShadow: '0 8px 32px rgba(9,64,103,0.12)',
+        boxShadow: '0 8px 32px rgba(39,39,42,0.12)',
         overflow: 'hidden',
         animation: shake ? 'shake 0.4s ease' : undefined,
       }}>
@@ -54,7 +54,7 @@ export function AccessCodeGate({ onUnlock, onCancel }: Props) {
         `}</style>
 
         {/* Top accent */}
-        <div style={{ height: 5, background: `linear-gradient(90deg, ${C.primary}, #3da9fc)` }} />
+        <div style={{ height: 5, background: `linear-gradient(90deg, ${C.primary}, #8E1533)` }} />
 
         <div style={{ padding: '32px 28px 28px', textAlign: 'center' }}>
           {/* Icon */}
@@ -92,7 +92,7 @@ export function AccessCodeGate({ onUnlock, onCancel }: Props) {
               autoFocus
             />
             {error && (
-              <div style={{ fontSize: 12, color: '#ef4565', marginTop: 6, fontWeight: 500 }}>
+              <div style={{ fontSize: 12, color: '#A72D1A', marginTop: 6, fontWeight: 500 }}>
                 {error}
               </div>
             )}
@@ -105,7 +105,7 @@ export function AccessCodeGate({ onUnlock, onCancel }: Props) {
             onClick={handleSubmit}
             style={{
               borderRadius: 14, height: 50, fontSize: 15, fontWeight: 700,
-              background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
+              background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
               border: 'none', boxShadow: `0 4px 16px ${C.primary}40`,
             }}
           >

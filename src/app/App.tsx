@@ -54,15 +54,19 @@ const arbolTheme = {
   algorithm: antTheme.defaultAlgorithm,
   token: {
     colorPrimary: C.primary,
-    colorSuccess: C.primary,
+    colorSuccess: C.success,
     colorWarning: C.streak,
     colorError: C.tertiary,
+    colorInfo: C.info,
     colorBgBase: C.bg,
     colorBgContainer: C.bgCard,
     colorBgElevated: C.bgAlt,
     colorBorder: C.border,
     colorText: C.headline,
     colorTextSecondary: C.body,
+    colorLink: C.primary,
+    colorLinkHover: C.primaryDark,
+    colorLinkActive: C.primaryPressed,
     borderRadius: 12,
     borderRadiusLG: 16,
     borderRadiusSM: 8,
@@ -70,9 +74,9 @@ const arbolTheme = {
     fontSize: 15,
   },
   components: {
-    Button: { colorPrimaryHover: C.primaryDark, colorPrimaryActive: '#1076cc' },
+    Button: { colorPrimaryHover: C.primaryDark, colorPrimaryActive: C.primaryPressed },
     Switch: { colorPrimary: C.primary },
-    Progress: { colorSuccess: C.primary },
+    Progress: { colorSuccess: C.success },
     Modal: { colorBgElevated: C.bg },
     Input: {
       colorBgContainer: C.bgAlt, colorBorder: C.border,
@@ -189,7 +193,7 @@ export default function App() {
     setLink('manifest', `${appBase}manifest.json`);
 
     // Universal PWA meta
-    setMeta('theme-color', '#094067');
+    setMeta('theme-color', '#182F53');
     setMeta('color-scheme', 'light');
     setMeta('application-name', 'Momentum');
 
@@ -213,8 +217,8 @@ export default function App() {
 
       // Gradient background
       const grad = ctx.createLinearGradient(0, 0, size, size);
-      grad.addColorStop(0, '#094067');
-      grad.addColorStop(1, '#1a6da8');
+      grad.addColorStop(0, '#182F53');
+      grad.addColorStop(1, C.primaryPressed);
       ctx.fillStyle = grad;
 
       // Rounded rectangle (22% radius)
@@ -271,7 +275,7 @@ export default function App() {
       display: 'standalone',
       orientation: 'portrait-primary',
       background_color: '#f0f4f8',
-      theme_color: '#094067',
+      theme_color: '#182F53',
       icons: [
         { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any' },
         { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
@@ -616,7 +620,7 @@ export default function App() {
         <AntdApp message={{ maxCount: 3, duration: 2.5 }}>
           {isDesktop ? (
             <div style={{ minHeight: '100dvh', background: C.bgAlt, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '32px' }}>
-              <div style={{ width: '100%', maxWidth: 900, background: C.bg, borderRadius: 24, overflow: 'hidden', boxShadow: '0 8px 48px rgba(9,64,103,0.13)', minHeight: 'calc(100vh - 64px)' }}>
+              <div style={{ width: '100%', maxWidth: 900, background: C.bg, borderRadius: 24, overflow: 'hidden', boxShadow: '0 8px 48px rgba(39,39,42,0.13)', minHeight: 'calc(100vh - 64px)' }}>
                 <AdminView onBack={() => setShowAdmin(false)} />
               </div>
             </div>
@@ -641,7 +645,7 @@ export default function App() {
           <AntdApp message={{ maxCount: 3, duration: 2.5 }}>
             {isDesktop ? (
               <div style={{ minHeight: '100dvh', background: C.bgAlt, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ width: '100%', maxWidth: 480, background: C.bg, borderRadius: 24, overflow: 'hidden', boxShadow: '0 8px 48px rgba(9,64,103,0.13)' }}>
+                <div style={{ width: '100%', maxWidth: 480, background: C.bg, borderRadius: 24, overflow: 'hidden', boxShadow: '0 8px 48px rgba(39,39,42,0.13)' }}>
                   <AccessCodeGate onUnlock={unlockProfileSelector} />
                 </div>
               </div>
@@ -657,7 +661,7 @@ export default function App() {
         <AntdApp message={{ maxCount: 3, duration: 2.5 }}>
           {isDesktop ? (
             <div style={{ minHeight: '100dvh', background: C.bgAlt, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ width: '100%', maxWidth: 480, background: C.bg, borderRadius: 24, overflow: 'hidden', boxShadow: '0 8px 48px rgba(9,64,103,0.13)' }}>
+              <div style={{ width: '100%', maxWidth: 480, background: C.bg, borderRadius: 24, overflow: 'hidden', boxShadow: '0 8px 48px rgba(39,39,42,0.13)' }}>
                 <ProfileSelector onSelect={handleSelectProfile} onAdmin={() => setShowAdmin(true)} />
               </div>
             </div>
@@ -801,7 +805,7 @@ export default function App() {
               <div style={{
                 width: '100%', maxWidth: 520,
                 background: C.bg, borderRadius: 24, overflow: 'hidden',
-                boxShadow: '0 8px 48px rgba(9,64,103,0.12)',
+                boxShadow: '0 8px 48px rgba(39,39,42,0.12)',
                 minHeight: 'calc(100vh - 64px)',
               }}>
                 {tabContent}
@@ -916,7 +920,7 @@ export default function App() {
               position: 'fixed', bottom: isDesktop ? 24 : 'calc(72px + env(safe-area-inset-bottom, 0px) + 8px)', left: isDesktop ? 'auto' : 16, right: isDesktop ? 24 : 16, zIndex: 200, maxWidth: isDesktop ? 380 : undefined,
               background: C.bgCard, border: `1.5px solid ${C.primary}40`,
               borderRadius: 18, padding: '16px 18px',
-              boxShadow: '0 8px 32px rgba(9,64,103,0.15)',
+              boxShadow: '0 8px 32px rgba(39,39,42,0.15)',
               display: 'flex', alignItems: 'center', gap: 12,
             }}>
               <span style={{ fontSize: 28 }}>🔔</span>

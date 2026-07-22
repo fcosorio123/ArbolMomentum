@@ -19,8 +19,12 @@ import { AiAssistCreationModal } from './AiAssistCreationModal';
 import { isAiAssistCreationEnabled } from '../data/environment';
 import { trackEvent } from '../data/deviceAnalytics';
 import { ONBOARDING_TOUR_VERSION } from '../data/productOnboarding';
-import { C } from '../data/colors';
+import { C, accentColorForId } from '../data/colors';
 import type { Profile } from '../data/profiles';
+
+function goalAccent(goalId: string) {
+  return accentColorForId(goalId);
+}
 
 function getWeekDays(): Array<{ label: string; short: string; dateKey: string; isToday: boolean }> {
   const now = new Date();
@@ -126,11 +130,6 @@ function suggestTasksForGoal(goal: PersonalGoal): Array<{ label: string; timeOfD
     { label: 'Identify the next step forward', timeOfDay: 'morning' as const },
     { label: "Reflect on today's progress", timeOfDay: 'evening' as const },
   ];
-}
-
-const ACCENT_COLORS = ['#3da9fc', '#2cb67d', '#7c3aed', '#ef4565', '#f5a623', '#094067', '#e85d04', '#90b4ce'];
-function goalAccent(goalId: string) {
-  return ACCENT_COLORS[Math.abs(goalId.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % ACCENT_COLORS.length];
 }
 
 export function GoalsPage({
@@ -328,7 +327,7 @@ export function GoalsPage({
               data-tour-id="goals-add-btn"
               onClick={() => { setEditingGoal(null); setManageGoalOpen(true); }}
               style={{
-                background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
+                background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
                 border: 'none', borderRadius: 12, padding: '12px 24px',
                 color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
                 display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -389,10 +388,10 @@ export function GoalsPage({
         <div
           onClick={goToLinkedTasks}
           style={{
-            marginTop: 24, background: `linear-gradient(135deg, ${C.headline}, #1a6da8)`,
+            marginTop: 24, background: `linear-gradient(135deg, ${C.headline}, ${C.primaryPressed})`,
             borderRadius: 14, padding: '14px 18px', cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 12,
-            boxShadow: '0 4px 16px rgba(9,64,103,0.18)',
+            boxShadow: '0 4px 16px rgba(39,39,42,0.18)',
           }}
         >
           <span style={{ fontSize: 20 }}>✅</span>
@@ -427,7 +426,7 @@ export function GoalsPage({
         {fabMenuOpen && (
           <div
             onClick={() => setFabMenuOpen(false)}
-            style={{ position: 'fixed', inset: 0, zIndex: 47, background: 'rgba(9,64,103,0.18)' }}
+            style={{ position: 'fixed', inset: 0, zIndex: 47, background: 'rgba(39,39,42,0.18)' }}
           />
         )}
         {fabMenuOpen && (
@@ -468,10 +467,10 @@ export function GoalsPage({
           style={{
             position: 'fixed', bottom: 'calc(72px + env(safe-area-inset-bottom, 0px) + 12px)', right: 20, zIndex: 48,
             width: 52, height: 52, borderRadius: '50%',
-            background: `linear-gradient(135deg, #ef4565, #f5a623)`,
+            background: `linear-gradient(135deg, #A72D1A, #E9A100)`,
             border: 'none', cursor: 'pointer', color: '#fff', fontSize: 22,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 6px 24px #ef456540',
+            boxShadow: '0 6px 24px #A72D1A40',
           }}
           title="Add a new goal"
         >
@@ -534,7 +533,7 @@ export function GoalsPage({
       >
         {suggestionGoal && (
           <>
-            <div style={{ height: 5, background: `linear-gradient(90deg, ${goalAccent(suggestionGoal.id)}, #3da9fc)` }} />
+            <div style={{ height: 5, background: `linear-gradient(90deg, ${goalAccent(suggestionGoal.id)}, #8E1533)` }} />
             <div style={{ padding: '22px 24px 24px' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: C.primary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
                 Goal created! 🎯
@@ -593,7 +592,7 @@ export function GoalsPage({
                 onClick={closeSuggestions}
                 style={{
                   borderRadius: 12, height: 46,
-                  background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
+                  background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
                   border: 'none', fontWeight: 700,
                 }}
               >
@@ -650,7 +649,7 @@ function BreakdownPills({ b, accent }: { b: TaskBreakdown; accent: string }) {
         </span>
       )}
       {b.inprogress > 0 && (
-        <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6, background: '#f5a62318', color: '#f5a623' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6, background: '#E9A10018', color: '#E9A100' }}>
           ◑ {b.inprogress} in progress
         </span>
       )}

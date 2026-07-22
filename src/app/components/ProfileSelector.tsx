@@ -88,7 +88,7 @@ export function ProfileSelector({ onSelect, onAdmin }: Props) {
     }}>
       {/* Header */}
       <div style={{
-        background: `linear-gradient(160deg, ${C.headline} 0%, #1a6da8 100%)`,
+        background: `linear-gradient(160deg, ${C.headline} 0%, ${C.primaryPressed} 100%)`,
         padding: '56px 24px 40px',
         position: 'relative',
         overflow: 'hidden',
@@ -96,7 +96,7 @@ export function ProfileSelector({ onSelect, onAdmin }: Props) {
         <div style={{
           position: 'absolute', top: -40, right: -40,
           width: 200, height: 200, borderRadius: '50%',
-          background: 'rgba(61,169,252,0.15)',
+          background: 'rgba(142,21,51,0.15)',
         }} />
         <div style={{
           position: 'absolute', bottom: -20, left: 20,

@@ -389,7 +389,7 @@ function OverviewTab() {
                           <div style={{ fontSize: 20 }}>{isNeutral ? '➡️' : isPositive ? '📈' : '📉'}</div>
                           <div style={{
                             fontSize: 16, fontWeight: 700,
-                            color: isNeutral ? C.secondary : isPositive ? '#22c55e' : C.tertiary
+                            color: isNeutral ? C.secondary : isPositive ? '#29823B' : C.tertiary
                           }}>
                             {isPositive ? '+' : ''}{diff}%
                           </div>
@@ -1257,7 +1257,7 @@ type OSFilter = 'all' | 'Android' | 'iOS' | 'Desktop';
 type InstallFilter = 'all' | 'installed' | 'browser';
 
 function notifStatus(record: DeviceRecord): { label: string; icon: string; color: string } {
-  if (record.notifPermission === 'granted') return { label: 'Enabled', icon: '✅', color: '#22c55e' };
+  if (record.notifPermission === 'granted') return { label: 'Enabled', icon: '✅', color: '#29823B' };
   if (record.notifPermission === 'denied') return { label: 'Blocked', icon: '❌', color: C.tertiary };
   if (record.notifPermission === 'unsupported') return { label: 'No support', icon: '🚫', color: C.secondary };
   return { label: 'Not set', icon: '⚠️', color: C.streak };
@@ -1770,13 +1770,13 @@ function PersonalGoalsTab() {
                   {goal && (
                     <div style={{
                       marginBottom: 10, padding: '8px 12px', borderRadius: 10,
-                      background: '#ef456508', border: '1.5px solid #ef456525',
+                      background: '#A72D1A08', border: '1.5px solid #A72D1A25',
                       display: 'flex', alignItems: 'center', gap: 8,
                     }}>
                       <span style={{ fontSize: 16 }}>⭐</span>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 11, color: C.secondary, marginBottom: 2 }}>Goal</div>
-                        <div style={{ fontSize: 14, color: '#ef4565', fontWeight: 700 }}>{goal.title}</div>
+                        <div style={{ fontSize: 14, color: '#A72D1A', fontWeight: 700 }}>{goal.title}</div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: 10, color: C.secondary }}>Progress</div>
@@ -1813,9 +1813,9 @@ function PersonalGoalsTab() {
                   {log.milestoneHit && (
                     <div style={{
                       marginTop: 8, padding: '8px 10px', borderRadius: 8,
-                      background: '#22c55e15', border: '1px solid #22c55e',
+                      background: '#29823B15', border: '1px solid #29823B',
                     }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#22c55e' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#29823B' }}>
                         🏆 Milestone completed!
                       </div>
                     </div>
@@ -2435,7 +2435,7 @@ export function AdminView({ onBack }: Props) {
   return (
     <div style={{ minHeight: '100dvh', background: C.bg, width: '100%', maxWidth: 'min(100vw, 900px)', margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
       {/* Header */}
-      <div style={{ background: `linear-gradient(160deg, ${C.headline} 0%, #1a6da8 100%)`, padding: 'max(52px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 20px' }}>
+      <div style={{ background: `linear-gradient(160deg, ${C.headline} 0%, ${C.primaryPressed} 100%)`, padding: 'max(52px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <Button icon={<ArrowLeftOutlined />} type="text" onClick={onBack}
             style={{ color: 'rgba(255,255,255,0.8)', paddingLeft: 0 }}>
@@ -2471,13 +2471,13 @@ export function AdminView({ onBack }: Props) {
       {/* Environment Banner */}
       {isPublishedVersion() ? (
         <div style={{
-          background: '#22c55e15', border: '1.5px solid #22c55e',
+          background: '#29823B15', border: '1.5px solid #29823B',
           padding: '12px 16px', margin: '16px 16px 0',
           borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10,
         }}>
-          <InfoCircleOutlined style={{ color: '#22c55e', fontSize: 16 }} />
+          <InfoCircleOutlined style={{ color: '#29823B', fontSize: 16 }} />
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#22c55e', marginBottom: 2 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#29823B', marginBottom: 2 }}>
               📊 Published Version - Data Collection Active
             </div>
             <div style={{ fontSize: 11, color: C.body }}>

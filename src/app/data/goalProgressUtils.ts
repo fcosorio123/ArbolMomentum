@@ -8,14 +8,13 @@ import {
   type GoalTaskBreakdown,
 } from './goalTaskResolution';
 import { applyTaskStatusUpdate } from './taskStatusPipeline';
+import { accentColorForId } from './colors';
 
 export type { GoalTaskBreakdown };
 export { getGoalTaskBreakdown };
 
-const ACCENT_COLORS = ['#3da9fc', '#2cb67d', '#7c3aed', '#ef4565', '#f5a623', '#094067', '#e85d04', '#90b4ce'];
-
 export function getGoalAccentColor(goalId: string): string {
-  return ACCENT_COLORS[Math.abs(goalId.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % ACCENT_COLORS.length];
+  return accentColorForId(goalId);
 }
 
 export function getGoalProgressPercent(profileId: string, goal: PersonalGoal, dateKey = getTodayKey()): number {

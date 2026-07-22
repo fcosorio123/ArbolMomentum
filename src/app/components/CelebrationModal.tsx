@@ -21,14 +21,14 @@ export function CelebrationModal({ open, streak, newBadges, onClose, onViewWeek 
       particleCount: 140,
       spread: 90,
       origin: { y: 0.55 },
-      colors: ['#3da9fc', '#094067', '#f5a623', '#ef4565', '#90b4ce', '#ffffff'],
+      colors: ['#8E1533', '#182F53', '#E9A100', '#A72D1A', '#52A7CC', '#ffffff'],
     });
     const t = setTimeout(() => {
       confetti({
         particleCount: 60,
         spread: 60,
         origin: { y: 0.4, x: 0.2 },
-        colors: ['#f5a623', '#3da9fc'],
+        colors: ['#E9A100', '#8E1533'],
       });
     }, 400);
     return () => clearTimeout(t);
@@ -45,7 +45,7 @@ export function CelebrationModal({ open, streak, newBadges, onClose, onViewWeek 
       closable={false}
       styles={{
         content: { borderRadius: 24, padding: 0, overflow: 'hidden', maxWidth: 340, margin: '0 auto' },
-        mask: { backdropFilter: 'blur(8px)', background: 'rgba(9,64,103,0.35)' },
+        mask: { backdropFilter: 'blur(8px)', background: 'rgba(39,39,42,0.35)' },
       }}
     >
       <div style={{ padding: '36px 24px 28px', textAlign: 'center' }}>
@@ -110,7 +110,7 @@ export function CelebrationModal({ open, streak, newBadges, onClose, onViewWeek 
             onClick={() => { onViewWeek(); onClose(); }}
             style={{
               height: 50, borderRadius: 14,
-              background: `linear-gradient(135deg, ${C.headline}, #1a6da8)`,
+              background: `linear-gradient(135deg, ${C.headline}, ${C.primaryPressed})`,
               border: 'none', fontSize: 15, fontWeight: 700,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}

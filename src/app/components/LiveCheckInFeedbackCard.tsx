@@ -55,7 +55,7 @@ function LiveCheckInHelpModal({ open, onClose }: { open: boolean; onClose: () =>
       destroyOnClose
       styles={ACCENT_MODAL_STYLES}
     >
-      <ModalAccentBar gradient={`linear-gradient(90deg, ${C.primary}, #3da9fc)`} />
+      <ModalAccentBar gradient={`linear-gradient(90deg, ${C.primary}, #8E1533)`} />
       <div style={{ padding: '16px 24px 24px' }}>
         <h3 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 800, color: C.headline }}>
           How to read Live check-in
@@ -111,7 +111,7 @@ function LiveCheckInHelpModal({ open, onClose }: { open: boolean; onClose: () =>
           onClick={onClose}
           style={{
             marginTop: 18, height: 46, borderRadius: 12, fontWeight: 700, border: 'none',
-            background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
+            background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
           }}
         >
           Got it

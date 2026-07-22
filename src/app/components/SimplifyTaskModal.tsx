@@ -426,9 +426,9 @@ export function SimplifyTaskModal({
       destroyOnClose
       styles={ACCENT_MODAL_STYLES}
     >
-      <ModalAccentBar gradient="linear-gradient(90deg, #7c3aed, #3da9fc)" />
+      <ModalAccentBar gradient="linear-gradient(90deg, #550D0E, #8E1533)" />
       <div style={{ padding: '16px 24px 24px', maxHeight: 'min(80vh, 720px)', overflowY: 'auto' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#550D0E', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
           Simplify for me
         </div>
         <h3 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 800, color: C.headline }}>
@@ -497,8 +497,8 @@ export function SimplifyTaskModal({
                             textAlign: 'left',
                             padding: '10px 12px',
                             borderRadius: 10,
-                            border: `1.5px solid ${active ? '#7c3aed' : C.border}`,
-                            background: active ? '#7c3aed12' : '#fff',
+                            border: `1.5px solid ${active ? '#550D0E' : C.border}`,
+                            background: active ? '#550D0E12' : '#fff',
                             cursor: 'pointer',
                             fontSize: 13,
                             color: C.headline,
@@ -554,7 +554,7 @@ export function SimplifyTaskModal({
                 loading={loading || detailLoading}
                 disabled={!canNext && step === 0}
                 onClick={handleNext}
-                style={{ borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none', background: '#7c3aed' }}
+                style={{ borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none', background: '#550D0E' }}
               >
                 {isLastQuestion ? (error ? 'Retry' : 'Suggest simpler tasks') : 'Next'}
               </Button>
@@ -681,7 +681,7 @@ export function SimplifyTaskModal({
                 type="primary"
                 disabled={selected.size === 0}
                 onClick={handleConfirm}
-                style={{ borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none', background: '#7c3aed' }}
+                style={{ borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none', background: '#550D0E' }}
               >
                 Replace with {selected.size} task{selected.size !== 1 ? 's' : ''}
               </Button>

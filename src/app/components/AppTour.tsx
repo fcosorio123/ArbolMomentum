@@ -118,7 +118,7 @@ export function sortTourStepsTopToBottom(steps: PageTourStep[]): PageTourStep[] 
 }
 
 const HIGHLIGHT_PAD = 10;
-const MASK_COLOR = 'rgba(9, 64, 103, 0.62)';
+const MASK_COLOR = 'rgba(39, 39, 42, 0.62)';
 const MASK_ID = 'arbol-tour-spotlight-mask';
 const VIEWPORT_MARGIN = 12;
 
@@ -402,8 +402,8 @@ function TourTooltip({
         maxHeight: `calc(${viewportHeight()}px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - ${VIEWPORT_MARGIN * 2}px)`,
         background: '#fff',
         borderRadius: 18,
-        boxShadow: '0 12px 40px rgba(9,64,103,0.22), 0 2px 8px rgba(9,64,103,0.08)',
-        border: '1px solid rgba(9,64,103,0.1)',
+        boxShadow: '0 12px 40px rgba(39,39,42,0.22), 0 2px 8px rgba(39,39,42,0.08)',
+        border: '1px solid rgba(39,39,42,0.1)',
         animation: 'arbolTourCardIn 0.22s ease',
         pointerEvents: 'auto',
         display: 'flex',
@@ -454,7 +454,7 @@ function TourTooltip({
               style={{
                 marginTop: 14,
                 display: 'inline-flex', alignItems: 'center', gap: 6,
-                background: 'linear-gradient(135deg, #ef4565, #f5a623)',
+                background: 'linear-gradient(135deg, #A72D1A, #E9A100)',
                 border: 'none', borderRadius: 10,
                 padding: '8px 14px', cursor: 'pointer',
                 color: '#fff', fontSize: 12, fontWeight: 700,
@@ -468,7 +468,7 @@ function TourTooltip({
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         gap: 10, padding: '14px 18px calc(16px + env(safe-area-inset-bottom, 0px))',
-        borderTop: '1px solid rgba(9,64,103,0.08)',
+        borderTop: '1px solid rgba(39,39,42,0.08)',
         flexShrink: 0,
         background: '#fff',
       }}>
@@ -485,7 +485,7 @@ function TourTooltip({
             border: 'none', borderRadius: 999, padding: '9px 18px',
             background: C.headline, color: '#fff',
             fontSize: 13, fontWeight: 700, cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(9,64,103,0.25)',
+            boxShadow: '0 4px 12px rgba(39,39,42,0.25)',
           }}
         >
           {isLast ? 'Done' : 'Next'}
@@ -507,7 +507,7 @@ function injectTourStyles() {
     }
     .arbol-tour-skip-btn {
       background: none; border: none; padding: 0;
-      font-size: 12px; font-weight: 600; color: #90b4ce;
+      font-size: 12px; font-weight: 600; color: #52A7CC;
       cursor: pointer;
     }
     .arbol-tour-skip-btn:hover { color: #5f6c7b; }
@@ -722,7 +722,7 @@ export function PageTour({
           display: 'flex', flexDirection: 'column',
           maxHeight: 'min(90vh, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px))',
         }}>
-          <div style={{ height: 4, background: `linear-gradient(90deg, ${C.primary}, #3da9fc)` }} />
+          <div style={{ height: 4, background: `linear-gradient(90deg, ${C.primary}, #8E1533)` }} />
           <div style={{
             padding: '24px 20px calc(20px + env(safe-area-inset-bottom, 0px))',
             textAlign: 'center', overflowY: 'auto', flex: 1, minHeight: 0,
@@ -740,7 +740,7 @@ export function PageTour({
               onClick={() => setShowDone(false)}
               style={{
                 borderRadius: 12, height: 44, fontWeight: 700,
-                background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
+                background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
                 border: 'none', fontSize: 14,
               }}
             >

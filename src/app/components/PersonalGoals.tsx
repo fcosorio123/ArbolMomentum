@@ -150,7 +150,7 @@ export function PersonalGoals({ profileId, onBack, onNavigateTasks }: Props) {
   return (
     <div style={{ minHeight: '100dvh', background: C.bg, maxWidth: 430, margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
       {/* Header */}
-      <div style={{ background: `linear-gradient(160deg, #ef4565 0%, #f5a623 100%)`, padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 12px)) 16px 20px' }}>
+      <div style={{ background: `linear-gradient(160deg, #A72D1A 0%, #E9A100 100%)`, padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 12px)) 16px 20px' }}>
         <Button icon={<ArrowLeftOutlined />} type="text" onClick={onBack}
           style={{ color: 'rgba(255,255,255,0.8)', marginBottom: 12, paddingLeft: 0 }}>
           Back
@@ -215,7 +215,7 @@ export function PersonalGoals({ profileId, onBack, onNavigateTasks }: Props) {
                   <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
                     <Progress
                       type="circle" percent={pct} size={58} strokeWidth={9}
-                      strokeColor={{ '0%': '#ef4565', '100%': '#f5a623' }}
+                      strokeColor={{ '0%': '#A72D1A', '100%': '#E9A100' }}
                       railColor={C.bgAlt}
                       format={p => (
                         <span style={{ fontSize: 11, fontWeight: 800, color: C.headline }}>
@@ -233,7 +233,7 @@ export function PersonalGoals({ profileId, onBack, onNavigateTasks }: Props) {
                 <div style={{ marginTop: 14 }}>
                   <Progress
                     percent={pct}
-                    strokeColor={{ '0%': '#ef4565', '100%': '#f5a623' }}
+                    strokeColor={{ '0%': '#A72D1A', '100%': '#E9A100' }}
                     railColor={C.bgAlt}
                     showInfo={false}
                     size={['100%', 7]}
@@ -430,7 +430,7 @@ export function PersonalGoals({ profileId, onBack, onNavigateTasks }: Props) {
                         }}
                         style={{
                           width: '100%', borderRadius: 10, fontSize: 13, fontWeight: 700,
-                          background: `linear-gradient(135deg, #ef4565, #f5a623)`,
+                          background: `linear-gradient(135deg, #A72D1A, #E9A100)`,
                           border: 'none', height: 40,
                         }}
                       >
@@ -440,9 +440,9 @@ export function PersonalGoals({ profileId, onBack, onNavigateTasks }: Props) {
                   )}
 
                   {!currentMilestone && (
-                    <div style={{ padding: '12px', borderRadius: 10, textAlign: 'center', background: '#22c55e15', border: '1px solid #22c55e' }}>
+                    <div style={{ padding: '12px', borderRadius: 10, textAlign: 'center', background: '#29823B15', border: '1px solid #29823B' }}>
                       <div style={{ fontSize: 24, marginBottom: 6 }}>🎉</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#22c55e' }}>All milestones completed!</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#29823B' }}>All milestones completed!</div>
                     </div>
                   )}
                 </div>
@@ -459,7 +459,7 @@ export function PersonalGoals({ profileId, onBack, onNavigateTasks }: Props) {
                         Today's Tasks
                       </span>
                       {allGoalTasks.length > 0 && (
-                        <span style={{ fontSize: 11, color: todayDoneCount === allGoalTasks.length ? '#22c55e' : C.secondary, fontWeight: 600 }}>
+                        <span style={{ fontSize: 11, color: todayDoneCount === allGoalTasks.length ? '#29823B' : C.secondary, fontWeight: 600 }}>
                           {todayDoneCount}/{allGoalTasks.length} done
                         </span>
                       )}
@@ -641,7 +641,7 @@ export function PersonalGoals({ profileId, onBack, onNavigateTasks }: Props) {
                 <div style={{ fontSize: 18, fontWeight: 700, color: C.headline, marginBottom: 8 }}>{completedMilestone.goal.title}</div>
                 <Progress
                   percent={Math.min(100, Math.round((completedMilestone.goal.currentValue / completedMilestone.goal.targetValue) * 100))}
-                  strokeColor={{ '0%': '#ef4565', '100%': '#f5a623' }}
+                  strokeColor={{ '0%': '#A72D1A', '100%': '#E9A100' }}
                   railColor={C.bgAlt} showInfo={false} size={['100%', 8]}
                 />
               </div>
@@ -652,7 +652,7 @@ export function PersonalGoals({ profileId, onBack, onNavigateTasks }: Props) {
               <Button
                 block type="primary" size="large"
                 onClick={() => { setCelebrationVisible(false); setCompletedMilestone(null); onNavigateTasks?.(); }}
-                style={{ borderRadius: 12, height: 48, fontSize: 15, fontWeight: 600, background: `linear-gradient(135deg, #ef4565, #f5a623)`, border: 'none' }}
+                style={{ borderRadius: 12, height: 48, fontSize: 15, fontWeight: 600, background: `linear-gradient(135deg, #A72D1A, #E9A100)`, border: 'none' }}
               >
                 Continue Journey →
               </Button>

@@ -99,7 +99,7 @@ export function FeedbackModal({ open, profileId, onSubmit, onLater }: Props) {
           width: 'min(360px, calc(100vw - 24px))',
           margin: '0 auto',
         },
-        mask: { backdropFilter: 'blur(6px)', background: 'rgba(9,64,103,0.25)' },
+        mask: { backdropFilter: 'blur(6px)', background: 'rgba(39,39,42,0.25)' },
       }}
     >
       {step === 'success' ? (
@@ -130,7 +130,7 @@ export function FeedbackModal({ open, profileId, onSubmit, onLater }: Props) {
               onClick={() => setStep('form')}
               style={{
                 width: '100%', padding: 14, borderRadius: 14, border: 'none',
-                background: `linear-gradient(135deg, ${C.headline}, #1a6da8)`,
+                background: `linear-gradient(135deg, ${C.headline}, ${C.primaryPressed})`,
                 color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
               }}
             >
@@ -153,7 +153,7 @@ export function FeedbackModal({ open, profileId, onSubmit, onLater }: Props) {
         <div>
           {/* Header */}
           <div style={{
-            background: `linear-gradient(135deg, ${C.headline} 0%, #1a6da8 100%)`,
+            background: `linear-gradient(135deg, ${C.headline} 0%, ${C.primaryPressed} 100%)`,
             padding: '20px 24px 18px',
           }}>
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#fff' }}>
@@ -309,7 +309,7 @@ export function FeedbackModal({ open, profileId, onSubmit, onLater }: Props) {
               disabled={!rating}
               style={{
                 width: '100%', padding: 14, borderRadius: 14, border: 'none', cursor: rating ? 'pointer' : 'not-allowed',
-                background: rating ? `linear-gradient(135deg, ${C.headline}, #1a6da8)` : C.bgAlt,
+                background: rating ? `linear-gradient(135deg, ${C.headline}, ${C.primaryPressed})` : C.bgAlt,
                 color: rating ? '#fff' : C.secondary, fontSize: 15, fontWeight: 700, marginBottom: 10,
                 transition: 'all 0.2s',
               }}

@@ -234,7 +234,7 @@ export function ManageTaskModal({
       width="min(420px, calc(100vw - 24px))"
       styles={ACCENT_MODAL_STYLES}
     >
-      <ModalAccentBar gradient="linear-gradient(90deg, #ef4565, #f5a623)" />
+      <ModalAccentBar gradient="linear-gradient(90deg, #A72D1A, #E9A100)" />
       <div style={{ padding: '16px 24px 24px', maxHeight: '85vh', overflowY: 'auto' }}>
         <h3 style={{ margin: '0 0 18px', fontSize: 17, fontWeight: 800, color: C.headline }}>
           {isEdit ? 'Edit Task' : 'Add Task'}
@@ -243,7 +243,7 @@ export function ManageTaskModal({
         {/* Task name */}
         <div style={{ marginBottom: 14 }}>
           <label style={{ fontSize: 12, fontWeight: 700, color: C.secondary, display: 'block', marginBottom: 6 }}>
-            Task name <span style={{ color: '#ef4565' }}>*</span>
+            Task name <span style={{ color: '#A72D1A' }}>*</span>
           </label>
           <Input
             value={label}
@@ -395,7 +395,7 @@ export function ManageTaskModal({
               <div style={{ fontSize: 11, color: C.secondary, marginBottom: 8 }}>Select days</div>
               <WeekdayPicker value={weekdays} onChange={setWeekdays} />
               {weekdays.length === 0 && (
-                <div style={{ fontSize: 11, color: '#ef4565', marginTop: 6 }}>Select at least one day</div>
+                <div style={{ fontSize: 11, color: '#A72D1A', marginTop: 6 }}>Select at least one day</div>
               )}
             </div>
           )}
@@ -406,7 +406,7 @@ export function ManageTaskModal({
               <div style={{ fontSize: 11, color: C.secondary, marginBottom: 8 }}>Select dates of month</div>
               <MonthDatePicker value={monthDates} onChange={setMonthDates} />
               {monthDates.length === 0 && (
-                <div style={{ fontSize: 11, color: '#ef4565', marginTop: 6 }}>Select at least one date</div>
+                <div style={{ fontSize: 11, color: '#A72D1A', marginTop: 6 }}>Select at least one date</div>
               )}
               <div style={{ fontSize: 10, color: C.secondary, marginTop: 8, lineHeight: 1.4 }}>
                 Note: if a month doesn't have a selected date (e.g. 31st), that month will be skipped.
@@ -429,7 +429,7 @@ export function ManageTaskModal({
                 }}
               />
               {!specificDate && (
-                <div style={{ fontSize: 11, color: '#ef4565', marginTop: 6 }}>Pick a date</div>
+                <div style={{ fontSize: 11, color: '#A72D1A', marginTop: 6 }}>Pick a date</div>
               )}
             </div>
           )}
@@ -485,7 +485,7 @@ export function ManageTaskModal({
           <Button block type="primary" disabled={!valid} onClick={handleSave}
             style={{
               borderRadius: 12, height: 46, flex: 2,
-              background: valid ? `linear-gradient(135deg, #ef4565, #f5a623)` : undefined,
+              background: valid ? `linear-gradient(135deg, #A72D1A, #E9A100)` : undefined,
               border: 'none', fontWeight: 700,
             }}>
             {confirmLabel ?? (isEdit ? 'Save Changes' : 'Save Task')}

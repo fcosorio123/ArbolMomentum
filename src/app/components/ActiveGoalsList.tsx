@@ -111,7 +111,7 @@ export function ActiveGoalsList({ profileId, onNavigateGoals }: Props) {
                 onNavigateGoals();
               }}
               style={{
-                background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
+                background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
                 border: 'none', borderRadius: 10, padding: '8px 14px',
                 color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer',
               }}

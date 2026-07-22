@@ -300,7 +300,7 @@ export function ContextAssistModal({ open, onClose, mode, existingGoals = [], on
       destroyOnClose
       styles={ACCENT_MODAL_STYLES}
     >
-      <ModalAccentBar gradient={`linear-gradient(90deg, ${C.primary}, #1a6da8)`} />
+      <ModalAccentBar gradient={`linear-gradient(90deg, ${C.primary}, ${C.primaryPressed})`} />
       <div style={{ padding: '16px 22px 18px' }}>
         {step === 'kind' && (
           <>
@@ -520,7 +520,7 @@ export function ContextAssistModal({ open, onClose, mode, existingGoals = [], on
             {aiFallbackWarning && (
               <div style={{
                 marginBottom: 12, padding: '10px 12px', borderRadius: 10,
-                background: '#fff8e6', border: '1px solid #f5a62350', fontSize: 12, color: '#8a6d00', lineHeight: 1.45,
+                background: '#fff8e6', border: '1px solid #E9A10050', fontSize: 12, color: '#8a6d00', lineHeight: 1.45,
               }}>
                 {parseReason === 'llm_unavailable' || parseReason === 'rate_limited'
                   ? 'AI assist is temporarily unavailable (missing key, rate limit, or model error). Showing rule-based suggestions - review carefully, then confirm.'

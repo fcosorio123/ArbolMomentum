@@ -111,10 +111,10 @@ function streakMotivation(streak: number, completionPct: number): string {
 
 function heatColor(count: number, isFuture: boolean, isToday: boolean): string {
   if (isFuture) return 'rgba(0,0,0,0.04)';
-  if (count === 0) return isToday ? 'rgba(9,64,103,0.10)' : 'rgba(0,0,0,0.06)';
-  if (count === 1) return '#4ade80aa';
-  if (count === 2) return '#22c55e';
-  return '#15803d';
+  if (count === 0) return isToday ? 'rgba(39,39,42,0.10)' : 'rgba(0,0,0,0.06)';
+  if (count === 1) return '#73C982aa';
+  if (count === 2) return '#29823B';
+  return '#1E612A';
 }
 
 function DashboardSkeleton() {
@@ -396,7 +396,7 @@ export function Dashboard({
             {onNavigateGoals && (
               <button type="button" onClick={onNavigateGoals} style={{
                 ...touchPrimaryButton, padding: '8px 14px', borderRadius: 10, border: 'none',
-                background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`, color: '#fff',
+                background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`, color: '#fff',
                 fontWeight: 700, fontSize: 12, cursor: 'pointer',
               }}>
                 Create a goal
@@ -425,13 +425,13 @@ export function Dashboard({
           const count = checkInGoals.length;
           return (
             <div data-tour-id="home-banner" style={{
-              background: '#ef456510', border: '1.5px solid #ef456530',
+              background: '#A72D1A10', border: '1.5px solid #A72D1A30',
               borderRadius: 18, padding: '14px 16px', marginBottom: 16,
               display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
             }}>
               <span style={{ fontSize: 22, flexShrink: 0 }}>🔴</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#ef4565', marginBottom: 2 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#A72D1A', marginBottom: 2 }}>
                   {count > 0 ? `${count} goal${count !== 1 ? 's' : ''} need check-in` : "You haven't checked in today"}
                 </div>
                 <div style={{ fontSize: 11, color: C.body, lineHeight: 1.4 }}>
@@ -440,7 +440,7 @@ export function Dashboard({
               </div>
               {onStartCheckIn && (
                 <button onClick={onStartCheckIn} style={{
-                  background: '#ef4565', border: 'none', borderRadius: 10,
+                  background: '#A72D1A', border: 'none', borderRadius: 10,
                   padding: '8px 12px', color: '#fff', fontWeight: 700, fontSize: 12,
                   cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
                 }}>Start Check-in</button>
@@ -451,13 +451,13 @@ export function Dashboard({
         if (bannerState === 'yellow') {
           return (
             <div data-tour-id="home-banner" style={{
-              background: '#f5a62310', border: '1.5px solid #f5a62330',
+              background: '#E9A10010', border: '1.5px solid #E9A10030',
               borderRadius: 18, padding: '14px 16px', marginBottom: 16,
               display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
             }}>
               <span style={{ fontSize: 22, flexShrink: 0 }}>🟡</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#f5a623', marginBottom: 2 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#E9A100', marginBottom: 2 }}>
                   {checkedIn
                     ? "You've checked in, but still have tasks to complete"
                     : 'Progress saved - keep going on your remaining tasks'}
@@ -470,7 +470,7 @@ export function Dashboard({
               </div>
               {onNavigateTasks && (
                 <button onClick={onNavigateTasks} style={{
-                  background: '#f5a623', border: 'none', borderRadius: 10,
+                  background: '#E9A100', border: 'none', borderRadius: 10,
                   padding: '8px 12px', color: '#fff', fontWeight: 700, fontSize: 12,
                   cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
                 }}>View Tasks</button>
@@ -481,19 +481,19 @@ export function Dashboard({
         // green - all done
         return (
           <div data-tour-id="home-banner" style={{
-            background: '#2cb67d0e', border: '1.5px solid #2cb67d30',
+            background: '#29823B0e', border: '1.5px solid #29823B30',
             borderRadius: 18, padding: '12px 16px', marginBottom: 16,
             display: 'flex', alignItems: 'center', gap: 10,
           }}>
             <span style={{ fontSize: 20, flexShrink: 0 }}>🟢</span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#2cb67d', marginBottom: 1 }}>You're checked in and all done!</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#29823B', marginBottom: 1 }}>You're checked in and all done!</div>
               <div style={{ fontSize: 11, color: C.body }}>Great work - everything for today is complete.</div>
             </div>
             {onNavigateGoals && (
               <button onClick={onNavigateGoals} style={{
-                background: 'none', border: '1px solid #2cb67d40', borderRadius: 8,
-                padding: '5px 10px', color: '#2cb67d', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                background: 'none', border: '1px solid #29823B40', borderRadius: 8,
+                padding: '5px 10px', color: '#29823B', fontSize: 11, fontWeight: 700, cursor: 'pointer',
               }}>View Progress</button>
             )}
           </div>
@@ -503,7 +503,7 @@ export function Dashboard({
       {/* ── [1] Combined Streak + Motivation */}
       <div data-tour-id="home-streak" style={{
         ...card,
-        background: `linear-gradient(135deg, ${C.headline} 0%, #1a6da8 100%)`,
+        background: `linear-gradient(135deg, ${C.headline} 0%, ${C.primaryPressed} 100%)`,
         border: 'none', padding: '18px 20px',
       }}>
         {/* Top row: streak count + milestone count */}
@@ -602,7 +602,7 @@ export function Dashboard({
             <button
               onClick={onNavigateTasks}
               style={{
-                background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
+                background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
                 border: 'none', borderRadius: 10, padding: '8px 16px', cursor: 'pointer',
                 color: '#fff', fontSize: 13, fontWeight: 700,
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -709,9 +709,9 @@ export function Dashboard({
 
         <div style={{ display: 'flex', gap: 12, marginTop: 14, alignItems: 'center', flexWrap: 'wrap' }}>
           {[
-            { color: '#4ade80aa', label: '1 task' },
-            { color: '#22c55e',   label: '2 tasks' },
-            { color: '#15803d',   label: '3+ tasks' },
+            { color: '#73C982aa', label: '1 task' },
+            { color: '#29823B',   label: '2 tasks' },
+            { color: '#1E612A',   label: '3+ tasks' },
           ].map(({ color, label }) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <div style={{ width: 9, height: 9, borderRadius: 2, background: color }} />

@@ -9,13 +9,12 @@ import {
 } from '../data/profiles';
 import { applyTaskStatusUpdate } from '../data/taskStatusPipeline';
 import { getTodayTaskRows } from '../data/dashboardSnapshot';
-import { C } from '../data/colors';
+import { C, accentColorForId, GOAL_ACCENT_COLORS } from '../data/colors';
 import type { Profile } from '../data/profiles';
 
 // ── Helpers ──────────────────────────────────────────────────────────
-const ACCENT_COLORS = ['#3da9fc', '#2cb67d', '#7c3aed', '#ef4565', '#f5a623', '#094067', '#e85d04', '#90b4ce'];
 function goalAccent(id: string) {
-  return ACCENT_COLORS[Math.abs(id.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % ACCENT_COLORS.length];
+  return accentColorForId(id);
 }
 
 function taskQuestion(label: string): string {
@@ -53,7 +52,7 @@ function ConfettiBlast() {
     id: i,
     left: `${Math.random() * 100}%`,
     delay: `${Math.random() * 0.8}s`,
-    color: ACCENT_COLORS[i % ACCENT_COLORS.length],
+    color: GOAL_ACCENT_COLORS[i % GOAL_ACCENT_COLORS.length],
     size: 6 + Math.random() * 8,
     duration: `${1.2 + Math.random() * 0.8}s`,
   })), []);
@@ -97,7 +96,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
     goals.forEach(g => {
       goalMeta[g.id] = { title: g.title, deepWhy: g.deepWhy, accentColor: goalAccent(g.id) };
     });
-    goalMeta.__routines__ = { title: 'Routines', accentColor: '#90b4ce' };
+    goalMeta.__routines__ = { title: 'Routines', accentColor: '#52A7CC' };
 
     const flat: FlatTask[] = rows.map(r => {
       const goalId = r.goalId ?? '__routines__';
@@ -322,18 +321,18 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
             <span style={{ fontSize: 13, fontWeight: 700, color: C.primary }}>{overallPct}%</span>
           </div>
           <Progress percent={overallPct} showInfo={false} size={['100%', 8]}
-            strokeColor={{ '0%': C.primary, '100%': '#2cb67d' }} railColor={C.bgAlt} />
+            strokeColor={{ '0%': C.primary, '100%': '#29823B' }} railColor={C.bgAlt} />
         </div>
 
         {/* Needs check-in */}
         {needsCount > 0 ? (
           <div style={{
-            background: '#f5a62310', border: '1.5px solid #f5a62330',
+            background: '#E9A10010', border: '1.5px solid #E9A10030',
             borderRadius: 16, padding: '16px 18px', marginBottom: 14,
           }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 18, flexShrink: 0 }}>⏰</span>
-              <span style={{ fontSize: 14, fontWeight: 800, color: '#f5a623', flex: 1, minWidth: 0, lineHeight: 1.4 }}>
+              <span style={{ fontSize: 14, fontWeight: 800, color: '#E9A100', flex: 1, minWidth: 0, lineHeight: 1.4 }}>
                 {needsCount} task{needsCount !== 1 ? 's' : ''} across {goalsNeedingCount} goal{goalsNeedingCount !== 1 ? 's' : ''} need your input
               </span>
             </div>
@@ -343,13 +342,13 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
           </div>
         ) : (
           <div style={{
-            background: '#2cb67d0e', border: '1.5px solid #2cb67d30',
+            background: '#29823B0e', border: '1.5px solid #29823B30',
             borderRadius: 16, padding: '16px 18px', marginBottom: 14,
             display: 'flex', alignItems: 'center', gap: 10,
           }}>
             <span style={{ fontSize: 22 }}>🎉</span>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#2cb67d' }}>All caught up!</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#29823B' }}>All caught up!</div>
               <div style={{ fontSize: 12, color: C.body, marginTop: 2 }}>All your tasks have been reviewed.</div>
             </div>
           </div>
@@ -393,8 +392,8 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
             position: 'fixed', bottom: 'max(24px, calc(env(safe-area-inset-bottom, 0px) + 12px))', left: '50%', transform: 'translateX(-50%)',
             width: 'calc(100% - 40px)', maxWidth: 390,
             background: needsCount > 0
-              ? `linear-gradient(135deg, ${C.primary}, #1a6da8)`
-              : '#2cb67d',
+              ? `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`
+              : '#29823B',
             border: 'none', borderRadius: 16, padding: '16px',
             color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer',
             boxShadow: `0 8px 28px ${C.primary}45`,
@@ -421,8 +420,8 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
       value: TaskStatus; label: string; sub: string; dot: string;
       color: string; bg: string; border: string;
     }> = [
-      { value: 'done',       label: 'Yes, Done!',      sub: 'I completed this task',      dot: '🟢', color: '#2cb67d', bg: '#2cb67d12', border: '#2cb67d45' },
-      { value: 'inprogress', label: 'Working On It',   sub: "I've started but not done",  dot: '🟡', color: '#f5a623', bg: '#f5a62312', border: '#f5a62345' },
+      { value: 'done',       label: 'Yes, Done!',      sub: 'I completed this task',      dot: '🟢', color: '#29823B', bg: '#29823B12', border: '#29823B45' },
+      { value: 'inprogress', label: 'Working On It',   sub: "I've started but not done",  dot: '🟡', color: '#E9A100', bg: '#E9A10012', border: '#E9A10045' },
     ];
 
     return (
@@ -605,8 +604,8 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
         <div style={{ fontSize: 12, fontWeight: 700, color: C.secondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 14 }}>Today's Updates</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {[
-            { label: 'Tasks Reviewed', value: successStats.tasksReviewed, color: '#7c3aed', icon: '📋' },
-            { label: 'Tasks Completed', value: successStats.tasksDone, color: '#2cb67d', icon: '✅' },
+            { label: 'Tasks Reviewed', value: successStats.tasksReviewed, color: '#550D0E', icon: '📋' },
+            { label: 'Tasks Completed', value: successStats.tasksDone, color: '#29823B', icon: '✅' },
           ].map(stat => (
             <div key={stat.label} style={{
               background: `${stat.color}08`, border: `1px solid ${stat.color}25`,
@@ -638,8 +637,8 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
 
       {/* Badges */}
       {earnedBadges.length > 0 && (
-        <div style={{ background: '#f5a62310', border: '1.5px solid #f5a62330', borderRadius: 18, padding: '18px', marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#f5a623', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>
+        <div style={{ background: '#E9A10010', border: '1.5px solid #E9A10030', borderRadius: 18, padding: '18px', marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#E9A100', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>
             🏅 Achievement{earnedBadges.length > 1 ? 's' : ''} Earned
           </div>
           {earnedBadges.slice(0, 3).map(badge => (
@@ -660,7 +659,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
 
       <button onClick={onClose} style={{
         width: '100%', padding: '16px', borderRadius: 16,
-        background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
+        background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
         border: 'none', color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer',
         boxShadow: `0 8px 28px ${C.primary}40`,
       }}>

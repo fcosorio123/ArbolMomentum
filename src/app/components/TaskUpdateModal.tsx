@@ -73,10 +73,10 @@ export function TaskUpdateModal({
       width="min(420px, calc(100vw - 24px))"
       styles={{
         ...ACCENT_MODAL_STYLES,
-        mask: { backdropFilter: 'blur(4px)', background: 'rgba(9,64,103,0.4)' },
+        mask: { backdropFilter: 'blur(4px)', background: 'rgba(39,39,42,0.4)' },
       }}
     >
-      <ModalAccentBar gradient={`linear-gradient(90deg, ${C.primary}, #1a6da8)`} />
+      <ModalAccentBar gradient={`linear-gradient(90deg, ${C.primary}, ${C.primaryPressed})`} />
       <div style={{ padding: '14px 20px 20px', maxHeight: 'min(85vh, 640px)', overflowY: 'auto' }}>
         {context.goalTitle && (
           <div style={{
@@ -160,7 +160,7 @@ export function TaskUpdateModal({
             onClick={() => onSubmit(status, note)}
             style={{
               borderRadius: 12, height: 46, flex: 1.4, fontWeight: 700,
-              background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
+              background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
               border: 'none', fontSize: 14,
             }}
           >

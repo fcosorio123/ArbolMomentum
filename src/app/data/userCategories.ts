@@ -10,10 +10,9 @@ export interface UserCategory {
   createdAt: number;
 }
 
-export const CAT_COLORS = [
-  '#ef4565', '#f5a623', '#094067', '#3da9fc',
-  '#90b4ce', '#2cb67d', '#7c3aed', '#e85d04',
-];
+import { GOAL_ACCENT_COLORS } from './colors';
+
+export const CAT_COLORS = [...GOAL_ACCENT_COLORS];
 
 function storageKey(profileId: string) {
   return `arbol-user-cats-${profileId}`;

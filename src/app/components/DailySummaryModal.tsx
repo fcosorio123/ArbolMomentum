@@ -3,7 +3,7 @@ import { Modal, Progress } from 'antd';
 import { ArrowRightOutlined, FireOutlined, StarFilled } from '@ant-design/icons';
 import { type Profile, getTodayKey } from '../data/profiles';
 import { getDashboardSnapshot, type TodayTaskRow } from '../data/dashboardSnapshot';
-import { C } from '../data/colors';
+import { C, accentColorForId } from '../data/colors';
 
 interface Props {
   open: boolean;
@@ -29,9 +29,8 @@ export function wasSummaryShownToday(profileId: string) {
   return localStorage.getItem(TODAY_SHOWN_KEY(profileId, getTodayKey())) === 'true';
 }
 
-const ACCENT_COLORS = ['#3da9fc', '#2cb67d', '#7c3aed', '#ef4565', '#f5a623', '#094067', '#e85d04', '#90b4ce'];
 function goalAccent(goalId: string) {
-  return ACCENT_COLORS[Math.abs(goalId.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % ACCENT_COLORS.length];
+  return accentColorForId(goalId);
 }
 
 function TaskSummaryRow({ task }: { task: TodayTaskRow }) {
@@ -41,7 +40,7 @@ function TaskSummaryRow({ task }: { task: TodayTaskRow }) {
   const isIP = !isRemoved && !isSkipped && task.status === 'inprogress';
   const disabled = isRemoved || isSkipped;
 
-  const dotColor = isRemoved ? '#ef4565' : isSkipped ? '#ef4565' : isDone ? '#22c55e' : isIP ? '#f5a623' : C.borderStrong;
+  const dotColor = isRemoved ? '#A72D1A' : isSkipped ? '#A72D1A' : isDone ? '#29823B' : isIP ? '#E9A100' : C.borderStrong;
 
   return (
     <div
@@ -53,13 +52,13 @@ function TaskSummaryRow({ task }: { task: TodayTaskRow }) {
     >
       <span style={{
         width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
-        background: isDone ? '#22c55e' : isIP ? '#f5a623' : isRemoved || isSkipped ? '#ef456520' : 'none',
+        background: isDone ? '#29823B' : isIP ? '#E9A100' : isRemoved || isSkipped ? '#A72D1A20' : 'none',
         border: `2px solid ${dotColor}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {isDone && <span style={{ color: '#fff', fontSize: 8, lineHeight: 1 }}>✓</span>}
         {isIP && <span style={{ color: '#fff', fontSize: 7, lineHeight: 1 }}>◑</span>}
-        {(isSkipped || isRemoved) && <span style={{ color: '#ef4565', fontSize: 8, lineHeight: 1 }}>✕</span>}
+        {(isSkipped || isRemoved) && <span style={{ color: '#A72D1A', fontSize: 8, lineHeight: 1 }}>✕</span>}
       </span>
       <span style={{
         fontSize: 12,
@@ -71,8 +70,8 @@ function TaskSummaryRow({ task }: { task: TodayTaskRow }) {
       </span>
       {(isSkipped || isRemoved) && (
         <span style={{
-          fontSize: 9, fontWeight: 700, color: '#ef4565',
-          background: '#ef456512', border: '1px solid #ef456530',
+          fontSize: 9, fontWeight: 700, color: '#A72D1A',
+          background: '#A72D1A12', border: '1px solid #A72D1A30',
           borderRadius: 4, padding: '1px 5px', flexShrink: 0, textTransform: 'uppercase',
         }}>
           {isRemoved ? 'Removed' : 'Skipped'}
@@ -165,13 +164,13 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
           maxHeight: '90vh', display: 'flex', flexDirection: 'column',
         },
         body: { padding: 0, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
-        mask: { backdropFilter: 'blur(6px)', background: 'rgba(9,64,103,0.3)' },
+        mask: { backdropFilter: 'blur(6px)', background: 'rgba(39,39,42,0.3)' },
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden' }}>
         {/* Header band */}
         <div style={{
-          background: `linear-gradient(135deg, ${C.headline} 0%, #1a6da8 100%)`,
+          background: `linear-gradient(135deg, ${C.headline} 0%, ${C.primaryPressed} 100%)`,
           padding: '20px 16px 18px',
           flexShrink: 0,
         }}>
@@ -338,10 +337,10 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
                       }}
                     >
                       <span style={{ fontSize: 10, color: C.secondary, fontWeight: 500 }}>Today:</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: allDone ? '#22c55e' : accentColor }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: allDone ? '#29823B' : accentColor }}>
                         {tasksDone}/{countable.length} tasks
                       </span>
-                      {allDone && <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 700 }}>✓ Done!</span>}
+                      {allDone && <span style={{ fontSize: 10, color: '#29823B', fontWeight: 700 }}>✓ Done!</span>}
                       <span style={{ flex: 1 }} />
                       <span style={{
                         fontSize: 12, color: C.secondary,
@@ -424,7 +423,7 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
             onClick={() => { handleClose(); onStartTasks(); }}
             style={{
               width: '100%', padding: '14px', borderRadius: 14, border: 'none', cursor: 'pointer',
-              background: `linear-gradient(135deg, ${C.headline}, #1a6da8)`,
+              background: `linear-gradient(135deg, ${C.headline}, ${C.primaryPressed})`,
               color: '#fff', fontSize: 15, fontWeight: 700, marginBottom: 10,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}

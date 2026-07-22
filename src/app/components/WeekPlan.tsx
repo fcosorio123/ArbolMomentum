@@ -13,7 +13,7 @@ import { getTaskNote } from '../data/liveCheckInFeedback';
 import { applyTaskStatusUpdate } from '../data/taskStatusPipeline';
 import { truncateRemark, SKIPPED_BADGE, shouldShowRemark } from './taskCardDisplay';
 import { TaskCalendarButton } from './TaskCalendarButton';
-import { C } from '../data/colors';
+import { C, accentColorForId } from '../data/colors';
 import { getGoalTaskBreakdown } from '../data/goalProgressUtils';
 
 interface Props { profile: Profile }
@@ -161,9 +161,9 @@ export function WeekPlan({ profile }: Props) {
   const weekAvg = Math.round(weekStats.reduce((s, d) => s + d.pct, 0) / 7);
 
   const STATUS_META: Record<TaskStatus | 'null', { dot: string; color: string; label: string }> = {
-    inprogress: { dot: '◑', color: '#f5a623', label: 'In Progress' },
+    inprogress: { dot: '◑', color: '#E9A100', label: 'In Progress' },
     done:       { dot: '●', color: C.primary, label: 'Done' },
-    skipped:    { dot: '✕', color: '#90b4ce', label: 'Skipped' },
+    skipped:    { dot: '✕', color: '#52A7CC', label: 'Skipped' },
     null:       { dot: '○', color: C.secondary, label: 'Not started' },
   };
 
@@ -250,9 +250,7 @@ export function WeekPlan({ profile }: Props) {
     );
   };
 
-  const ACCENT_COLORS = ['#3da9fc', '#2cb67d', '#7c3aed', '#ef4565', '#f5a623', '#094067', '#e85d04', '#90b4ce'];
-  const goalAccent = (goalId: string) =>
-    ACCENT_COLORS[Math.abs(goalId.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % ACCENT_COLORS.length];
+  const goalAccent = (goalId: string) => accentColorForId(goalId);
 
   return (
     <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px calc(100px + env(safe-area-inset-bottom, 0px))', background: C.bg, minHeight: '100dvh' }}>
@@ -284,7 +282,7 @@ export function WeekPlan({ profile }: Props) {
           borderRadius: 16, padding: '14px 16px', marginBottom: 16, boxShadow: C.shadow,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <StarFilled style={{ color: '#ef4565', fontSize: 14 }} />
+            <StarFilled style={{ color: '#A72D1A', fontSize: 14 }} />
             <span style={{ fontWeight: 700, fontSize: 14, color: C.headline }}>Goals</span>
           </div>
           {personalGoals.map(goal => {
@@ -325,7 +323,7 @@ export function WeekPlan({ profile }: Props) {
               background: isActive ? C.headline : C.bgCard,
               border: isToday && !isActive ? `1.5px solid ${C.primary}` : `1.5px solid ${isActive ? 'transparent' : C.border}`,
               borderRadius: 14, cursor: 'pointer', transition: 'all 0.2s',
-              boxShadow: isActive ? '0 4px 12px rgba(9,64,103,0.2)' : C.shadow,
+              boxShadow: isActive ? '0 4px 12px rgba(39,39,42,0.2)' : C.shadow,
             }}>
               <span style={{ fontSize: 11, color: isActive ? '#fff' : (isToday ? C.primary : C.body), fontWeight: isToday ? 700 : 400 }}>{day}</span>
               <div style={{
@@ -393,7 +391,7 @@ export function WeekPlan({ profile }: Props) {
             <div key={stat.day} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
               <div style={{
                 width: '100%', height: 40, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: stat.pct === 0 ? C.bgAlt : `rgba(61,169,252,${0.1 + (stat.pct / 100) * 0.7})`,
+                background: stat.pct === 0 ? C.bgAlt : `rgba(142,21,51,${0.1 + (stat.pct / 100) * 0.7})`,
                 fontSize: 11, fontWeight: 700, color: stat.pct > 50 ? C.headline : C.secondary,
                 border: stat.day === todayDay ? `1.5px solid ${C.primary}` : '1px solid transparent',
               }}>

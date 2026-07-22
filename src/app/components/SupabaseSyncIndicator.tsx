@@ -39,7 +39,7 @@ export function SupabaseSyncIndicator() {
       bottom: 'calc(72px + env(safe-area-inset-bottom, 0px) + 8px)',
       right: 16,
       zIndex: 1000,
-      background: '#22c55e',
+      background: '#29823B',
       color: '#fff',
       padding: '8px 12px',
       borderRadius: 20,

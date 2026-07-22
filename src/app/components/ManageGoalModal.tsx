@@ -45,7 +45,7 @@ export function ManageGoalModal({ open, goal, draft, confirmLabel, onSave, onCan
       destroyOnClose
       styles={ACCENT_MODAL_STYLES}
     >
-      <ModalAccentBar gradient={`linear-gradient(90deg, ${C.primary}, #3da9fc)`} />
+      <ModalAccentBar gradient={`linear-gradient(90deg, ${C.primary}, #8E1533)`} />
       <div style={{ padding: '16px 24px 24px' }}>
         <h3 style={{ margin: '0 0 18px', fontSize: 17, fontWeight: 800, color: C.headline }}>
           {isEdit ? 'Edit Goal' : 'Add Goal'}
@@ -93,7 +93,7 @@ export function ManageGoalModal({ open, goal, draft, confirmLabel, onSave, onCan
             onClick={() => onSave({ title: title.trim(), deepWhy: deepWhy.trim() })}
             style={{
               borderRadius: 12, height: 46, fontWeight: 700, border: 'none',
-              background: valid ? `linear-gradient(135deg, ${C.primary}, #1a6da8)` : undefined,
+              background: valid ? `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})` : undefined,
             }}
           >
             {confirmLabel ?? (isEdit ? 'Save' : 'Add goal')}

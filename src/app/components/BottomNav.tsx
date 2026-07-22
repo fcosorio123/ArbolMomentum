@@ -39,7 +39,7 @@ export function BottomNav({ activeTab, onChange, pendingCount = 0, isDesktop = f
         display: 'flex',
         flexDirection: 'column',
         zIndex: 100,
-        boxShadow: '4px 0 24px rgba(9,64,103,0.10)',
+        boxShadow: '4px 0 24px rgba(39,39,42,0.10)',
       }}>
         {/* Logo */}
         <div style={{ padding: '32px 24px 28px' }}>
@@ -63,7 +63,7 @@ export function BottomNav({ activeTab, onChange, pendingCount = 0, isDesktop = f
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '11px 14px',
                   borderRadius: 10,
-                  background: active ? 'rgba(61,169,252,0.18)' : 'transparent',
+                  background: active ? 'rgba(142,21,51,0.18)' : 'transparent',
                   border: 'none', cursor: 'pointer',
                   color: active ? '#fff' : 'rgba(255,255,255,0.5)',
                   fontSize: 14, fontWeight: active ? 600 : 400,
@@ -127,7 +127,7 @@ export function BottomNav({ activeTab, onChange, pendingCount = 0, isDesktop = f
       paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       paddingLeft: 'env(safe-area-inset-left, 0px)',
       paddingRight: 'env(safe-area-inset-right, 0px)',
-      boxShadow: '0 -4px 20px rgba(9,64,103,0.06)',
+      boxShadow: '0 -4px 20px rgba(39,39,42,0.06)',
     }}>
       {TABS.map((tab) => {
         const active = activeTab === tab.key;

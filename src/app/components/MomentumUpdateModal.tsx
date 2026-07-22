@@ -68,10 +68,10 @@ export function MomentumUpdateModal({
             borderRadius: 20,
             padding: 0,
             overflow: 'hidden',
-            boxShadow: '0 24px 64px rgba(9,64,103,0.22)',
+            boxShadow: '0 24px 64px rgba(39,39,42,0.22)',
           },
           mask: {
-            background: 'rgba(9, 64, 103, 0.45)',
+            background: 'rgba(39, 39, 42, 0.45)',
             backdropFilter: 'blur(4px)',
           },
           header: {

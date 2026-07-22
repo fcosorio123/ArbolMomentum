@@ -51,12 +51,12 @@ export function AddToHomeScreen({ open, onClose, installPrompt, onInstall }: Pro
       title={null}
       styles={{
         content: { borderRadius: 24, padding: 0, overflow: 'hidden', border: `1px solid ${C.border}` },
-        mask: { background: 'rgba(9,64,103,0.5)', backdropFilter: 'blur(8px)' },
+        mask: { background: 'rgba(39,39,42,0.5)', backdropFilter: 'blur(8px)' },
       }}
     >
       {/* Header */}
       <div style={{
-        background: `linear-gradient(135deg, ${C.headline} 0%, #1a6da8 100%)`,
+        background: `linear-gradient(135deg, ${C.headline} 0%, ${C.primaryPressed} 100%)`,
         padding: '28px 24px 24px', textAlign: 'center',
       }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>📱</div>

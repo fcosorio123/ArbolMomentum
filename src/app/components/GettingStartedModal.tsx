@@ -64,7 +64,7 @@ export function GettingStartedModal({
       styles={ACCENT_MODAL_STYLES}
       aria-labelledby="getting-started-title"
     >
-      <ModalAccentBar gradient={`linear-gradient(90deg, ${C.primary}, #3da9fc)`} />
+      <ModalAccentBar gradient={`linear-gradient(90deg, ${C.primary}, #8E1533)`} />
       <div style={{ padding: '18px 22px 22px' }}>
         <h2 id="getting-started-title" style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 800, color: C.headline }}>
           Let’s build your first plan
@@ -81,7 +81,7 @@ export function GettingStartedModal({
             onClick={chooseGoal}
             style={{
               height: 48, borderRadius: 12, fontWeight: 700, border: 'none',
-              background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
+              background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
             }}
           >
             Create a goal

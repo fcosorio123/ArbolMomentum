@@ -225,9 +225,9 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
       {/* Add to Home Screen tutorial banner */}
       <button onClick={onShowInstallTutorial} style={{
         display: 'flex', alignItems: 'center', gap: 12, width: '100%',
-        background: `linear-gradient(135deg, ${C.headline}, #1a6da8)`,
+        background: `linear-gradient(135deg, ${C.headline}, ${C.primaryPressed})`,
         border: 'none', borderRadius: 16, padding: '14px 16px', marginBottom: 14, cursor: 'pointer',
-        boxShadow: '0 4px 16px rgba(9,64,103,0.2)', textAlign: 'left',
+        boxShadow: '0 4px 16px rgba(39,39,42,0.2)', textAlign: 'left',
       }}>
         <MobileOutlined style={{ color: '#fff', fontSize: 22 }} />
         <div style={{ flex: 1 }}>

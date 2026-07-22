@@ -571,7 +571,7 @@ export function AiAssistCreationModal({
         styles={ACCENT_MODAL_STYLES}
         aria-labelledby="ai-assist-title"
       >
-        <ModalAccentBar gradient={`linear-gradient(90deg, ${C.primary}, #3da9fc)`} />
+        <ModalAccentBar gradient={`linear-gradient(90deg, ${C.primary}, #8E1533)`} />
         <div style={{ padding: '16px 20px 22px', maxHeight: 'min(78dvh, 640px)', overflowY: 'auto' }}>
           <h3 id="ai-assist-title" style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 800, color: C.headline }}>
             Create with AI
@@ -642,7 +642,7 @@ export function AiAssistCreationModal({
                   onClick={() => void runGenerate(false)}
                   style={{
                     borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none',
-                    background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
+                    background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
                   }}
                 >
                   Generate
@@ -736,7 +736,7 @@ export function AiAssistCreationModal({
                   onClick={() => void chooseStarterMode('goal_only')}
                   style={{
                     borderRadius: 12, height: 48, fontWeight: 700, border: 'none',
-                    background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
+                    background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
                   }}
                 >
                   Goal only
@@ -833,7 +833,7 @@ export function AiAssistCreationModal({
                   onClick={() => setSession(setStep(session, 'final_review', true))}
                   style={{
                     borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none',
-                    background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
+                    background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
                   }}
                 >
                   Review & save
@@ -934,7 +934,7 @@ export function AiAssistCreationModal({
                     onClick={() => runPersist(true)}
                     style={{
                       borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none',
-                      background: `linear-gradient(135deg, #ef4565, #f5a623)`,
+                      background: `linear-gradient(135deg, #A72D1A, #E9A100)`,
                     }}
                   >
                     Retry failed
@@ -946,7 +946,7 @@ export function AiAssistCreationModal({
                     onClick={() => runPersist(false)}
                     style={{
                       borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none',
-                      background: `linear-gradient(135deg, #ef4565, #f5a623)`,
+                      background: `linear-gradient(135deg, #A72D1A, #E9A100)`,
                     }}
                   >
                     Save

@@ -28,7 +28,7 @@ function ConfettiBurst() {
 
     const W = canvas.width = canvas.offsetWidth;
     const H = canvas.height = canvas.offsetHeight;
-    const COLORS = ['#094067', '#3da9fc', '#ef4565', '#f5a623', '#2cb67d', '#ffd700'];
+    const COLORS = ['#182F53', '#8E1533', '#A72D1A', '#E9A100', '#29823B', '#FFD337'];
 
     const particles = Array.from({ length: 48 }, () => ({
       x: W / 2 + (Math.random() - 0.5) * 60,
@@ -91,8 +91,8 @@ export function CongratModal({ open, type, title, rows, onClose }: Props) {
   const isGoal = type === 'goal';
   const emoji = isGoal ? '🎯' : '✅';
   const headline = isGoal ? 'Goal Created!' : 'Task Added!';
-  const accent = isGoal ? '#ef4565' : C.primary;
-  const gradientEnd = isGoal ? '#f5a623' : '#1a6da8';
+  const accent = isGoal ? '#A72D1A' : C.primary;
+  const gradientEnd = isGoal ? '#E9A100' : C.primaryPressed;
 
   return (
     <Modal
@@ -106,7 +106,7 @@ export function CongratModal({ open, type, title, rows, onClose }: Props) {
         content: {
           borderRadius: 24, padding: 0,
           overflow: 'hidden',
-          boxShadow: '0 20px 60px rgba(9,64,103,0.22)',
+          boxShadow: '0 20px 60px rgba(39,39,42,0.22)',
         },
         mask: { backdropFilter: 'blur(6px)' },
         wrapper: { zIndex: 1200 },

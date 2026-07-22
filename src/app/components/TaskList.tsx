@@ -34,7 +34,7 @@ import { AiAssistCreationModal } from './AiAssistCreationModal';
 import { isAiAssistCreationEnabled } from '../data/environment';
 import { DeleteTaskModal, type DeleteTaskChoice } from './DeleteTaskModal';
 import { TasksMonthView } from './TasksMonthView';
-import { C } from '../data/colors';
+import { C, accentColorForId } from '../data/colors';
 import { getDisplayPotentialValue } from '../data/potentialValue';
 import {
   mergeSeedForProfile,
@@ -124,9 +124,9 @@ function recurrenceEqual(a?: Recurrence, b?: Recurrence): boolean {
 }
 
 const STATUS_META: Record<TaskStatus, { label: string; dot: string; color: string }> = {
-  inprogress: { label: 'In Progress', dot: '◑', color: '#f5a623' },
-  done:       { label: 'Done',        dot: '●', color: '#2cb67d' },
-  skipped:    { label: 'Skipped',     dot: '✕', color: '#90b4ce' },
+  inprogress: { label: 'In Progress', dot: '◑', color: C.primary },
+  done:       { label: 'Done',        dot: '●', color: C.success },
+  skipped:    { label: 'Skipped',     dot: '✕', color: C.secondary },
 };
 
 
@@ -353,7 +353,7 @@ function TaskItem({
       style={{
         display: 'flex', flexDirection: 'column', gap: 10,
         padding: isFocus ? '14px 16px' : '12px 14px',
-        background: isMuted ? (isDone ? '#f7fafc' : display.bg) : (isFocus ? '#fff' : display.bg),
+        background: isMuted ? (isDone ? '#FAFAFA' : display.bg) : (isFocus ? '#fff' : display.bg),
         borderRadius: 14,
         border: isFocus && focusBorder
           ? `2px solid ${focusBorder}`
@@ -403,7 +403,7 @@ function TaskItem({
                   fontSize: 10, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase',
                   padding: '2px 8px', borderRadius: 6,
                   background: focusLabel === 'active' ? `${C.streak}22` : `${C.primary}18`,
-                  color: focusLabel === 'active' ? '#c47d0e' : C.primaryDark,
+                  color: focusLabel === 'active' ? '#D08700' : C.primaryDark,
                 }}
               >
                 {focusBadgeLabel}
@@ -563,9 +563,9 @@ function TaskItem({
               ...actionBtnStyle,
               minWidth: 'auto',
               padding: '6px 10px',
-              color: '#6d28d9',
-              background: '#7c3aed12',
-              borderColor: '#7c3aed35',
+              color: '#80132E',
+              background: '#550D0E12',
+              borderColor: '#550D0E35',
               fontSize: 12,
               fontWeight: 700,
               gap: 4,
@@ -752,9 +752,8 @@ function OtherTasksSection({
   );
 }
 
-const GOAL_ACCENT_COLORS = ['#3da9fc', '#2cb67d', '#7c3aed', '#ef4565', '#f5a623', '#094067', '#e85d04', '#90b4ce'];
 function goalAccentColor(goalId: string) {
-  return GOAL_ACCENT_COLORS[Math.abs(goalId.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % GOAL_ACCENT_COLORS.length];
+  return accentColorForId(goalId);
 }
 
 // ── Goal group: goal header + flat task list
@@ -2144,7 +2143,7 @@ export function TaskList({
                   type="button"
                   onClick={() => { setEditingTask(null); setEditingSeedTaskId(null); setDefaultTaskGoalId(undefined); setManageTaskOpen(true); }}
                   style={{
-                    background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
+                    background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
                     border: 'none', borderRadius: 12, padding: '12px 24px',
                     color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', minHeight: MIN_TOUCH,
                   }}
@@ -2231,7 +2230,7 @@ export function TaskList({
         style={{
           position: 'fixed', bottom: 'calc(72px + env(safe-area-inset-bottom, 0px) + 12px)', right: 20, zIndex: 48,
           width: 52, height: 52, borderRadius: '50%',
-          background: `linear-gradient(135deg, ${C.primary}, #1a6da8)`,
+          background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
           border: 'none', cursor: 'pointer', color: '#fff', fontSize: 24,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: `0 6px 24px ${C.primary}50`,
