@@ -46,6 +46,52 @@ export const SEED_FAMILY_MEMBERS: Record<SeedFamilyId, readonly string[]> = {
   'roi-hydrate': [
     'roi-mon-5', 'roi-tue-7', 'roi-wed-5', 'roi-thu-6', 'roi-fri-5', 'roi-sun-5',
   ],
+  // Eunice recurring day siblings (eu-* IDs). Missing these made Delete Forever
+  // look like a no-op: one day hidden, same habit still visible on other days / All Tasks.
+  'eu-walk-dog': [
+    'eu-mon-1', 'eu-tue-1', 'eu-wed-1', 'eu-thu-1', 'eu-fri-1', 'eu-sat-1', 'eu-sun-1',
+  ],
+  'eu-stretch-10': [
+    'eu-mon-2', 'eu-tue-2', 'eu-wed-2', 'eu-thu-2', 'eu-fri-2',
+  ],
+  'eu-stretch-meditate-15': [
+    'eu-sat-2', 'eu-sun-2',
+  ],
+  'eu-strava-5k': [
+    'eu-mon-3', 'eu-wed-3', 'eu-fri-3',
+  ],
+  'eu-cook-lunch': [
+    'eu-mon-4', 'eu-tue-3', 'eu-wed-4', 'eu-thu-3', 'eu-fri-4',
+  ],
+  'eu-check-work': [
+    'eu-mon-5', 'eu-tue-4', 'eu-wed-5', 'eu-thu-4', 'eu-fri-5',
+  ],
+  'eu-work-block': [
+    'eu-mon-6', 'eu-tue-6', 'eu-wed-6', 'eu-thu-7', 'eu-fri-6',
+  ],
+  'eu-play-dog': [
+    'eu-mon-7', 'eu-tue-7', 'eu-wed-7', 'eu-thu-8', 'eu-fri-7', 'eu-sat-7', 'eu-sun-7',
+  ],
+  'eu-cook-dinner': [
+    'eu-mon-8', 'eu-tue-8', 'eu-wed-8', 'eu-thu-9', 'eu-fri-8',
+  ],
+  'eu-wind-down': [
+    'eu-mon-9', 'eu-tue-9', 'eu-wed-9', 'eu-thu-10', 'eu-fri-9', 'eu-sun-8',
+  ],
+  'eu-paint-30': [
+    'eu-tue-5', 'eu-thu-5',
+  ],
+  'eu-paint-long': [
+    'eu-sat-3', 'eu-sun-4',
+  ],
+  'eu-meditate-10': ['eu-thu-6'],
+  'eu-review-artwork': ['eu-sat-4'],
+  'eu-discover-restaurant': ['eu-sat-5'],
+  'eu-restaurant-note': ['eu-sat-6'],
+  'eu-light-cleaning': ['eu-sat-8'],
+  'eu-sunday-lunch': ['eu-sun-3'],
+  'eu-explore-cafe': ['eu-sun-5'],
+  'eu-plan-week': ['eu-sun-6'],
 };
 
 const TASK_TO_FAMILY: Record<string, SeedFamilyId> = (() => {
@@ -69,7 +115,13 @@ export function hiddenSeedFamilyStorageKey(profileId: string) {
 }
 
 export function seedFamilyBackfillMarkerKey(profileId: string) {
-  return `arbol-seed-family-backfill-v1-${profileId}`;
+  // v2: re-run after Eunice (+ future) family registry expansions so prior
+  // single-ID "Delete Forever" hides expand to full families.
+  return `arbol-seed-family-backfill-v2-${profileId}`;
+}
+
+export function seedLabelExpandMarkerKey(profileId: string) {
+  return `arbol-seed-label-expand-v1-${profileId}`;
 }
 
 export function readHiddenSeedFamilyIds(profileId: string): Set<string> {
@@ -130,9 +182,14 @@ export function isSeedHiddenByTombstones(profileId: string, taskId: string): boo
 
 /**
  * Write hide-ID and/or hide-family tombstones. Does not purge history or sync.
+ * @param extraSiblingIds optional exact-label day copies (when registry incomplete).
  * @returns familyId when a family was tombstoned.
  */
-export function applySeedHideTombstones(profileId: string, taskId: string): string | null {
+export function applySeedHideTombstones(
+  profileId: string,
+  taskId: string,
+  extraSiblingIds: readonly string[] = [],
+): string | null {
   const hidden = readHiddenSeedTaskIds(profileId);
   const familyId = getSeedFamilyIdForTaskId(taskId);
 
@@ -147,8 +204,76 @@ export function applySeedHideTombstones(profileId: string, taskId: string): stri
     hidden.add(taskId);
   }
 
+  for (const sib of extraSiblingIds) {
+    if (sib) hidden.add(sib);
+    // If a sibling belongs to a known family, tombstone that family too.
+    const sibFamily = getSeedFamilyIdForTaskId(sib);
+    if (sibFamily) {
+      const families = readHiddenSeedFamilyIds(profileId);
+      if (!families.has(sibFamily)) {
+        families.add(sibFamily);
+        writeHiddenSeedFamilyIds(profileId, families);
+      }
+      for (const memberId of listSeedTaskIdsInFamily(sibFamily)) {
+        hidden.add(memberId);
+      }
+    }
+  }
+
   writeHiddenSeedTaskIds(profileId, hidden);
   return familyId;
+}
+
+/**
+ * Expand already-hidden IDs using an exact-label sibling map from the seed catalog.
+ * Used once per profile after registry gaps (e.g. Eunice) so prior deletes stick.
+ */
+export function expandHiddenSeedIdsByExactLabel(
+  profileId: string,
+  catalog: ReadonlyArray<{ id: string; label: string }>,
+): boolean {
+  const marker = seedLabelExpandMarkerKey(profileId);
+  if (localStorage.getItem(marker) === '1') return false;
+
+  const hidden = readHiddenSeedTaskIds(profileId);
+  const byLabel = new Map<string, string[]>();
+  for (const t of catalog) {
+    if (!t?.id || typeof t.label !== 'string') continue;
+    const list = byLabel.get(t.label) ?? [];
+    list.push(t.id);
+    byLabel.set(t.label, list);
+  }
+
+  let idChanged = false;
+  let familyChanged = false;
+  const families = readHiddenSeedFamilyIds(profileId);
+
+  for (const taskId of [...hidden]) {
+    const entry = catalog.find(t => t.id === taskId);
+    if (!entry) continue;
+    for (const sibId of byLabel.get(entry.label) ?? []) {
+      if (!hidden.has(sibId)) {
+        hidden.add(sibId);
+        idChanged = true;
+      }
+      const fam = getSeedFamilyIdForTaskId(sibId);
+      if (fam && !families.has(fam)) {
+        families.add(fam);
+        familyChanged = true;
+        for (const memberId of listSeedTaskIdsInFamily(fam)) {
+          if (!hidden.has(memberId)) {
+            hidden.add(memberId);
+            idChanged = true;
+          }
+        }
+      }
+    }
+  }
+
+  if (familyChanged) writeHiddenSeedFamilyIds(profileId, families);
+  if (idChanged) writeHiddenSeedTaskIds(profileId, hidden);
+  localStorage.setItem(marker, '1');
+  return idChanged || familyChanged;
 }
 
 /**

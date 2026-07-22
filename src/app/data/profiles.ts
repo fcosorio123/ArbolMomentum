@@ -11,6 +11,7 @@ import {
   isSeedHiddenByTombstones,
   readHiddenSeedTaskIds,
   hiddenSeedTaskStorageKey,
+  expandHiddenSeedIdsByExactLabel,
 } from './seedFamilies';
 export interface ValueStats {
   money: number;      // ₱ saved/earned
@@ -1713,20 +1714,33 @@ export function getAllTasks(): Task[] {
 }
 
 export function getAllTasksForProfile(profileId: string): Task[] {
+  return getRawSeedTasksForProfile(profileId).filter(
+    t => !isSeedTaskPermanentlyHidden(profileId, t.id),
+  );
+}
+
+/** Unfiltered seed catalog for a profile (includes permanently hidden). */
+export function getRawSeedTasksForProfile(profileId: string): Task[] {
   if (isFreshProfile(profileId) || isUserDefinedProfile(profileId)) return [];
-  let tasks: Task[];
   switch (profileId) {
-    case 'kyle':   tasks = Object.values(KYLE_BY_DAY).flat().flatMap(c => c.tasks); break;
-    case 'john':   tasks = JOHN_CATEGORIES.flatMap(c => c.tasks); break;
-    case 'jude':   tasks = Object.values(JUDE_BY_DAY).flat().flatMap(c => c.tasks); break;
-    case 'rafael': tasks = Object.values(RAFAEL_BY_DAY).flat().flatMap(c => c.tasks); break;
-    case 'yesa':   tasks = Object.values(YESA_BY_DAY).flat().flatMap(c => c.tasks); break;
-    case 'favio':  tasks = Object.values(FAVIO_BY_DAY).flat().flatMap(c => c.tasks); break;
-    case 'roi':    tasks = Object.values(ROI_BY_DAY).flat().flatMap(c => c.tasks); break;
-    case 'eunice': tasks = Object.values(EUNICE_BY_DAY).flat().flatMap(c => c.tasks); break;
-    default:       tasks = getAllTasks();
+    case 'kyle':   return Object.values(KYLE_BY_DAY).flat().flatMap(c => c.tasks);
+    case 'john':   return JOHN_CATEGORIES.flatMap(c => c.tasks);
+    case 'jude':   return Object.values(JUDE_BY_DAY).flat().flatMap(c => c.tasks);
+    case 'rafael': return Object.values(RAFAEL_BY_DAY).flat().flatMap(c => c.tasks);
+    case 'yesa':   return Object.values(YESA_BY_DAY).flat().flatMap(c => c.tasks);
+    case 'favio':  return Object.values(FAVIO_BY_DAY).flat().flatMap(c => c.tasks);
+    case 'roi':    return Object.values(ROI_BY_DAY).flat().flatMap(c => c.tasks);
+    case 'eunice': return Object.values(EUNICE_BY_DAY).flat().flatMap(c => c.tasks);
+    default:       return getAllTasks();
   }
-  return tasks.filter(t => !isSeedTaskPermanentlyHidden(profileId, t.id));
+}
+
+/** Exact-label day siblings in the seed catalog (never crosses different labels). */
+export function listExactLabelSeedSiblingIds(profileId: string, taskId: string): string[] {
+  const catalog = getRawSeedTasksForProfile(profileId);
+  const target = catalog.find(t => t.id === taskId);
+  if (!target) return [taskId];
+  return catalog.filter(t => t.label === target.label).map(t => t.id);
 }
 
 export function getTasksForToday(profileId: string): Task[] {
@@ -2157,11 +2171,12 @@ export function isSeedTaskPermanentlyHidden(profileId: string, taskId: string): 
 }
 
 /**
- * Permanently hide a seed task. If it belongs to a seed family, tombstone the
- * family (and known member IDs). Does not purge status/notes history.
+ * Permanently hide a seed task. Tombstones the family when known, and always
+ * expands to exact-label day siblings so Delete Forever cannot leave copies.
  */
 export function permanentlyHideSeedTask(profileId: string, taskId: string) {
-  const familyId = applySeedHideTombstones(profileId, taskId);
+  const siblings = listExactLabelSeedSiblingIds(profileId, taskId);
+  const familyId = applySeedHideTombstones(profileId, taskId, siblings);
   if (familyId) {
     try {
       import('./deviceAnalytics').then(({ trackEvent }) => {
@@ -2180,16 +2195,17 @@ export function permanentlyHideSeedTask(profileId: string, taskId: string) {
 }
 
 /**
- * One-shot: convert known hidden task IDs into family tombstones.
- * Call only from App mount post-sync. Idempotent via marker key.
- * @returns true if this call performed the backfill pass (marker was unset).
+ * One-shot: convert known hidden task IDs into family tombstones + exact-label siblings.
+ * Call only from App mount post-sync. Idempotent via marker keys.
  */
 export function runSeedFamilyBackfillIfNeeded(profileId: string): boolean {
-  const ran = runSeedFamilyBackfillCore(profileId);
-  if (ran) {
+  const familyRan = runSeedFamilyBackfillCore(profileId);
+  const catalog = getRawSeedTasksForProfile(profileId).map(t => ({ id: t.id, label: t.label }));
+  const labelRan = expandHiddenSeedIdsByExactLabel(profileId, catalog);
+  if (familyRan || labelRan) {
     import('./cloudBackup').then(({ scheduleSave }) => scheduleSave(profileId)).catch(() => {});
   }
-  return ran;
+  return familyRan || labelRan;
 }
 
 export function markTaskDeleted(profileId: string, taskId: string, date: string) {

@@ -8,11 +8,13 @@ import {
   unionIdArrays,
   SEED_FAMILY_MEMBERS,
   seedFamilyBackfillMarkerKey,
+  seedLabelExpandMarkerKey,
   hiddenSeedFamilyStorageKey,
   hiddenSeedTaskStorageKey,
   applySeedHideTombstones,
   isSeedHiddenByTombstones,
   runSeedFamilyBackfillCore,
+  expandHiddenSeedIdsByExactLabel,
   readHiddenSeedFamilyIds,
   readHiddenSeedTaskIds,
 } from '../src/app/data/seedFamilies.ts';
@@ -35,6 +37,7 @@ function resetProfile(profileId: string) {
   store.delete(hiddenSeedTaskStorageKey(profileId));
   store.delete(hiddenSeedFamilyStorageKey(profileId));
   store.delete(seedFamilyBackfillMarkerKey(profileId));
+  store.delete(seedLabelExpandMarkerKey(profileId));
 }
 
 section('unionIdArrays survives empty / disjoint / shorter');
@@ -131,6 +134,49 @@ section('SEED_FAMILY_MEMBERS entries are unique per family');
   for (const [fam, members] of Object.entries(SEED_FAMILY_MEMBERS)) {
     assert.equal(new Set(members).size, members.length, fam);
   }
+}
+
+section('Eunice Walk the dog: Delete Forever hides all day siblings');
+{
+  const profileId = 'eunice';
+  resetProfile(profileId);
+  assert.equal(getSeedFamilyIdForTaskId('eu-mon-1'), 'eu-walk-dog');
+  applySeedHideTombstones(profileId, 'eu-mon-1');
+  assert.ok(readHiddenSeedFamilyIds(profileId).has('eu-walk-dog'));
+  for (const id of listSeedTaskIdsInFamily('eu-walk-dog')) {
+    assert.ok(isSeedHiddenByTombstones(profileId, id), id);
+  }
+  assert.ok(!isSeedHiddenByTombstones(profileId, 'eu-mon-2'), 'stretch remains visible');
+}
+
+section('exact-label sibling expansion heals prior single-ID Eunice hides');
+{
+  const profileId = 'eunice-heal';
+  resetProfile(profileId);
+  store.delete(seedLabelExpandMarkerKey(profileId));
+  // Simulate old bug: only Monday walk hidden
+  store.set(hiddenSeedTaskStorageKey(profileId), JSON.stringify(['eu-mon-1']));
+  const catalog = [
+    { id: 'eu-mon-1', label: 'Walk the dog' },
+    { id: 'eu-tue-1', label: 'Walk the dog' },
+    { id: 'eu-wed-1', label: 'Walk the dog' },
+    { id: 'eu-mon-2', label: 'Stretching - 10 min' },
+  ];
+  assert.equal(expandHiddenSeedIdsByExactLabel(profileId, catalog), true);
+  assert.ok(isSeedHiddenByTombstones(profileId, 'eu-tue-1'));
+  assert.ok(isSeedHiddenByTombstones(profileId, 'eu-wed-1'));
+  assert.ok(!isSeedHiddenByTombstones(profileId, 'eu-mon-2'));
+  assert.ok(readHiddenSeedFamilyIds(profileId).has('eu-walk-dog'));
+  assert.equal(expandHiddenSeedIdsByExactLabel(profileId, catalog), false);
+}
+
+section('extraSiblingIds expand hide even before registry lookup');
+{
+  const profileId = 'extra-sibs';
+  resetProfile(profileId);
+  applySeedHideTombstones(profileId, 'one-off-x', ['one-off-x', 'one-off-y']);
+  assert.ok(isSeedHiddenByTombstones(profileId, 'one-off-x'));
+  assert.ok(isSeedHiddenByTombstones(profileId, 'one-off-y'));
 }
 
 console.log('\nAll seed deletion tombstone tests passed.\n');
