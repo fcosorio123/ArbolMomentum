@@ -9,6 +9,8 @@ import {
   type PotentialValue, type PotentialValueScore,
 } from '../data/potentialValue';
 import { ACCENT_MODAL_STYLES, ModalAccentBar } from '../styles/modalChrome';
+import { VoiceInputPanel } from './VoiceInputPanel';
+import type { VoiceTaskDraft } from '../data/voiceExtract';
 
 type ApplyTo = 'this' | 'all';
 
@@ -224,6 +226,25 @@ export function ManageTaskModal({
 
   const editingRecurring = isEdit && isRecurring(task?.recurrence);
 
+  const applyVoiceDraft = (d: VoiceTaskDraft) => {
+    if (d.label != null) setLabel(d.label);
+    if (d.description != null) setDescription(d.description);
+    if (d.timeOfDay != null) setTimeOfDay(d.timeOfDay);
+    if (d.goalId != null) {
+      setGoalId(d.goalId);
+      setRecommendedGoalId(undefined);
+    }
+    if (d.potentialValue != null) {
+      setPotentialValue(normalizePotentialValue(d.potentialValue) ?? d.potentialValue);
+    }
+    if (d.recurrence) {
+      setRecType(d.recurrence.type);
+      setWeekdays(d.recurrence.weekdays ?? []);
+      setMonthDates(d.recurrence.monthDates ?? []);
+      setSpecificDate(d.recurrence.specificDate ?? currentDate ?? '');
+    }
+  };
+
   return (
     <Modal
       open={open}
@@ -239,6 +260,15 @@ export function ManageTaskModal({
         <h3 style={{ margin: '0 0 18px', fontSize: 17, fontWeight: 800, color: C.headline }}>
           {isEdit ? 'Edit Task' : 'Add Task'}
         </h3>
+
+        {!isEdit && (
+          <VoiceInputPanel
+            recordType="task"
+            goals={goals}
+            active={open}
+            onApplyTask={applyVoiceDraft}
+          />
+        )}
 
         {/* Task name */}
         <div style={{ marginBottom: 14 }}>

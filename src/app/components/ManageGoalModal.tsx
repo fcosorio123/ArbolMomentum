@@ -3,6 +3,7 @@ import { Modal, Input, Button } from 'antd';
 import { C } from '../data/colors';
 import type { PersonalGoal } from '../data/personalGoals';
 import { ACCENT_MODAL_STYLES, ModalAccentBar } from '../styles/modalChrome';
+import { VoiceInputPanel } from './VoiceInputPanel';
 
 export interface GoalDraftValues {
   title?: string;
@@ -50,6 +51,17 @@ export function ManageGoalModal({ open, goal, draft, confirmLabel, onSave, onCan
         <h3 style={{ margin: '0 0 18px', fontSize: 17, fontWeight: 800, color: C.headline }}>
           {isEdit ? 'Edit Goal' : 'Add Goal'}
         </h3>
+
+        {!isEdit && (
+          <VoiceInputPanel
+            recordType="goal"
+            active={open}
+            onApplyGoal={(d) => {
+              if (d.title != null) setTitle(d.title);
+              if (d.deepWhy != null) setDeepWhy(d.deepWhy);
+            }}
+          />
+        )}
 
         <div style={{ marginBottom: 14 }}>
           <label style={{ fontSize: 12, fontWeight: 700, color: C.secondary, display: 'block', marginBottom: 6 }}>
