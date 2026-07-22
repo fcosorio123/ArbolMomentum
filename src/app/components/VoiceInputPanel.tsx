@@ -156,7 +156,8 @@ export function VoiceInputPanel({
             display: 'inline-flex',
             alignItems: 'center',
             gap: 6,
-            padding: '6px 10px',
+            padding: '10px 12px',
+            minHeight: 44,
             borderRadius: 8,
             border: `1px solid ${C.border}`,
             background: C.bgAlt,
@@ -216,7 +217,7 @@ export function VoiceInputPanel({
               padding: '8px 12px', borderRadius: 10, border: 'none',
               background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
               color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-              minHeight: 40,
+              minHeight: 44,
             }}
           >
             <AudioOutlined aria-hidden />
@@ -231,7 +232,7 @@ export function VoiceInputPanel({
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '8px 12px', borderRadius: 10, border: 'none',
               background: C.primary, color: '#fff', fontSize: 12, fontWeight: 700,
-              cursor: 'pointer', minHeight: 40,
+              cursor: 'pointer', minHeight: 44,
             }}
           >
             <StopOutlined aria-hidden />
@@ -245,7 +246,7 @@ export function VoiceInputPanel({
             style={{
               padding: '8px 12px', borderRadius: 10,
               border: `1px solid ${C.border}`, background: '#fff',
-              color: C.secondary, fontSize: 12, fontWeight: 600, cursor: 'pointer', minHeight: 40,
+              color: C.secondary, fontSize: 12, fontWeight: 600, cursor: 'pointer', minHeight: 44,
             }}
           >
             Cancel
@@ -261,7 +262,7 @@ export function VoiceInputPanel({
             style={{
               padding: '8px 12px', borderRadius: 10,
               border: `1px solid ${C.border}`, background: '#fff',
-              color: C.secondary, fontSize: 12, fontWeight: 600, cursor: 'pointer', minHeight: 40,
+              color: C.secondary, fontSize: 12, fontWeight: 600, cursor: 'pointer', minHeight: 44,
             }}
           >
             Type instead

@@ -260,7 +260,7 @@ export function GoalsPage({
   const goToLinkedTasks = onNavigateAllTasks ?? onNavigateTasks;
 
   return (
-    <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 100px', background: C.bg, minHeight: '100dvh' }}>
+    <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px calc(160px + env(safe-area-inset-bottom, 0px))', background: C.bg, minHeight: '100dvh' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -534,7 +534,12 @@ export function GoalsPage({
         {suggestionGoal && (
           <>
             <div style={{ height: 5, background: `linear-gradient(90deg, ${goalAccent(suggestionGoal.id)}, #8E1533)` }} />
-            <div style={{ padding: '22px 24px 24px' }}>
+            <div style={{
+              padding: '22px 24px 24px',
+              maxHeight: 'min(85dvh, calc(100dvh - 48px))',
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch',
+            }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: C.primary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
                 Goal created! 🎯
               </div>
@@ -571,7 +576,7 @@ export function GoalsPage({
                           setAddedSuggestions(prev => new Set([...prev, s.label]));
                         }}
                         style={{
-                          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                          width: 44, height: 44, borderRadius: 10, flexShrink: 0,
                           background: added ? `${C.primary}20` : `${C.primary}15`,
                           border: `1px solid ${C.primary}40`,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -580,6 +585,7 @@ export function GoalsPage({
                           transition: 'all 0.15s',
                         }}
                         title={added ? 'Added' : 'Add task'}
+                        aria-label={added ? 'Added' : `Add task: ${s.label}`}
                       >
                         {added ? '✓' : '+'}
                       </button>

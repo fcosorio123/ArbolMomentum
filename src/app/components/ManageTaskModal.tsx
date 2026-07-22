@@ -66,7 +66,7 @@ function WeekdayPicker({ value, onChange }: { value: number[]; onChange: (v: num
             type="button"
             onClick={() => toggle(i)}
             style={{
-              flex: 1, height: 34, borderRadius: 8, border: `1.5px solid ${active ? C.primary : C.border}`,
+              flex: 1, height: 34, minHeight: 44, borderRadius: 8, border: `1.5px solid ${active ? C.primary : C.border}`,
               background: active ? C.primary : C.bgAlt,
               color: active ? '#fff' : C.secondary,
               fontWeight: 700, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s',
@@ -94,7 +94,7 @@ function MonthDatePicker({ value, onChange }: { value: number[]; onChange: (v: n
             type="button"
             onClick={() => toggle(d)}
             style={{
-              height: 30, borderRadius: 7, border: `1.5px solid ${active ? C.primary : C.border}`,
+              height: 30, minHeight: 40, borderRadius: 7, border: `1.5px solid ${active ? C.primary : C.border}`,
               background: active ? C.primary : C.bgAlt,
               color: active ? '#fff' : C.secondary,
               fontWeight: 600, fontSize: 11, cursor: 'pointer', transition: 'all 0.15s',
@@ -256,7 +256,12 @@ export function ManageTaskModal({
       styles={ACCENT_MODAL_STYLES}
     >
       <ModalAccentBar gradient="linear-gradient(90deg, #A72D1A, #E9A100)" />
-      <div style={{ padding: '16px 24px 24px', maxHeight: '85vh', overflowY: 'auto' }}>
+      <div style={{
+        padding: '16px 24px 24px',
+        maxHeight: 'min(85dvh, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 48px))',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
+      }}>
         <h3 style={{ margin: '0 0 18px', fontSize: 17, fontWeight: 800, color: C.headline }}>
           {isEdit ? 'Edit Task' : 'Add Task'}
         </h3>

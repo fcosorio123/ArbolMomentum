@@ -47,7 +47,12 @@ export function ManageGoalModal({ open, goal, draft, confirmLabel, onSave, onCan
       styles={ACCENT_MODAL_STYLES}
     >
       <ModalAccentBar gradient={`linear-gradient(90deg, ${C.primary}, #8E1533)`} />
-      <div style={{ padding: '16px 24px 24px' }}>
+      <div style={{
+        padding: '16px 24px 24px',
+        maxHeight: 'min(85dvh, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 48px))',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
+      }}>
         <h3 style={{ margin: '0 0 18px', fontSize: 17, fontWeight: 800, color: C.headline }}>
           {isEdit ? 'Edit Goal' : 'Add Goal'}
         </h3>

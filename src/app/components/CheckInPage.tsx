@@ -516,7 +516,10 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
         </div>
 
         {/* Bottom navigation */}
-        <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+        <div style={{
+          display: 'flex', gap: 10, marginTop: 24,
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}>
           {!isFirst && (
             <button onClick={goPrev} style={{
               width: 44, height: 44, borderRadius: 12, flexShrink: 0,
@@ -679,6 +682,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
       position: 'fixed', inset: 0, zIndex: 300, background: C.bg,
       display: 'flex', flexDirection: 'column',
       paddingTop: 'env(safe-area-inset-top, 0px)',
+      paddingBottom: 'env(safe-area-inset-bottom, 0px)',
     }}>
 
       {/* Top bar */}
@@ -691,7 +695,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
         {screen === 'task' && (
           <button onClick={() => setScreen('landing')} style={{
             background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 10,
-            width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', color: C.body, fontSize: 14, flexShrink: 0,
           }}>←</button>
         )}
@@ -712,7 +716,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
         {screen !== 'processing' && (
           <button onClick={onClose} style={{
             background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 10,
-            width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', color: C.secondary, fontSize: 13, flexShrink: 0,
           }} title="Close"><CloseOutlined /></button>
         )}

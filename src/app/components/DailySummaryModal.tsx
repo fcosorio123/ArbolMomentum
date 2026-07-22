@@ -161,13 +161,13 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
           maxWidth: 'calc(100vw - 24px)',
           width: 'min(400px, calc(100vw - 24px))',
           margin: '0 auto',
-          maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+          maxHeight: 'min(90dvh, calc(100dvh - 24px))', display: 'flex', flexDirection: 'column',
         },
         body: { padding: 0, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
         mask: { backdropFilter: 'blur(6px)', background: 'rgba(39,39,42,0.3)' },
       }}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 'min(90dvh, calc(100dvh - 24px))', overflow: 'hidden' }}>
         {/* Header band */}
         <div style={{
           background: `linear-gradient(135deg, ${C.headline} 0%, ${C.primaryPressed} 100%)`,
@@ -406,7 +406,7 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
 
         {/* Pinned footer - always reachable on small screens */}
         <div style={{
-          flexShrink: 0, padding: '12px 16px 16px',
+          flexShrink: 0, padding: '12px 16px max(16px, env(safe-area-inset-bottom, 0px))',
           borderTop: `1px solid ${C.border}`, background: C.bg,
         }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 12 }}>

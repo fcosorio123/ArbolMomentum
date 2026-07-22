@@ -32,7 +32,7 @@ export function AccessCodeGate({ onUnlock, onCancel }: Props) {
     <div style={{
       minHeight: '100dvh', background: C.bg,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      padding: '24px 24px',
+      padding: 'max(24px, env(safe-area-inset-top, 0px)) 24px max(24px, env(safe-area-inset-bottom, 0px))',
       fontFamily: 'system-ui, -apple-system, sans-serif',
     }}>
       <div style={{
@@ -118,6 +118,7 @@ export function AccessCodeGate({ onUnlock, onCancel }: Props) {
               style={{
                 marginTop: 14, background: 'none', border: 'none',
                 color: C.secondary, fontSize: 13, cursor: 'pointer',
+                minHeight: 44, padding: '12px 16px',
               }}
             >
               Cancel

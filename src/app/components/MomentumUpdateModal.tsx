@@ -62,13 +62,16 @@ export function MomentumUpdateModal({
         destroyOnClose
         maskClosable
         width={MODAL_WIDTH}
-        style={{ maxWidth: '100vw' }}
+        style={{ maxWidth: 'calc(100vw - 24px)' }}
         styles={{
           content: {
             borderRadius: 20,
             padding: 0,
             overflow: 'hidden',
             boxShadow: '0 24px 64px rgba(39,39,42,0.22)',
+            maxHeight: 'min(90dvh, calc(100dvh - 24px))',
+            display: 'flex',
+            flexDirection: 'column',
           },
           mask: {
             background: 'rgba(39, 39, 42, 0.45)',
@@ -80,7 +83,7 @@ export function MomentumUpdateModal({
             background: 'transparent',
             border: 'none',
           },
-          body: { padding: 0 },
+          body: { padding: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' },
           wrapper: { zIndex: 1100 },
         }}
       >
@@ -94,7 +97,7 @@ export function MomentumUpdateModal({
             background: isUrgent
               ? 'linear-gradient(135deg, #cf1322, #ff7875)'
               : `linear-gradient(135deg, ${C.headline}, ${C.primary})`,
-            padding: '14px 44px 12px 18px',
+            padding: '14px 52px 12px 18px',
             color: '#fff',
           }}>
             <button
@@ -102,11 +105,11 @@ export function MomentumUpdateModal({
               aria-label="Close"
               onClick={onContinue}
               style={{
-                position: 'absolute', top: 10, right: 12,
-                width: 28, height: 28, borderRadius: 8,
+                position: 'absolute', top: 8, right: 10,
+                width: 44, height: 44, borderRadius: 10,
                 border: '1px solid rgba(255,255,255,0.35)',
                 background: 'rgba(255,255,255,0.12)',
-                color: '#fff', fontSize: 16, lineHeight: 1,
+                color: '#fff', fontSize: 18, lineHeight: 1,
                 cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
             >

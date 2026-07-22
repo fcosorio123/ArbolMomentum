@@ -56,9 +56,33 @@ for (const file of MOBILE_SCREENS) {
     assert(`${file} safe-area top`, SAFE_TOP.test(text));
   }
   if (!['BottomNav.tsx', 'CheckInPage.tsx'].includes(file)) {
-    assert(`${file} clears bottom nav`, BOTTOM_NAV_CLEAR.test(text) || /16px 100px/.test(text) || (file === 'ProfileScreen.tsx' && /calc\(130px \+ env\(safe-area-inset-bottom/.test(text)));
+    assert(
+      `${file} clears bottom nav`,
+      BOTTOM_NAV_CLEAR.test(text)
+        || /16px 100px/.test(text)
+        || /160px \+ env\(safe-area-inset-bottom/.test(text)
+        || (file === 'ProfileScreen.tsx' && /calc\(130px \+ env\(safe-area-inset-bottom/.test(text)),
+    );
   }
 }
+
+// FAB screens must clear nav + FAB + safe-area
+const goalsPage = readFileSync(join(src, 'GoalsPage.tsx'), 'utf8');
+const taskListPad = readFileSync(join(src, 'TaskList.tsx'), 'utf8');
+assert('GoalsPage FAB bottom clearance', /160px \+ env\(safe-area-inset-bottom/.test(goalsPage));
+assert('TaskList FAB bottom clearance', /160px \+ env\(safe-area-inset-bottom/.test(taskListPad));
+
+const checkIn = readFileSync(join(src, 'CheckInPage.tsx'), 'utf8');
+assert('CheckInPage bottom safe-area', /paddingBottom:\s*['"]env\(safe-area-inset-bottom/.test(checkIn));
+
+const themeCss = readFileSync(join(root, 'src', 'styles', 'theme.css'), 'utf8');
+assert('toasts clear FAB', /72px \+ 52px \+ 20px \+ env\(safe-area-inset-bottom/.test(themeCss));
+
+const bottomNav = readFileSync(join(src, 'BottomNav.tsx'), 'utf8');
+assert('BottomNav min touch height', /minHeight:\s*44/.test(bottomNav));
+
+const manageGoal = readFileSync(join(src, 'ManageGoalModal.tsx'), 'utf8');
+assert('ManageGoalModal scroll body', /maxHeight:.*85dvh/.test(manageGoal) && /overflowY:\s*'auto'/.test(manageGoal));
 
 // Core workflow modules present
 const workflowModules = [

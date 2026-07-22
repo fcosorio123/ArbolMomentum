@@ -89,7 +89,7 @@ export function ProfileSelector({ onSelect, onAdmin }: Props) {
       {/* Header */}
       <div style={{
         background: `linear-gradient(160deg, ${C.headline} 0%, ${C.primaryPressed} 100%)`,
-        padding: '56px 24px 40px',
+        padding: 'max(56px, calc(env(safe-area-inset-top, 0px) + 24px)) 24px 40px',
         position: 'relative',
         overflow: 'hidden',
       }}>
@@ -125,7 +125,7 @@ export function ProfileSelector({ onSelect, onAdmin }: Props) {
             onClick={() => void refreshStreaks()}
             style={{
               border: 'none', background: 'none', color: C.primary, fontSize: 11,
-              fontWeight: 700, cursor: 'pointer', padding: 0,
+              fontWeight: 700, cursor: 'pointer', padding: '10px 8px', minHeight: 44,
             }}
           >
             {streaksLoading ? 'Syncing…' : 'Refresh'}

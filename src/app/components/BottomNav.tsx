@@ -143,6 +143,7 @@ export function BottomNav({ activeTab, onChange, pendingCount = 0, isDesktop = f
               justifyContent: 'center',
               gap: 2,
               padding: '9px 0 7px',
+              minHeight: 44,
               background: 'none',
               border: 'none',
               cursor: 'pointer',
@@ -176,7 +177,7 @@ export function BottomNav({ activeTab, onChange, pendingCount = 0, isDesktop = f
                 </span>
               )}
             </span>
-            <span style={{ fontSize: 8, fontWeight: active ? 700 : 400, lineHeight: 1.1 }}>{tab.label}</span>
+            <span style={{ fontSize: 10, fontWeight: active ? 700 : 400, lineHeight: 1.1 }}>{tab.label}</span>
           </button>
         );
       })}

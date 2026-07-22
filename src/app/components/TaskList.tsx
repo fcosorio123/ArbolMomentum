@@ -196,8 +196,6 @@ function TaskOverflowMenu({
         }}
         style={{
           ...touchIconButton,
-          minWidth: 36,
-          minHeight: 36,
           padding: '6px 10px',
           background: C.bgAlt,
           border: `1.5px solid ${C.borderStrong}`,
@@ -315,9 +313,6 @@ function TaskItem({
 
   const actionBtnStyle: import('react').CSSProperties = {
     ...touchIconButton,
-    minWidth: 36,
-    minHeight: 36,
-    padding: '6px 8px',
     background: C.bgAlt,
     border: `1px solid ${C.border}`,
     borderRadius: 8,
@@ -1902,7 +1897,7 @@ export function TaskList({
   };
 
   return (
-    <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 100px', background: C.bg, minHeight: '100dvh' }}>
+    <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px calc(160px + env(safe-area-inset-bottom, 0px))', background: C.bg, minHeight: '100dvh' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 }}>
         <div>

@@ -203,7 +203,8 @@
 /* ── Global toast (Ant Design message) - Linear-style bottom placement */
 .ant-message {
   top: auto !important;
-  bottom: calc(72px + env(safe-area-inset-bottom, 0px) + 12px) !important;
+  /* Above BottomNav (~72) + FAB (52) so toasts do not cover Add on Goals/Tasks */
+  bottom: calc(72px + 52px + 20px + env(safe-area-inset-bottom, 0px)) !important;
   z-index: 10050 !important;
 }
 .ant-message-notice-content {
