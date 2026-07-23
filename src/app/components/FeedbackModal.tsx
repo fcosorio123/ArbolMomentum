@@ -152,7 +152,7 @@ export function FeedbackModal({ open, profileId, onSubmit, onLater }: Props) {
         /* ── Full form step ── */
         <div>
           {/* Header */}
-          <div style={{
+          <div style={{ color: C.onPrimary,
             background: `linear-gradient(135deg, ${C.headline} 0%, ${C.primaryPressed} 100%)`,
             padding: '20px 24px 18px',
           }}>

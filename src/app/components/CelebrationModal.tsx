@@ -108,7 +108,7 @@ export function CelebrationModal({ open, streak, newBadges, onClose, onViewWeek 
             type="primary"
             block
             onClick={() => { onViewWeek(); onClose(); }}
-            style={{
+            style={{ color: C.onPrimary,
               height: 50, borderRadius: 14,
               background: `linear-gradient(135deg, ${C.headline}, ${C.primaryPressed})`,
               border: 'none', fontSize: 15, fontWeight: 700,

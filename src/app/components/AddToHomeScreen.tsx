@@ -55,7 +55,7 @@ export function AddToHomeScreen({ open, onClose, installPrompt, onInstall }: Pro
       }}
     >
       {/* Header */}
-      <div style={{
+      <div style={{ color: C.onPrimary,
         background: `linear-gradient(135deg, ${C.headline} 0%, ${C.primaryPressed} 100%)`,
         padding: '28px 24px 24px', textAlign: 'center',
       }}>
@@ -75,7 +75,7 @@ export function AddToHomeScreen({ open, onClose, installPrompt, onInstall }: Pro
       <div style={{ padding: '20px 24px 28px', background: C.bg }}>
         {/* Native install prompt (Android Chrome) */}
         {installPrompt && (
-          <button onClick={onInstall} style={{
+          <button onClick={onInstall} style={{ color: C.onPrimary,
             display: 'flex', alignItems: 'center', gap: 12, width: '100%',
             background: `linear-gradient(135deg, ${C.primary}20, ${C.bgAlt})`,
             border: `1.5px solid ${C.primary}50`, borderRadius: 14,

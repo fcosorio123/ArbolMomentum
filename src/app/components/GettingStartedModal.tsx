@@ -79,7 +79,7 @@ export function GettingStartedModal({
             type="primary"
             block
             onClick={chooseGoal}
-            style={{
+            style={{ color: C.onPrimary,
               height: 48, borderRadius: 12, fontWeight: 700, border: 'none',
               background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
             }}

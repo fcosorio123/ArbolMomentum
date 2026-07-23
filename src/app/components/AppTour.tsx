@@ -738,7 +738,7 @@ export function PageTour({
               type="primary"
               block
               onClick={() => setShowDone(false)}
-              style={{
+              style={{ color: C.onPrimary,
                 borderRadius: 12, height: 44, fontWeight: 700,
                 background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
                 border: 'none', fontSize: 14,

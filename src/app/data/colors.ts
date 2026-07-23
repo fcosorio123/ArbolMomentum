@@ -116,6 +116,8 @@ export const C = {
   primary: ARBOL_PRIMARY.DEFAULT,
   primaryDark: ARBOL_PRIMARY.hover,
   primaryPressed: ARBOL_PRIMARY.pressed,
+  /** Text / icons on solid primary (maroon) chrome — keep AA contrast */
+  onPrimary: ARBOL_NEUTRAL.white,
   /**
    * Secondary labels / inactive icons on light surfaces.
    * Heavy charcoal (not zinc-400) so text stays readable on linen.

@@ -322,7 +322,7 @@ export function DataMigration({ onClose }: { onClose: () => void }) {
               block
               icon={<UploadOutlined />}
               onClick={migrateData}
-              style={{
+              style={{ color: C.onPrimary,
                 height: 48, fontSize: 16, borderRadius: 12,
                 background: `linear-gradient(135deg, ${C.primary} 0%, ${C.headline} 100%)`,
                 border: 'none',
@@ -417,7 +417,7 @@ export function DataMigration({ onClose }: { onClose: () => void }) {
               size="large"
               block
               onClick={onClose}
-              style={{
+              style={{ color: C.onPrimary,
                 height: 48, fontSize: 16, borderRadius: 12,
                 background: C.primary,
                 border: 'none',

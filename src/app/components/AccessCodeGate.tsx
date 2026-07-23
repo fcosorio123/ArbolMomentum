@@ -54,7 +54,7 @@ export function AccessCodeGate({ onUnlock, onCancel }: Props) {
         `}</style>
 
         {/* Top accent */}
-        <div style={{ height: 5, background: `linear-gradient(90deg, ${C.primary}, #8E1533)` }} />
+        <div style={{ color: C.onPrimary, height: 5, background: `linear-gradient(90deg, ${C.primary}, #8E1533)` }} />
 
         <div style={{ padding: '32px 28px 28px', textAlign: 'center' }}>
           {/* Icon */}
@@ -103,7 +103,7 @@ export function AccessCodeGate({ onUnlock, onCancel }: Props) {
             block
             size="large"
             onClick={handleSubmit}
-            style={{
+            style={{ color: C.onPrimary,
               borderRadius: 14, height: 50, fontSize: 15, fontWeight: 700,
               background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
               border: 'none', boxShadow: `0 4px 16px ${C.primary}40`,

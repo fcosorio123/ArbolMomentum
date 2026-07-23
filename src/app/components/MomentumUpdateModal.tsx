@@ -203,7 +203,7 @@ export function MomentumUpdateModal({
               type="primary"
               size="large"
               onClick={onContinue}
-              style={{
+              style={{ color: C.onPrimary,
                 borderRadius: 12, height: 48, fontWeight: 700, fontSize: 14, flex: 1.15,
                 background: C.primary, border: 'none',
                 boxShadow: `0 4px 14px ${C.primary}40`,

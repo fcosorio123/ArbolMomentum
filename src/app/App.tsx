@@ -69,6 +69,8 @@ const arbolTheme = {
     colorBorder: C.border,
     colorText: C.headline,
     colorTextSecondary: C.body,
+    /** Labels on solid primary / danger fills (Generate, Save, etc.) */
+    colorTextLightSolid: C.onPrimary,
     colorLink: C.primary,
     colorLinkHover: C.primaryDark,
     colorLinkActive: C.primaryPressed,
@@ -79,7 +81,12 @@ const arbolTheme = {
     fontSize: 15,
   },
   components: {
-    Button: { colorPrimaryHover: C.primaryDark, colorPrimaryActive: C.primaryPressed },
+    Button: {
+      colorPrimaryHover: C.primaryDark,
+      colorPrimaryActive: C.primaryPressed,
+      primaryColor: C.onPrimary,
+      dangerColor: C.onPrimary,
+    },
     Switch: { colorPrimary: C.primary },
     Progress: { colorSuccess: C.success },
     Modal: { colorBgElevated: C.bg },

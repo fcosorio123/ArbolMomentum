@@ -234,7 +234,7 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
             loading={parsing}
             disabled={goalText.trim().length < 8 || parsing}
             onClick={handleGenerate}
-            style={{ background: C.primary, fontWeight: 600 }}
+            style={{ color: C.onPrimary, background: C.primary, fontWeight: 600 }}
           >
             Generate suggestions
           </Button>
@@ -294,7 +294,7 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
               </div>
             ))}
           </div>
-          <Button type="primary" block size="large" onClick={() => setStep('name')} style={{ background: C.primary, fontWeight: 600 }}>
+          <Button type="primary" block size="large" onClick={() => setStep('name')} style={{ color: C.onPrimary, background: C.primary, fontWeight: 600 }}>
             Continue
           </Button>
         </>
@@ -360,7 +360,7 @@ export function CreateProfileModal({ open, onClose, onCreated }: Props) {
             loading={creating}
             disabled={!name.trim() || !email.trim() || !isValidProfileEmail(email.trim())}
             onClick={handleCreate}
-            style={{ background: C.primary, fontWeight: 600 }}
+            style={{ color: C.onPrimary, background: C.primary, fontWeight: 600 }}
           >
             Create profile
           </Button>

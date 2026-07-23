@@ -431,7 +431,7 @@ export function ContextAssistModal({ open, onClose, mode, existingGoals = [], on
               block
               size="large"
               onClick={continueFromTaskLink}
-              style={{ borderRadius: 12, height: 46, background: C.primary, fontWeight: 700, border: 'none' }}
+              style={{ color: C.onPrimary, borderRadius: 12, height: 46, background: C.primary, fontWeight: 700, border: 'none' }}
             >
               Continue
             </Button>
@@ -483,7 +483,7 @@ export function ContextAssistModal({ open, onClose, mode, existingGoals = [], on
               loading={parsing}
               disabled={text.trim().length < 8 || parsing}
               onClick={handleParse}
-              style={{ borderRadius: 12, height: 46, background: C.primary, fontWeight: 700, border: 'none' }}
+              style={{ color: C.onPrimary, borderRadius: 12, height: 46, background: C.primary, fontWeight: 700, border: 'none' }}
             >
               Parse suggestions
             </Button>
@@ -613,7 +613,7 @@ export function ContextAssistModal({ open, onClose, mode, existingGoals = [], on
                 size="large"
                 disabled={(selectedTaskCount === 0 && kind === 'task') || parsing}
                 onClick={handleConfirm}
-                style={{ borderRadius: 12, height: 46, background: C.primary, fontWeight: 700, border: 'none', flex: '1.4 1 160px' }}
+                style={{ color: C.onPrimary, borderRadius: 12, height: 46, background: C.primary, fontWeight: 700, border: 'none', flex: '1.4 1 160px' }}
               >
                 {copy.confirm}
               </Button>

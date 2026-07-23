@@ -175,7 +175,7 @@ export function CalendarScreen({ profile, onOpenReminders, onProductTour }: Prop
       {/* Hero */}
       <div
         data-tour-id="calendar-hero"
-        style={{
+        style={{ color: C.onPrimary,
           background: `linear-gradient(135deg, ${C.headline}, ${C.primaryPressed})`,
           borderRadius: 16,
           padding: '18px 16px',

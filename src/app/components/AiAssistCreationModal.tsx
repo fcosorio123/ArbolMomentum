@@ -640,7 +640,7 @@ export function AiAssistCreationModal({
                   loading={loading}
                   disabled={session.brainDump.text.trim().length < 8}
                   onClick={() => void runGenerate(false)}
-                  style={{
+                  style={{ color: C.onPrimary,
                     borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none',
                     background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
                   }}
@@ -734,7 +734,7 @@ export function AiAssistCreationModal({
                   type="primary"
                   block
                   onClick={() => void chooseStarterMode('goal_only')}
-                  style={{
+                  style={{ color: C.onPrimary,
                     borderRadius: 12, height: 48, fontWeight: 700, border: 'none',
                     background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
                   }}
@@ -831,7 +831,7 @@ export function AiAssistCreationModal({
                   block
                   type="primary"
                   onClick={() => setSession(setStep(session, 'final_review', true))}
-                  style={{
+                  style={{ color: C.onPrimary,
                     borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none',
                     background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
                   }}
@@ -933,6 +933,7 @@ export function AiAssistCreationModal({
                     type="primary"
                     onClick={() => runPersist(true)}
                     style={{
+                      color: C.onPrimary,
                       borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none',
                       background: `linear-gradient(135deg, #A72D1A, #E9A100)`,
                     }}
@@ -945,6 +946,7 @@ export function AiAssistCreationModal({
                     type="primary"
                     onClick={() => runPersist(false)}
                     style={{
+                      color: C.onPrimary,
                       borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none',
                       background: `linear-gradient(135deg, #A72D1A, #E9A100)`,
                     }}

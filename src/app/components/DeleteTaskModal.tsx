@@ -89,6 +89,7 @@ export function DeleteTaskModal({
           </Button>
           <Button block type="primary" onClick={onConfirm}
             style={{
+              color: C.onPrimary,
               borderRadius: 12, height: 44, flex: 1,
               background: choice === 'forever' ? C.tertiary : C.primary,
               border: 'none', fontWeight: 700,

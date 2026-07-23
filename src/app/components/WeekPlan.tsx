@@ -332,8 +332,8 @@ export function WeekPlan({ profile }: Props) {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 {stat.pct === 100
-                  ? <CheckCircleFilled style={{ color: '#fff', fontSize: 13 }} />
-                  : <span style={{ fontSize: 10, color: isActive ? '#fff' : C.secondary, fontWeight: 700 }}>{stat.done}</span>
+                  ? <CheckCircleFilled style={{ color: C.onPrimary, fontSize: 13 }} />
+                  : <span style={{ fontSize: 10, color: stat.pct > 40 ? C.onPrimary : C.secondary, fontWeight: 700 }}>{stat.done}</span>
                 }
               </div>
             </button>

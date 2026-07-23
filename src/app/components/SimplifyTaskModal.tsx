@@ -554,7 +554,7 @@ export function SimplifyTaskModal({
                 loading={loading || detailLoading}
                 disabled={!canNext && step === 0}
                 onClick={handleNext}
-                style={{ borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none', background: '#550D0E' }}
+                style={{ color: C.onPrimary, borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none', background: '#550D0E' }}
               >
                 {isLastQuestion ? (error ? 'Retry' : 'Suggest simpler tasks') : 'Next'}
               </Button>
@@ -681,7 +681,7 @@ export function SimplifyTaskModal({
                 type="primary"
                 disabled={selected.size === 0}
                 onClick={handleConfirm}
-                style={{ borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none', background: '#550D0E' }}
+                style={{ color: C.onPrimary, borderRadius: 12, height: 46, flex: 2, fontWeight: 700, border: 'none', background: '#550D0E' }}
               >
                 Replace with {selected.size} task{selected.size !== 1 ? 's' : ''}
               </Button>

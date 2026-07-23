@@ -429,6 +429,7 @@ export function PersonalGoals({ profileId, onBack, onNavigateTasks }: Props) {
                           setLogModalVisible(true);
                         }}
                         style={{
+                          color: C.onPrimary,
                           width: '100%', borderRadius: 10, fontSize: 13, fontWeight: 700,
                           background: `linear-gradient(135deg, #A72D1A, #E9A100)`,
                           border: 'none', height: 40,
@@ -610,7 +611,7 @@ export function PersonalGoals({ profileId, onBack, onNavigateTasks }: Props) {
               Cancel
             </Button>
             <Button block type="primary" onClick={handleReset}
-              style={{ borderRadius: 12, height: 44, background: C.tertiary, border: 'none' }}>
+              style={{ color: C.onPrimary, borderRadius: 12, height: 44, background: C.tertiary, border: 'none' }}>
               Reset
             </Button>
           </div>
@@ -652,7 +653,7 @@ export function PersonalGoals({ profileId, onBack, onNavigateTasks }: Props) {
               <Button
                 block type="primary" size="large"
                 onClick={() => { setCelebrationVisible(false); setCompletedMilestone(null); onNavigateTasks?.(); }}
-                style={{ borderRadius: 12, height: 48, fontSize: 15, fontWeight: 600, background: `linear-gradient(135deg, #A72D1A, #E9A100)`, border: 'none' }}
+                style={{ color: C.onPrimary, borderRadius: 12, height: 48, fontSize: 15, fontWeight: 600, background: `linear-gradient(135deg, #A72D1A, #E9A100)`, border: 'none' }}
               >
                 Continue Journey →
               </Button>

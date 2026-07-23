@@ -29,7 +29,7 @@ export function ProfileScreen({ profile, onSwitch, onAdmin, onAlerts }: Props) {
   return (
     <div style={{ padding: 'max(20px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px calc(130px + env(safe-area-inset-bottom, 0px))', background: C.bg, minHeight: '100dvh' }}>
       {/* Hero */}
-      <div style={{
+      <div style={{ color: C.onPrimary,
         background: `linear-gradient(160deg, ${C.headline} 0%, ${C.primaryPressed} 100%)`,
         borderRadius: 24, padding: '28px 20px 24px', marginBottom: 16,
         textAlign: 'center', boxShadow: C.shadowMd,

@@ -158,7 +158,7 @@ export function TaskUpdateModal({
             block
             type="primary"
             onClick={() => onSubmit(status, note)}
-            style={{
+            style={{ color: C.onPrimary,
               borderRadius: 12, height: 46, flex: 1.4, fontWeight: 700,
               background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
               border: 'none', fontSize: 14,

@@ -519,6 +519,7 @@ export function ManageTaskModal({
           </Button>
           <Button block type="primary" disabled={!valid} onClick={handleSave}
             style={{
+              color: C.onPrimary,
               borderRadius: 12, height: 46, flex: 2,
               background: valid ? `linear-gradient(135deg, #A72D1A, #E9A100)` : undefined,
               border: 'none', fontWeight: 700,

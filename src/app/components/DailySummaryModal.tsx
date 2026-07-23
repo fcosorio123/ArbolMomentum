@@ -169,7 +169,7 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
     >
       <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 'min(90dvh, calc(100dvh - 24px))', overflow: 'hidden' }}>
         {/* Header band */}
-        <div style={{
+        <div style={{ color: C.onPrimary,
           background: `linear-gradient(135deg, ${C.headline} 0%, ${C.primaryPressed} 100%)`,
           padding: '20px 16px 18px',
           flexShrink: 0,

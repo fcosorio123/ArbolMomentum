@@ -223,7 +223,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
       </div>
 
       {/* Add to Home Screen tutorial banner */}
-      <button onClick={onShowInstallTutorial} style={{
+      <button onClick={onShowInstallTutorial} style={{ color: C.onPrimary,
         display: 'flex', alignItems: 'center', gap: 12, width: '100%',
         background: `linear-gradient(135deg, ${C.headline}, ${C.primaryPressed})`,
         border: 'none', borderRadius: 16, padding: '14px 16px', marginBottom: 14, cursor: 'pointer',
@@ -272,7 +272,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
           </div>
           {notifGloballyEnabled && permission === 'default' && !platform.needsHomeScreenInstall && (
             <Button type="primary" size="small" icon={<BellOutlined />} onClick={requestPermission} loading={enabling}
-              style={{ background: C.primary, border: 'none', borderRadius: 8, fontSize: 12, flexShrink: 0 }}>
+              style={{ color: C.onPrimary, background: C.primary, border: 'none', borderRadius: 8, fontSize: 12, flexShrink: 0 }}>
               Enable
             </Button>
           )}
@@ -542,7 +542,7 @@ export function RemindersScreen({ profile, swRegistration, onShowInstallTutorial
       <Modal open={showAdd} title={<span style={{ color: C.headline }}>New Reminder</span>}
         onCancel={() => setShowAdd(false)} onOk={add} okText="Save Reminder"
         width="min(400px, calc(100vw - 24px))"
-        okButtonProps={{ style: { background: C.primary, border: 'none' } }}>
+        okButtonProps={{ style: { color: C.onPrimary, background: C.primary, border: 'none' } }}>
         <div style={{ paddingTop: 8 }}>
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', color: C.body, fontSize: 12, marginBottom: 6 }}>Label</label>

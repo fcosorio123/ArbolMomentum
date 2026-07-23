@@ -109,6 +109,7 @@ export function ManageGoalModal({ open, goal, draft, confirmLabel, onSave, onCan
             disabled={!valid}
             onClick={() => onSave({ title: title.trim(), deepWhy: deepWhy.trim() })}
             style={{
+              color: C.onPrimary,
               borderRadius: 12, height: 46, fontWeight: 700, border: 'none',
               background: valid ? `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})` : undefined,
             }}

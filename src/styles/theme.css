@@ -200,6 +200,33 @@
   }
 }
 
+/**
+ * Ant Design disabled solid primaries use colorTextDisabled (dark) while many
+ * CTAs keep a maroon fill via inline style — e.g. Create with AI → Generate.
+ * Keep light labels on brand fills so disabled/loading CTAs stay readable.
+ */
+.ant-btn-variant-solid.ant-btn-color-primary:disabled,
+.ant-btn-variant-solid.ant-btn-color-primary.ant-btn-disabled,
+.ant-btn-primary:disabled,
+.ant-btn-primary.ant-btn-disabled {
+  color: #ffffff !important;
+  background: #8E1533 !important;
+  border-color: transparent !important;
+  opacity: 0.55;
+  box-shadow: none !important;
+}
+
+.ant-btn-variant-solid.ant-btn-color-dangerous:disabled,
+.ant-btn-variant-solid.ant-btn-color-dangerous.ant-btn-disabled,
+.ant-btn-dangerous:disabled,
+.ant-btn-dangerous.ant-btn-disabled {
+  color: #ffffff !important;
+  background: #A72D1A !important;
+  border-color: transparent !important;
+  opacity: 0.55;
+  box-shadow: none !important;
+}
+
 /* ── Global toast (Ant Design message) - Linear-style bottom placement */
 .ant-message {
   top: auto !important;

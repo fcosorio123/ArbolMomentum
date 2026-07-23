@@ -387,7 +387,7 @@ export function GoalsPage({
       {goals.length > 0 && goToLinkedTasks && (
         <div
           onClick={goToLinkedTasks}
-          style={{
+          style={{ color: C.onPrimary,
             marginTop: 24, background: `linear-gradient(135deg, ${C.headline}, ${C.primaryPressed})`,
             borderRadius: 14, padding: '14px 18px', cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 12,
@@ -596,7 +596,7 @@ export function GoalsPage({
               <Button
                 block type="primary"
                 onClick={closeSuggestions}
-                style={{
+                style={{ color: C.onPrimary,
                   borderRadius: 12, height: 46,
                   background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
                   border: 'none', fontWeight: 700,

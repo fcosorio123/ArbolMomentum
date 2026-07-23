@@ -109,7 +109,7 @@ function LiveCheckInHelpModal({ open, onClose }: { open: boolean; onClose: () =>
           type="primary"
           block
           onClick={onClose}
-          style={{
+          style={{ color: C.onPrimary,
             marginTop: 18, height: 46, borderRadius: 12, fontWeight: 700, border: 'none',
             background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
           }}

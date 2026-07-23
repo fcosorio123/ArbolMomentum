@@ -188,6 +188,7 @@ export function CongratModal({ open, type, title, rows, onClose }: Props) {
           size="large"
           onClick={onClose}
           style={{
+            color: C.onPrimary,
             borderRadius: 14, height: 48, fontWeight: 800, fontSize: 15,
             background: `linear-gradient(135deg, ${accent}, ${gradientEnd})`,
             border: 'none',

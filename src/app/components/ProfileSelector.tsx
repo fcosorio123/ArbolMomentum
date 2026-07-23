@@ -87,7 +87,7 @@ export function ProfileSelector({ onSelect, onAdmin }: Props) {
       margin: '0 auto',
     }}>
       {/* Header */}
-      <div style={{
+      <div style={{ color: C.onPrimary,
         background: `linear-gradient(160deg, ${C.headline} 0%, ${C.primaryPressed} 100%)`,
         padding: 'max(56px, calc(env(safe-area-inset-top, 0px) + 24px)) 24px 40px',
         position: 'relative',

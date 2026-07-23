@@ -407,7 +407,7 @@ function OverviewTab() {
                   <div style={{ display: 'flex', gap: 2 }}>
                     {p.weekDays.map((d: any) => (
                       <div key={d.day} style={{ flex: 1, height: 40, background: C.bgAlt, borderRadius: 4, position: 'relative', overflow: 'hidden' }}>
-                        <div style={{
+                        <div style={{ color: C.onPrimary,
                           position: 'absolute', bottom: 0, width: '100%',
                           height: `${d.pct}%`, background: C.primary,
                           transition: 'height 0.3s ease',
@@ -2140,7 +2140,7 @@ function SettingsTab() {
       </div>
 
       <Button type="primary" loading={saving} onClick={handleSave}
-        style={{ width: '100%', background: C.primary, border: 'none', borderRadius: 12, height: 44, fontWeight: 600, marginBottom: 24 }}>
+        style={{ color: C.onPrimary, width: '100%', background: C.primary, border: 'none', borderRadius: 12, height: 44, fontWeight: 600, marginBottom: 24 }}>
         {saved ? 'Browser settings saved ✓' : 'Save browser settings'}
       </Button>
 
@@ -2180,7 +2180,7 @@ function SettingsTab() {
       </div>
 
       <Button type="primary" loading={liveCheckInSaving} onClick={handleLiveCheckInSave}
-        style={{ width: '100%', background: C.primary, border: 'none', borderRadius: 12, height: 44, fontWeight: 600, marginBottom: 24 }}>
+        style={{ color: C.onPrimary, width: '100%', background: C.primary, border: 'none', borderRadius: 12, height: 44, fontWeight: 600, marginBottom: 24 }}>
         {liveCheckInSaved ? 'Live check-in settings saved ✓' : 'Save live check-in settings'}
       </Button>
 
@@ -2431,7 +2431,7 @@ function SettingsTab() {
           type="primary"
           loading={inviteSending}
           onClick={handleResendInvite}
-          style={{ marginTop: 12, borderRadius: 10, background: C.primary, border: 'none' }}
+          style={{ color: C.onPrimary, marginTop: 12, borderRadius: 10, background: C.primary, border: 'none' }}
         >
           Resend invite
         </Button>
@@ -2481,7 +2481,7 @@ function SettingsTab() {
       </div>
 
       <Button type="primary" loading={emailSaving} onClick={handleEmailSave}
-        style={{ width: '100%', background: C.primary, border: 'none', borderRadius: 12, height: 44, fontWeight: 600 }}>
+        style={{ color: C.onPrimary, width: '100%', background: C.primary, border: 'none', borderRadius: 12, height: 44, fontWeight: 600 }}>
         {emailSaved ? 'Email settings saved ✓' : 'Save email settings'}
       </Button>
     </div>
@@ -2498,7 +2498,7 @@ export function AdminView({ onBack }: Props) {
   return (
     <div style={{ minHeight: '100dvh', background: C.bg, width: '100%', maxWidth: 'min(100vw, 900px)', margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
       {/* Header */}
-      <div style={{ background: `linear-gradient(160deg, ${C.headline} 0%, ${C.primaryPressed} 100%)`, padding: 'max(52px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 20px' }}>
+      <div style={{ color: C.onPrimary, background: `linear-gradient(160deg, ${C.headline} 0%, ${C.primaryPressed} 100%)`, padding: 'max(52px, calc(env(safe-area-inset-top, 0px) + 16px)) 16px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <Button icon={<ArrowLeftOutlined />} type="text" onClick={onBack}
             style={{ color: 'rgba(255,255,255,0.8)', paddingLeft: 0 }}>

@@ -501,7 +501,7 @@ export function Dashboard({
       })()}
 
       {/* ── [1] Combined Streak + Motivation */}
-      <div data-tour-id="home-streak" style={{
+      <div data-tour-id="home-streak" style={{ color: C.onPrimary,
         ...card,
         background: `linear-gradient(135deg, ${C.headline} 0%, ${C.primaryPressed} 100%)`,
         border: 'none', padding: '18px 20px',
@@ -791,7 +791,7 @@ export function Dashboard({
             <div style={{ color: C.body, fontSize: 12 }}>Add to home screen for the best experience</div>
           </div>
           <Button type="primary" size="small" onClick={onInstall}
-            style={{ background: C.primary, border: 'none', borderRadius: 8, fontSize: 12 }}>
+            style={{ color: C.onPrimary, background: C.primary, border: 'none', borderRadius: 8, fontSize: 12 }}>
             Install
           </Button>
         </div>
