@@ -97,9 +97,10 @@ function goalVariants(text: string): GoalCandidate[] {
 
 function taskVariants(text: string, priorTitles: string[] = []): TaskCandidate[] {
   const lower = text.toLowerCase();
-  const drafts: Array<{ title: string; previewReason: string; description?: string }> = [];
+  const drafts: Array<{ title: string; previewReason: string; description?: string; evening?: boolean }> = [];
 
-  if (/insur|claim|deni|letter|call/.test(lower)) {
+  // Insurance / claims — do NOT match bare "call" (that stole "Call mom tonight").
+  if (/insur|claim|deni|appeal|policy/.test(lower)) {
     drafts.push(
       {
         title: 'Review the denial letter and identify the stated reason',
@@ -116,7 +117,6 @@ function taskVariants(text: string, priorTitles: string[] = []): TaskCandidate[]
         previewReason: 'Direct action step',
         description: 'Call during business hours with notes and claim ID in hand.',
       },
-      // Regen / anti-repeat set
       {
         title: 'Outline an appeal timeline with hard deadlines',
         previewReason: 'Planning angle instead of calling first',
@@ -131,26 +131,87 @@ function taskVariants(text: string, priorTitles: string[] = []): TaskCandidate[]
         title: 'Draft a short script for the insurance call',
         previewReason: 'Communication prep, not the call itself',
         description: 'Opening line, 3 asks, and what success looks like.',
+        evening: true,
       },
     );
-  } else if (/budget|money|financ|save/.test(lower)) {
+  } else if (/report|essay|paper|presentation|thesis|write-?up|\bdeck\b|slides?/.test(lower)) {
+    drafts.push(
+      { title: 'Draft the project outline', previewReason: 'Structure first', description: 'Section list and success criteria for the deliverable.' },
+      { title: 'Complete the introduction', previewReason: 'Lead section', description: 'Write the opening that sets scope and stakes.' },
+      { title: 'Gather supporting data', previewReason: 'Evidence', description: 'Collect figures, sources, or notes the report needs.' },
+      { title: 'Write the remaining sections', previewReason: 'Core drafting', description: 'Fill body sections against the outline.' },
+      { title: 'Proofread the report', previewReason: 'Quality pass', description: 'Fix clarity, typos, and formatting.' },
+      { title: 'Submit the final report', previewReason: 'Close the loop', description: 'Send or file by the deadline.' },
+    );
+  } else if (/exercise|workout|\bgym\b|fitness|\brun\b|jog|stretch|go to the gym|gto the gym/.test(lower)) {
+    drafts.push(
+      { title: 'Put on workout clothes and stretch for 5 minutes', previewReason: 'Start frictionless' },
+      { title: 'Do a 20-minute workout or brisk walk', previewReason: 'Primary action' },
+      { title: 'Log how you felt after exercising', previewReason: 'Feedback loop', evening: true },
+      { title: 'Schedule the next workout on the calendar', previewReason: 'Follow-through' },
+      { title: 'Prep a water bottle and shoes by the door', previewReason: 'Remove blockers', evening: true },
+      { title: 'Choose tomorrow’s workout type (walk, strength, or stretch)', previewReason: 'Plan lightly', evening: true },
+    );
+  } else if (/\bcall\b|\bphone\b|\btext\b/.test(lower)) {
+    const who = clip(
+      text.replace(/^(call|phone|text)\s+/i, '').replace(/\b(tonight|today|tomorrow|this evening)\b/gi, '').trim() ||
+        extractNounish(text),
+      36,
+    );
+    drafts.push(
+      { title: `Call ${who}`, previewReason: 'Direct action', description: 'Make the call with a clear purpose.' },
+      { title: `Jot 3 talking points before calling ${who}`, previewReason: 'Prep', description: 'Keep the conversation focused.' },
+      { title: `Set a reminder to call ${who}`, previewReason: 'Time cue', description: 'Protect the slot so it doesn’t slip.' },
+      { title: `Send a short text to ${who} if they miss the call`, previewReason: 'Backup path', evening: true },
+      { title: `Note the outcome after talking with ${who}`, previewReason: 'Close the loop', evening: true },
+      { title: `Confirm a follow-up time with ${who}`, previewReason: 'Next step' },
+    );
+  } else if (/grocer|supermarket|shopping list|buy groceries|on the way home/.test(lower)) {
+    drafts.push(
+      { title: 'Check the fridge and write a short grocery list', previewReason: 'Prep' },
+      { title: 'Buy groceries on the way home', previewReason: 'Primary action' },
+      { title: 'Grab healthy staples first (produce, protein)', previewReason: 'Prioritize' },
+      { title: 'Unpack groceries and put perishables away', previewReason: 'Finish strong', evening: true },
+      { title: 'Add missing staples to a recurring list', previewReason: 'System', evening: true },
+      { title: 'Set a midweek grocery top-up reminder', previewReason: 'Follow-through' },
+    );
+  } else if (/plants?|garden|water the/.test(lower)) {
+    drafts.push(
+      { title: 'Water the plants', previewReason: 'Primary action' },
+      { title: 'Check soil moisture before watering', previewReason: 'Avoid overwatering' },
+      { title: 'Set a Tuesday reminder to water the plants', previewReason: 'Repeating cue' },
+      { title: 'Move thirsty plants to a brighter spot if needed', previewReason: 'Care tweak' },
+      { title: 'Wipe dust off leaves while watering', previewReason: 'Small upgrade' },
+      { title: 'Note which plants need more or less water', previewReason: 'Learn the pattern', evening: true },
+    );
+  } else if (/tax|irs|deadline|before friday|due (by |before )?friday|submit .*documents|documents before/.test(lower)) {
+    drafts.push(
+      { title: 'Gather tax documents into one folder', previewReason: 'Collect inputs' },
+      { title: 'List missing forms and who to request them from', previewReason: 'Gap check' },
+      { title: 'Block 45 minutes to complete the filing steps', previewReason: 'Time box' },
+      { title: 'Submit tax documents before Friday', previewReason: 'Deadline action' },
+      { title: 'Confirm submission receipt or tracking number', previewReason: 'Proof', evening: true },
+      { title: 'Calendar a reminder two days before Friday', previewReason: 'Buffer' },
+    );
+  } else if (/budget|money|financ|save|debt/.test(lower)) {
     drafts.push(
       { title: 'List this month’s fixed expenses', previewReason: 'Clarify the baseline' },
       { title: 'Open the banking app and check current balances', previewReason: 'Quick situational awareness' },
       { title: 'Set a 20-minute weekly money check on the calendar', previewReason: 'Turn control into a repeating action' },
       { title: 'Pick one expense to cut or pause this week', previewReason: 'Immediate leverage' },
       { title: 'Transfer a small savings amount today', previewReason: 'Actionable money move' },
-      { title: 'Write down next month’s money priorities', previewReason: 'Forward-looking planning' },
+      { title: 'Write down next month’s money priorities', previewReason: 'Forward-looking planning', evening: true },
     );
   } else {
     const focus = clip(extractNounish(text), 40);
+    const raw = clip(text.replace(/\s+/g, ' '), 72);
     drafts.push(
-      { title: `Define the next concrete step for ${focus}`, previewReason: 'Clarify the first move' },
-      { title: `Gather what you need to start on ${focus}`, previewReason: 'Prep / unblocking step' },
-      { title: `Spend 15 focused minutes on ${focus}`, previewReason: 'Time-boxed action' },
-      { title: `Write the smallest done definition for ${focus}`, previewReason: 'Clarify success' },
-      { title: `Remove one blocker related to ${focus}`, previewReason: 'Unblocking' },
-      { title: `Ask one clarifying question about ${focus}`, previewReason: 'Information gathering' },
+      { title: raw.length >= 8 ? raw : `Finish ${focus}`, previewReason: 'Use your wording' },
+      { title: `Break ${focus} into the first unfinished piece and do it`, previewReason: 'Decompose' },
+      { title: `Block 25 focused minutes for ${focus}`, previewReason: 'Time box' },
+      { title: `Prep what you need, then start ${focus}`, previewReason: 'Unblock + act' },
+      { title: `Define done for ${focus} in one sentence, then execute`, previewReason: 'Success criteria' },
+      { title: `Schedule the finish-by time for ${focus} today`, previewReason: 'Deadline', evening: true },
     );
   }
 
@@ -158,6 +219,7 @@ function taskVariants(text: string, priorTitles: string[] = []): TaskCandidate[]
   const byTitle = new Map(drafts.map(d => [d.title, d]));
   return titles.map((t, i) => {
     const d = byTitle.get(t)!;
+    const timeOfDay = d.evening || i === 2 ? 'evening' : 'morning';
     return {
       id: newAiAssistId(`taskcand${i}`),
       type: 'task' as const,
@@ -165,8 +227,8 @@ function taskVariants(text: string, priorTitles: string[] = []): TaskCandidate[]
       description: d.description,
       previewReason: d.previewReason,
       suggestedFields: d.description
-        ? { description: d.description, timeOfDay: i === 2 ? 'evening' : 'morning' }
-        : { timeOfDay: i === 2 ? 'evening' : 'morning' },
+        ? { description: d.description, timeOfDay }
+        : { timeOfDay },
     };
   });
 }

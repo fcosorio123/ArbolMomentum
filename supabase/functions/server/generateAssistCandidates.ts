@@ -154,25 +154,96 @@ function rulesGoalCandidates(text: string, prior: string[]): GoalCandidate[] {
 function rulesTaskCandidates(text: string, prior: string[]): TaskCandidate[] {
   const lower = text.toLowerCase();
   const drafts: TaskCandidate[] = [];
-  if (/insur|claim|deni|letter|call/.test(lower)) {
-    drafts.push(
-      { id: newId("t"), type: "task", title: "Review the denial letter and identify the stated reason", previewReason: "Understand the document", suggestedFields: { description: "Highlight reasons, deadlines, and appeal steps.", timeOfDay: "morning" }, description: "Highlight reasons, deadlines, and appeal steps." },
-      { id: newId("t"), type: "task", title: "Prepare questions for the insurance company", previewReason: "Prepare before calling", suggestedFields: { description: "Write 3–5 questions and gather claim numbers.", timeOfDay: "morning" }, description: "Write 3–5 questions and gather claim numbers." },
-      { id: newId("t"), type: "task", title: "Call the insurer about the denied claim", previewReason: "Direct action", suggestedFields: { description: "Call with notes and claim ID ready.", timeOfDay: "morning" }, description: "Call with notes and claim ID ready." },
-      { id: newId("t"), type: "task", title: "Outline an appeal timeline with hard deadlines", previewReason: "Planning angle", suggestedFields: { description: "List filing dates, docs, and owners.", timeOfDay: "morning" }, description: "List filing dates, docs, and owners." },
-      { id: newId("t"), type: "task", title: "Collect claim numbers and recent correspondence in one place", previewReason: "Organization prep", suggestedFields: { description: "Folder with claim ID, letters, policy number.", timeOfDay: "morning" }, description: "Folder with claim ID, letters, policy number." },
-      { id: newId("t"), type: "task", title: "Draft a short script for the insurance call", previewReason: "Communication prep", suggestedFields: { description: "Opening line, 3 asks, success criteria.", timeOfDay: "evening" }, description: "Opening line, 3 asks, success criteria." },
+  const push = (
+    title: string,
+    previewReason: string,
+    description?: string,
+    timeOfDay: "morning" | "evening" = "morning",
+  ) => {
+    drafts.push({
+      id: newId("t"),
+      type: "task",
+      title,
+      previewReason,
+      description,
+      suggestedFields: description
+        ? { description, timeOfDay }
+        : { timeOfDay },
+    });
+  };
+
+  // Insurance / claims — do NOT match bare "call" (that stole "Call mom tonight").
+  if (/insur|claim|deni|appeal|policy/.test(lower)) {
+    push("Review the denial letter and identify the stated reason", "Understand the document", "Highlight reasons, deadlines, and appeal steps.");
+    push("Prepare questions for the insurance company", "Prepare before calling", "Write 3–5 questions and gather claim numbers.");
+    push("Call the insurer about the denied claim", "Direct action", "Call with notes and claim ID ready.");
+    push("Outline an appeal timeline with hard deadlines", "Planning angle", "List filing dates, docs, and owners.");
+    push("Collect claim numbers and recent correspondence in one place", "Organization prep", "Folder with claim ID, letters, policy number.");
+    push("Draft a short script for the insurance call", "Communication prep", "Opening line, 3 asks, success criteria.", "evening");
+  } else if (/report|essay|paper|presentation|thesis|write-?up|\bdeck\b|slides?/.test(lower)) {
+    push("Draft the project outline", "Structure first", "Section list and success criteria for the deliverable.");
+    push("Complete the introduction", "Lead section", "Write the opening that sets scope and stakes.");
+    push("Gather supporting data", "Evidence", "Collect figures, sources, or notes the report needs.");
+    push("Write the remaining sections", "Core drafting", "Fill body sections against the outline.");
+    push("Proofread the report", "Quality pass", "Fix clarity, typos, and formatting.");
+    push("Submit the final report", "Close the loop", "Send or file by the deadline.");
+  } else if (/exercise|workout|\bgym\b|fitness|\brun\b|jog|stretch|go to the gym|gto the gym/.test(lower)) {
+    push("Put on workout clothes and stretch for 5 minutes", "Start frictionless", "Lower the barrier to beginning.");
+    push("Do a 20-minute workout or brisk walk", "Primary action", "Pick a realistic duration and finish it.");
+    push("Log how you felt after exercising", "Feedback loop", "Note energy and anything to adjust next time.", "evening");
+    push("Schedule the next workout on the calendar", "Follow-through", "Protect a repeat slot this week.");
+    push("Prep a water bottle and shoes by the door", "Remove blockers", "Make tomorrow’s session automatic.", "evening");
+    push("Choose tomorrow’s workout type (walk, strength, or stretch)", "Plan lightly", "Decide once so you don’t stall later.", "evening");
+  } else if (/\bcall\b|\bphone\b|\btext\b/.test(lower)) {
+    const who = clip(
+      text.replace(/^(call|phone|text)\s+/i, "").replace(/\b(tonight|today|tomorrow|this evening)\b/gi, "").trim() ||
+        extractFocus(text),
+      36,
     );
+    push(`Call ${who}`, "Direct action", "Make the call with a clear purpose.");
+    push(`Jot 3 talking points before calling ${who}`, "Prep", "Keep the conversation focused.");
+    push(`Set a reminder to call ${who}`, "Time cue", "Protect the slot so it doesn’t slip.");
+    push(`Send a short text to ${who} if they miss the call`, "Backup path", "Keep the thread moving.", "evening");
+    push(`Note the outcome after talking with ${who}`, "Close the loop", "Capture next steps while fresh.", "evening");
+    push(`Confirm a follow-up time with ${who}`, "Next step", "Agree when you’ll talk again if needed.");
+  } else if (/grocer|supermarket|shopping list|buy groceries|on the way home/.test(lower)) {
+    push("Check the fridge and write a short grocery list", "Prep", "Only buy what you need.");
+    push("Buy groceries on the way home", "Primary action", "Stick to the list while commuting.");
+    push("Grab healthy staples first (produce, protein)", "Prioritize", "Fill the cart with essentials before extras.");
+    push("Unpack groceries and put perishables away", "Finish strong", "Avoid waste after the trip.", "evening");
+    push("Add missing staples to a recurring list", "System", "Make the next shop faster.", "evening");
+    push("Set a midweek grocery top-up reminder", "Follow-through", "Prevent an empty fridge midweek.");
+  } else if (/plants?|garden|water the/.test(lower)) {
+    push("Water the plants", "Primary action", "Give each plant enough water without overdoing it.");
+    push("Check soil moisture before watering", "Avoid overwatering", "Only water pots that are dry.");
+    push("Set a Tuesday reminder to water the plants", "Repeating cue", "Protect the weekly habit.");
+    push("Move thirsty plants to a brighter spot if needed", "Care tweak", "Fix light issues that dry them out.");
+    push("Wipe dust off leaves while watering", "Small upgrade", "Help plants absorb light better.");
+    push("Note which plants need more or less water", "Learn the pattern", "Adjust the Tuesday routine.", "evening");
+  } else if (/tax|irs|deadline|before friday|due (by |before )?friday|submit .*documents|documents before/.test(lower)) {
+    push("Gather tax documents into one folder", "Collect inputs", "W-2s, receipts, IDs, and prior returns.");
+    push("List missing forms and who to request them from", "Gap check", "Know what’s still outstanding.");
+    push("Block 45 minutes to complete the filing steps", "Time box", "Protect focus before the deadline.");
+    push("Submit tax documents before Friday", "Deadline action", "File or send with confirmation saved.");
+    push("Confirm submission receipt or tracking number", "Proof", "Keep evidence the deadline was met.", "evening");
+    push("Calendar a reminder two days before Friday", "Buffer", "Leave time to fix surprises.");
+  } else if (/budget|money|financ|save|debt/.test(lower)) {
+    push("List this month’s fixed expenses", "Clarify the baseline");
+    push("Open the banking app and check current balances", "Quick situational awareness");
+    push("Set a 20-minute weekly money check on the calendar", "Turn control into a repeating action");
+    push("Pick one expense to cut or pause this week", "Immediate leverage");
+    push("Transfer a small savings amount today", "Actionable money move");
+    push("Write down next month’s money priorities", "Forward-looking planning", undefined, "evening");
   } else {
+    // Prefer action-shaped titles from the dump over meta coaching templates.
     const focus = clip(extractFocus(text), 40);
-    drafts.push(
-      { id: newId("t"), type: "task", title: `Define the next concrete step for ${focus}`, previewReason: "Clarify first move", suggestedFields: { timeOfDay: "morning" } },
-      { id: newId("t"), type: "task", title: `Gather what you need to start on ${focus}`, previewReason: "Unblocking prep", suggestedFields: { timeOfDay: "morning" } },
-      { id: newId("t"), type: "task", title: `Spend 15 focused minutes on ${focus}`, previewReason: "Time-boxed action", suggestedFields: { timeOfDay: "evening" } },
-      { id: newId("t"), type: "task", title: `Write the smallest done definition for ${focus}`, previewReason: "Clarify success", suggestedFields: { timeOfDay: "morning" } },
-      { id: newId("t"), type: "task", title: `Remove one blocker related to ${focus}`, previewReason: "Unblocking", suggestedFields: { timeOfDay: "morning" } },
-      { id: newId("t"), type: "task", title: `Ask one clarifying question about ${focus}`, previewReason: "Information gathering", suggestedFields: { timeOfDay: "evening" } },
-    );
+    const raw = clip(text.replace(/\s+/g, " "), 72);
+    push(raw.length >= 8 ? raw : `Finish ${focus}`, "Use your wording", "Keep the action concrete and doable today.");
+    push(`Break ${focus} into the first unfinished piece and do it`, "Decompose", "Ship one real chunk instead of planning forever.");
+    push(`Block 25 focused minutes for ${focus}`, "Time box", "Protect a short window and start.");
+    push(`Prep what you need, then start ${focus}`, "Unblock + act", "Gather materials only long enough to begin.");
+    push(`Define done for ${focus} in one sentence, then execute`, "Success criteria", "Know when to stop.");
+    push(`Schedule the finish-by time for ${focus} today`, "Deadline", "Give the work a clear end.", "evening");
   }
   return drafts.filter((d) => !isNearDuplicate(d.title, prior)).slice(0, 3);
 }
@@ -245,7 +316,7 @@ async function callLlmCandidates(
   const model = Deno.env.get("LLM_MODEL")?.trim() || "gpt-4o-mini";
   const system = creationType === "goal"
     ? 'Return JSON only: {"candidates":[{"title":string,"description"?:string,"previewReason":string}]}. Give exactly 3 meaningfully different GOAL (outcome) candidates based on the user brain dump. Titles must be outcome-driven, not feelings. Avoid paraphrases of each other or of priorTitles. Do not invent tasks.'
-    : 'Return JSON only: {"candidates":[{"title":string,"description"?:string,"previewReason":string,"timeOfDay"?: "morning"|"evening"}]}. Give exactly 3 meaningfully different TASK (action) candidates. Verb-led titles. Avoid paraphrases of each other or priorTitles. Do not invent goals.';
+    : 'Return JSON only: {"candidates":[{"title":string,"description"?:string,"previewReason":string,"timeOfDay"?: "morning"|"evening"}]}. Give exactly 3 meaningfully different TASK (action) candidates grounded in the brain dump domain (e.g. project report → outline/draft/proofread/submit; groceries → list/buy/unpack; call mom → call/prep points). Verb-led, specific titles. Ban meta coaching like "define the next concrete step", "gather what you need to start", "spend 15 focused minutes", "smallest done definition", "remove one blocker". Avoid paraphrases of each other or priorTitles. Do not invent goals.';
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);
   try {
@@ -279,6 +350,7 @@ async function callLlmCandidates(
     for (const raw of arr) {
       const title = String(raw?.title || "").trim();
       if (title.length < 3) continue;
+      if (creationType === "task" && META_TASK_RE.test(title)) continue;
       if (isNearDuplicate(title, [...prior, ...out.map((c) => c.title)])) continue;
       if (creationType === "goal") {
         out.push({
@@ -311,6 +383,9 @@ async function callLlmCandidates(
     clearTimeout(timeout);
   }
 }
+
+const META_TASK_RE =
+  /define the next concrete|gather what you need|spend 15 focused|smallest done definition|remove one blocker|ask one clarifying|smallest next step|concrete action toward|build a (simple )?plan for/i;
 
 const META_STARTER_RE =
   /smallest next step|define next|concrete action toward|spend 15 focused|build a (simple )?plan for|remove one blocker|review progress on/i;

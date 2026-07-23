@@ -116,6 +116,32 @@ async function main() {
     `unexpected generic templates: ${weightBlob}`,
   );
 
+  const META_TASK = /define the next concrete|gather what you need|spend 15 focused|smallest done definition/i;
+  const domainCases: Array<{ input: string; expect: RegExp; label: string }> = [
+    { label: 'report', input: 'Finish my project report', expect: /outline|introduction|supporting|proofread|submit|sections/i },
+    { label: 'exercise', input: 'Exercise', expect: /workout|walk|stretch|gym|exercise/i },
+    { label: 'call', input: 'Call mom tonight', expect: /call|mom|talking points|reminder/i },
+    { label: 'groceries', input: 'Buy groceries on the way home', expect: /grocery|groceries|fridge|list/i },
+    { label: 'plants', input: 'Water the plants every Tuesday', expect: /plant|water|tuesday|soil/i },
+    { label: 'tax', input: 'Submit tax documents before Friday', expect: /tax|document|friday|folder|submit/i },
+    { label: 'presentation', input: "Prepare presentation for Monday's client meeting", expect: /outline|introduction|proofread|submit|sections|presentation|draft/i },
+    { label: 'typo-gym', input: 'Gto the gym', expect: /workout|walk|stretch|gym|exercise|shoes/i },
+    { label: 'mixed', input: 'Mag exercise after work', expect: /workout|walk|stretch|gym|exercise/i },
+  ];
+  for (const c of domainCases) {
+    const got = buildClientAssistCandidates('task', c.input, []);
+    assert.ok(got.length >= 2 && got.length <= 3, `${c.label}: expected 2–3 candidates`);
+    const blob = got.map(t => t.title).join(' | ');
+    assert.ok(c.expect.test(blob), `${c.label}: expected domain titles, got: ${blob}`);
+    assert.ok(!META_TASK.test(blob), `${c.label}: unexpected meta templates: ${blob}`);
+  }
+
+  // Ambiguous still returns actionable titles (not the old meta shells).
+  const ambiguous = buildClientAssistCandidates('task', 'Finish it', []);
+  const ambBlob = ambiguous.map(t => t.title).join(' | ');
+  assert.ok(ambiguous.length >= 2, 'ambiguous: candidates');
+  assert.ok(!META_TASK.test(ambBlob), `ambiguous: unexpected meta templates: ${ambBlob}`);
+
   console.log('AI Assist contract tests passed.');
 }
 
