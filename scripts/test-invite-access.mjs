@@ -48,6 +48,20 @@ assert('redeem-invite route registered', /\/redeem-invite/.test(index));
 const app = read('src/app/App.tsx');
 assert('App boots invite redeem', /redeemInviteToken/.test(app) && /inviteBoot/.test(app));
 assert('invite bypasses access gate while pending', /Opening your account/.test(app));
+assert('invite skips localStorage profile hydrate', /if \(readInviteTokenFromUrl\(\)\) return null/.test(app));
+assert('invite boot gate is hoisted above profile chrome',
+  app.lastIndexOf("if (inviteBoot === 'pending' || inviteBoot === 'error')") <
+  app.lastIndexOf('if (!activeProfile) {'));
+
+const profileScreen = read('src/app/components/ProfileScreen.tsx');
+assert('email reminders input is isolated from ProfileScreen stats',
+  /function EmailRemindersCard/.test(profileScreen) &&
+  /<EmailRemindersCard /.test(profileScreen) &&
+  !/const \[email, setEmail\]/.test(profileScreen.replace(/function EmailRemindersCard[\s\S]*?\n\}/, '')));
+
+const profiles = read('src/app/data/profiles.ts');
+assert('getEarnedBadges computes live profile once',
+  /export function getEarnedBadges[\s\S]{0,180}?const live = getLiveBadgeProfile/.test(profiles));
 
 const create = read('src/app/components/CreateProfileModal.tsx');
 assert('create profile force-sends welcome invite', /forceWelcome:\s*true/.test(create));

@@ -2329,7 +2329,8 @@ function getLiveBadgeProfile(profile: Profile): Profile {
 }
 
 export function getEarnedBadges(profile: Profile): Badge[] {
-  return BADGES.filter(b => b.check(getLiveBadgeProfile(profile)));
+  const live = getLiveBadgeProfile(profile);
+  return BADGES.filter(b => b.check(live));
 }
 
 // ──────────────────────────────────────────────

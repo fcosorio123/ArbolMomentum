@@ -113,6 +113,8 @@ const SELECTOR_UNLOCK_KEY = 'arbol-selector-unlocked';
 
 export default function App() {
   const [activeProfile, setActiveProfile] = useState<Profile | null>(() => {
+    // Invite deep-links must not flash a prior localStorage profile while redeeming.
+    if (readInviteTokenFromUrl()) return null;
     try {
       const saved = localStorage.getItem('arbol-active-profile');
       if (saved && isProfileArchived(saved)) {
@@ -688,52 +690,54 @@ export default function App() {
     try { sessionStorage.setItem(SELECTOR_UNLOCK_KEY, 'true'); } catch {}
   };
 
-  if (!activeProfile) {
-    if (inviteBoot === 'pending' || inviteBoot === 'error') {
-      return (
-        <ConfigProvider theme={arbolTheme}>
-          <AntdApp message={{ maxCount: 3, duration: 2.5 }}>
+  // Block all app chrome (including a stale session profile) until invite redeem settles.
+  if (inviteBoot === 'pending' || inviteBoot === 'error') {
+    return (
+      <ConfigProvider theme={arbolTheme}>
+        <AntdApp message={{ maxCount: 3, duration: 2.5 }}>
+          <div style={{
+            minHeight: '100dvh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 'max(24px, env(safe-area-inset-top, 0px)) 24px max(24px, env(safe-area-inset-bottom, 0px))',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+          }}>
             <div style={{
-              minHeight: '100dvh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: 'max(24px, env(safe-area-inset-top, 0px)) 24px max(24px, env(safe-area-inset-bottom, 0px))',
-              fontFamily: 'system-ui, -apple-system, sans-serif',
+              width: '100%', maxWidth: 400, background: C.bgCard, borderRadius: 20,
+              border: `1.5px solid ${C.border}`, padding: '28px 24px', textAlign: 'center',
             }}>
-              <div style={{
-                width: '100%', maxWidth: 400, background: C.bgCard, borderRadius: 20,
-                border: `1.5px solid ${C.border}`, padding: '28px 24px', textAlign: 'center',
-              }}>
-                <div style={{ fontSize: 28, marginBottom: 12 }}>🌿</div>
-                <h2 style={{ margin: '0 0 10px', fontSize: 18, fontWeight: 800, color: C.headline }}>
-                  {inviteBoot === 'pending' ? 'Opening your account…' : 'Invite link issue'}
-                </h2>
-                <p style={{ margin: 0, fontSize: 14, color: C.body, lineHeight: 1.5 }}>
-                  {inviteBoot === 'pending'
-                    ? 'Hang tight — we’re signing you into the account from your invitation email.'
-                    : (inviteError ?? 'This invite could not be opened.')}
-                </p>
-                {inviteBoot === 'error' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      clearInviteFromUrl();
-                      setInviteBoot('idle');
-                      setInviteError(null);
-                    }}
-                    style={{
-                      marginTop: 18, minHeight: 44, padding: '10px 16px', borderRadius: 12,
-                      border: `1px solid ${C.border}`, background: C.bgAlt, color: C.headline,
-                      fontWeight: 700, fontSize: 13, cursor: 'pointer',
-                    }}
-                  >
-                    Continue to sign-in
-                  </button>
-                )}
-              </div>
+              <div style={{ fontSize: 28, marginBottom: 12 }}>🌿</div>
+              <h2 style={{ margin: '0 0 10px', fontSize: 18, fontWeight: 800, color: C.headline }}>
+                {inviteBoot === 'pending' ? 'Opening your account…' : 'Invite link issue'}
+              </h2>
+              <p style={{ margin: 0, fontSize: 14, color: C.body, lineHeight: 1.5 }}>
+                {inviteBoot === 'pending'
+                  ? 'Hang tight — we’re signing you into the account from your invitation email.'
+                  : (inviteError ?? 'This invite could not be opened.')}
+              </p>
+              {inviteBoot === 'error' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearInviteFromUrl();
+                    setInviteBoot('idle');
+                    setInviteError(null);
+                  }}
+                  style={{
+                    marginTop: 18, minHeight: 44, padding: '10px 16px', borderRadius: 12,
+                    border: `1px solid ${C.border}`, background: C.bgAlt, color: C.headline,
+                    fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                  }}
+                >
+                  Continue to sign-in
+                </button>
+              )}
             </div>
-          </AntdApp>
-        </ConfigProvider>
-      );
-    }
+          </div>
+        </AntdApp>
+      </ConfigProvider>
+    );
+  }
+
+  if (!activeProfile) {
     if (!profileSelectorUnlocked) {
       return (
         <ConfigProvider theme={arbolTheme}>

@@ -8,10 +8,51 @@ import { C } from '../data/colors';
 
 interface Props { profile: Profile; onSwitch: () => void; onAdmin: () => void; onAlerts?: () => void; }
 
+/** Isolated so typing does not re-run streak/badge localStorage work on each keystroke. */
+function EmailRemindersCard({ profileId, profileName }: { profileId: string; profileName: string }) {
+  const [email, setEmail] = useState(() => getProfileEmail(profileId));
+  const [emailMsg, setEmailMsg] = useState<string | null>(null);
+
+  return (
+    <div style={{ background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16, padding: '16px 18px', boxShadow: C.shadow, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <MailOutlined style={{ color: C.primary }} />
+        <span style={{ fontWeight: 600, fontSize: 14, color: C.headline }}>Email for reminders</span>
+      </div>
+      <Input
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        placeholder="you@example.com"
+        inputMode="email"
+        autoComplete="email"
+        style={{ borderRadius: 10, marginBottom: 8 }}
+      />
+      <Button
+        block
+        onClick={() => {
+          const result = saveProfileEmail(profileId, email, { profileName });
+          setEmailMsg(result.ok ? 'Email saved' : (result.error ?? 'Could not save'));
+          setTimeout(() => setEmailMsg(null), 2500);
+        }}
+        style={{ borderRadius: 10, height: 40 }}
+      >
+        Save email
+      </Button>
+      {emailMsg && <div style={{ fontSize: 12, color: C.body, marginTop: 8 }}>{emailMsg}</div>}
+      {!email.trim() && (
+        <div style={{ fontSize: 11, color: C.streak, marginTop: 8, lineHeight: 1.45 }}>
+          Add your email to receive daily task reminders and streak alerts.
+        </div>
+      )}
+      <div style={{ fontSize: 11, color: C.secondary, marginTop: 8 }}>
+        Required for new profiles. Used for welcome and reminder emails when enabled by admin.
+      </div>
+    </div>
+  );
+}
+
 export function ProfileScreen({ profile, onSwitch, onAdmin, onAlerts }: Props) {
   const [tab, setTab] = useState<'stats' | 'badges'>('stats');
-  const [email, setEmail] = useState(() => getProfileEmail(profile.id));
-  const [emailMsg, setEmailMsg] = useState<string | null>(null);
   const rank = [...PROFILES].sort((a, b) => b.streak - a.streak).findIndex(p => p.id === profile.id) + 1;
   const earned = getEarnedBadges(profile);
   const liveStreak = computeLiveStreak(profile.id);
@@ -93,34 +134,7 @@ export function ProfileScreen({ profile, onSwitch, onAdmin, onAlerts }: Props) {
             ))}
           </div>
 
-          <div style={{ background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16, padding: '16px 18px', boxShadow: C.shadow, marginBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <MailOutlined style={{ color: C.primary }} />
-              <span style={{ fontWeight: 600, fontSize: 14, color: C.headline }}>Email for reminders</span>
-            </div>
-            <Input
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              style={{ borderRadius: 10, marginBottom: 8 }}
-            />
-            <Button block onClick={() => {
-              const result = saveProfileEmail(profile.id, email, { profileName: profile.name });
-              setEmailMsg(result.ok ? 'Email saved' : (result.error ?? 'Could not save'));
-              setTimeout(() => setEmailMsg(null), 2500);
-            }} style={{ borderRadius: 10, height: 40 }}>
-              Save email
-            </Button>
-            {emailMsg && <div style={{ fontSize: 12, color: C.body, marginTop: 8 }}>{emailMsg}</div>}
-            {!email.trim() && (
-              <div style={{ fontSize: 11, color: C.streak, marginTop: 8, lineHeight: 1.45 }}>
-                Add your email to receive daily task reminders and streak alerts.
-              </div>
-            )}
-            <div style={{ fontSize: 11, color: C.secondary, marginTop: 8 }}>
-              Required for new profiles. Used for welcome and reminder emails when enabled by admin.
-            </div>
-          </div>
+          <EmailRemindersCard profileId={profile.id} profileName={profile.name} />
 
           <div style={{ background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16, padding: '16px 18px', boxShadow: C.shadow, marginBottom: 56, scrollMarginBottom: 'calc(72px + env(safe-area-inset-bottom, 0px))' }}>
             {onAlerts && (
