@@ -9,12 +9,13 @@ interface Props {
   streak: number;
   newBadges: Badge[];
   onClose: () => void;
-  onViewWeek: () => void;
+  /** Navigate to an existing product surface (Tasks). Week Plan is retired from nav. */
+  onViewTasks: () => void;
 }
 
 const STREAK_MILESTONES = [3, 7, 14, 30];
 
-export function CelebrationModal({ open, streak, newBadges, onClose, onViewWeek }: Props) {
+export function CelebrationModal({ open, streak, newBadges, onClose, onViewTasks }: Props) {
   useEffect(() => {
     if (!open) return;
     confetti({
@@ -107,7 +108,7 @@ export function CelebrationModal({ open, streak, newBadges, onClose, onViewWeek 
           <Button
             type="primary"
             block
-            onClick={() => { onViewWeek(); onClose(); }}
+            onClick={() => { onViewTasks(); onClose(); }}
             style={{ color: C.onPrimary,
               height: 50, borderRadius: 14,
               background: `linear-gradient(135deg, ${C.headline}, ${C.primaryPressed})`,
@@ -115,7 +116,7 @@ export function CelebrationModal({ open, streak, newBadges, onClose, onViewWeek 
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}
           >
-            View Week Plan →
+            View Tasks →
           </Button>
           <Button
             block

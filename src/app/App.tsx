@@ -972,7 +972,7 @@ export default function App() {
             streak={activeProfile.streak}
             newBadges={celebrationBadges}
             onClose={() => setShowCelebration(false)}
-            onViewWeek={() => { setActiveTab('month'); setShowCelebration(false); }}
+            onViewTasks={() => { setActiveTab('tasks'); setShowCelebration(false); }}
           />
 
           {/* Coach marks */}

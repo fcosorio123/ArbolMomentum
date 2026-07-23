@@ -99,6 +99,23 @@ async function main() {
   assert.ok(starters.length >= 2 && starters.length <= 5);
   assert.ok(starters.every(t => t.clientKey && t.label));
 
+  // Planning-titled weight-loss goals must stay domain-specific (tester: Lose 10 lbs).
+  const weightStarters = buildClientStarterTasks(
+    'Build a simple plan for Lose lbs',
+    'Lose 10 lbs',
+    [],
+  );
+  assert.ok(weightStarters.length >= 2 && weightStarters.length <= 5);
+  const weightBlob = weightStarters.map(t => t.label).join(' ').toLowerCase();
+  assert.ok(
+    /weight|calorie|meal|workout|grocer|food/.test(weightBlob),
+    `expected weight-loss domain tasks, got: ${weightBlob}`,
+  );
+  assert.ok(
+    !/smallest next step|concrete action toward|15 focused minutes/.test(weightBlob),
+    `unexpected generic templates: ${weightBlob}`,
+  );
+
   console.log('AI Assist contract tests passed.');
 }
 

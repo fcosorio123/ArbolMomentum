@@ -179,7 +179,19 @@ function rulesTaskCandidates(text: string, prior: string[]): TaskCandidate[] {
 
 function rulesStarters(goalTitle: string, text: string, prior: string[]): GoalStarterTaskDraft[] {
   const lower = `${goalTitle} ${text}`.toLowerCase();
-  const ideas: string[] = /fit|energy|health|exercise|movement/.test(lower)
+  // Weight / nutrition first so planning-titled goals like "Build a simple plan for Lose lbs"
+  // still produce domain-specific tasks when the dump mentions weight loss.
+  const ideas: string[] = /weight|lose\b.*\blbs?\b|\blbs?\b|diet|nutrition|calorie|meal\s*plan/.test(lower)
+    ? [
+      "Define your target weight and a realistic deadline",
+      "Calculate your daily calorie goal",
+      "Create a healthy meal plan for this week",
+      "Schedule three workout sessions in your calendar",
+      "List foods to avoid and healthy alternatives",
+      "Buy healthy groceries for the week",
+      "Identify your biggest weight-loss obstacle and write one solution",
+    ]
+    : /fit|energy|health|exercise|gym|movement/.test(lower)
     ? [
       "Schedule three 20-minute walks this week",
       "Prep workout clothes the night before",
@@ -300,10 +312,14 @@ async function callLlmCandidates(
   }
 }
 
+const META_STARTER_RE =
+  /smallest next step|define next|concrete action toward|spend 15 focused|build a (simple )?plan for|remove one blocker|review progress on/i;
+
 async function callLlmStarters(
   goalTitle: string,
   text: string,
   prior: string[],
+  goalDeepWhy?: string,
 ): Promise<GoalStarterTaskDraft[] | null> {
   const apiKey = Deno.env.get("LLM_API_KEY")?.trim();
   if (!apiKey) return null;
@@ -325,11 +341,16 @@ async function callLlmStarters(
           {
             role: "system",
             content:
-              'Return JSON only: {"tasks":[{"label":string,"timeOfDay"?: "morning"|"evening"}]}. Give 2–5 concrete verb-led starter tasks that support ONLY the given goal. No separate goals. Avoid priorTitles paraphrases.',
+              'Return JSON only: {"tasks":[{"label":string,"timeOfDay"?: "morning"|"evening"}]}. Give 2–5 concrete verb-led starter tasks that support ONLY the given goal. Ground every task in the user\'s domain from brainDump/goalDeepWhy (e.g. lose weight → target weight, calories, meal plan, workouts, groceries—not generic coaching). Ban meta labels like "smallest next step", "define next concrete step", "take one concrete action toward", "spend 15 focused minutes on", "build a plan for". No separate goals. Avoid priorTitles paraphrases.',
           },
           {
             role: "user",
-            content: JSON.stringify({ goalTitle, brainDump: text.slice(0, MAX_INPUT), priorTitles: prior }),
+            content: JSON.stringify({
+              goalTitle,
+              goalDeepWhy: (goalDeepWhy || "").slice(0, 240),
+              brainDump: text.slice(0, MAX_INPUT),
+              priorTitles: prior,
+            }),
           },
         ],
       }),
@@ -345,6 +366,7 @@ async function callLlmStarters(
     for (const raw of arr) {
       const label = String(raw?.label || "").trim();
       if (label.length < 3) continue;
+      if (META_STARTER_RE.test(label)) continue;
       if (isNearDuplicate(label, [...prior, ...out.map((t) => t.label)])) continue;
       out.push({
         id: newId("s"),
@@ -439,6 +461,7 @@ export async function generateAssistStarters(body: {
   const sessionId = typeof body.sessionId === "string" ? body.sessionId : newId("sess");
   const text = typeof body.text === "string" ? body.text.trim() : "";
   const goalTitle = typeof body.goalTitle === "string" ? body.goalTitle.trim() : "Goal";
+  const goalDeepWhy = typeof body.goalDeepWhy === "string" ? body.goalDeepWhy.trim() : "";
   const prior = Array.isArray(body.priorStarterTitles)
     ? body.priorStarterTitles.filter((t) => typeof t === "string")
     : [];
@@ -450,7 +473,7 @@ export async function generateAssistStarters(body: {
   let reason: AiAssistReasonCode = "ok";
 
   if (!body.preferRules) {
-    tasks = await callLlmStarters(goalTitle, text, prior);
+    tasks = await callLlmStarters(goalTitle, text, prior, goalDeepWhy);
     if (tasks) source = "llm";
     else reason = "llm_unavailable";
   }

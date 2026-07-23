@@ -220,7 +220,18 @@ export function buildClientStarterTasks(
 ): GoalStarterTaskDraft[] {
   const lower = `${goalTitle} ${brainDump}`.toLowerCase();
   const ideas: string[] = [];
-  if (/fit|energy|health|exercise|gym|movement/.test(lower)) {
+  // Weight / nutrition first so planning-titled goals still stay domain-specific.
+  if (/weight|lose\b.*\blbs?\b|\blbs?\b|diet|nutrition|calorie|meal\s*plan/.test(lower)) {
+    ideas.push(
+      'Define your target weight and a realistic deadline',
+      'Calculate your daily calorie goal',
+      'Create a healthy meal plan for this week',
+      'Schedule three workout sessions in your calendar',
+      'List foods to avoid and healthy alternatives',
+      'Buy healthy groceries for the week',
+      'Identify your biggest weight-loss obstacle and write one solution',
+    );
+  } else if (/fit|energy|health|exercise|gym|movement/.test(lower)) {
     ideas.push(
       'Schedule three 20-minute walks this week',
       'Prep workout clothes the night before',
