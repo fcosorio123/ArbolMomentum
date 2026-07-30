@@ -35,10 +35,12 @@ export interface EngagementControls {
 }
 
 export const DEFAULT_ENGAGEMENT_CONTROLS: EngagementControls = {
-  attributionCollect: false,
-  adminNotifFunnel: false,
-  taskDeferralUi: false,
-  deferralReminders: false,
+  /** Enabled for user testing of R1 attribution + deferral (safe subset). */
+  attributionCollect: true,
+  adminNotifFunnel: true,
+  taskDeferralUi: true,
+  deferralReminders: true,
+  /** Privacy-sensitive — remains OFF until review cleared. */
   deferralReasonCapture: false,
   quickWinRecs: false,
   timingRecommendations: false,
