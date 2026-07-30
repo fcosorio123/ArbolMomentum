@@ -160,7 +160,6 @@ export async function runPushNudgesForProfile(profileId: string): Promise<{ sent
       title: slot.title,
       body: slot.body,
       tag: slot.tag,
-      url: "./?checkin=1",
     });
     if (result.ok) {
       await markPushSentToday(profileId, slot.tag, dateKey);
