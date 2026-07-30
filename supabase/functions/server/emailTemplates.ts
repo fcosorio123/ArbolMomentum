@@ -30,6 +30,17 @@ function appLink(): string {
   return getEmailConfig().appBaseUrl;
 }
 
+/** Append ?checkin=1 (or &checkin=1) so CTAs open the check-in workflow. */
+function withCheckIn(href: string): string {
+  try {
+    const url = new URL(href);
+    url.searchParams.set("checkin", "1");
+    return url.toString();
+  } catch {
+    return href.includes("?") ? `${href}&checkin=1` : `${href.replace(/\/?$/, "/")}?checkin=1`;
+  }
+}
+
 function ctaHtml(label = "Open Arbol Momentum", href?: string): string {
   const url = href || appLink();
   return `<p style="margin:24px 0;"><a href="${url}" style="background:#094067;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">${label}</a></p>`;
@@ -45,6 +56,7 @@ export function buildEmailContent(
 ): { subject: string; html: string; text: string } {
   const name = ctx.firstName || ctx.profileName?.split(" ")[0] || "there";
   const link = ctx.inviteUrl || appLink();
+  const checkInLink = withCheckIn(link);
 
   switch (type) {
     case "welcome":
@@ -54,9 +66,9 @@ export function buildEmailContent(
           <h2 style="margin:0 0 12px;">Welcome, ${name}!</h2>
           <p>Your Arbol Momentum account is ready. Use the button below to open <strong>your</strong> account and start today's check-in.</p>
           <p style="color:#555;font-size:13px;">This personal link works for 30 days. If it expires, ask your admin to resend your invite.</p>
-          ${ctaHtml("Access your account", link)}
+          ${ctaHtml("Access your account", checkInLink)}
         `),
-        text: `Welcome, ${name}! Your Arbol Momentum account is ready. Access your account: ${link}`,
+        text: `Welcome, ${name}! Your Arbol Momentum account is ready. Access your account: ${checkInLink}`,
       };
 
     case "smart_nudge": {
@@ -76,9 +88,9 @@ export function buildEmailContent(
           <p style="white-space:pre-line;">${body}</p>
           ${taskHtml}
           ${ctx.streak && ctx.streak > 0 ? `<p style="margin-top:12px;">🔥 Current streak: <strong>${ctx.streak} day${ctx.streak === 1 ? "" : "s"}</strong></p>` : ""}
-          ${ctaHtml("Open today's check-in")}
+          ${ctaHtml("Open today's check-in", checkInLink)}
         `),
-        text: `${subject}\n\n${body}${taskText ? `\n\n${taskText}` : ""}${ctx.streak ? `\n\nStreak: ${ctx.streak} days` : ""}\n\nOpen the app: ${link}`,
+        text: `${subject}\n\n${body}${taskText ? `\n\n${taskText}` : ""}${ctx.streak ? `\n\nStreak: ${ctx.streak} days` : ""}\n\nOpen today's check-in: ${checkInLink}`,
       };
     }
 

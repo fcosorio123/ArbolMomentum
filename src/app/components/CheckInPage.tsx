@@ -679,7 +679,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 300, background: C.bg,
+      position: 'fixed', inset: 0, zIndex: 1100, background: C.bg,
       display: 'flex', flexDirection: 'column',
       paddingTop: 'env(safe-area-inset-top, 0px)',
       paddingBottom: 'env(safe-area-inset-bottom, 0px)',

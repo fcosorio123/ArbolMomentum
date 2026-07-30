@@ -51,6 +51,13 @@ import {
   clearInviteFromUrl,
   redeemInviteToken,
 } from './data/inviteAccess';
+import {
+  readCheckInIntentFromUrl,
+  clearCheckInFromUrl,
+  stashCheckInIntent,
+  peekCheckInIntent,
+  consumeStashedCheckInIntent,
+} from './data/checkInDeepLink';
 import { C } from './data/colors';
 
 type Tab = 'home' | 'goals' | 'tasks' | 'week' | 'month' | 'calendar' | 'reminders' | 'profile';
@@ -162,6 +169,15 @@ export default function App() {
 
   const swRef = useRef<ServiceWorkerRegistration | null>(null);
   swRef.current = swRegistration;
+  /** When true, skip coach/summary/feedback auto-open for this profile session (check-in deep link). */
+  const skipBootModalsRef = useRef(false);
+
+  // Capture check-in deep-link early so access gate / invite redeem can still honor it.
+  useEffect(() => {
+    if (!readCheckInIntentFromUrl()) return;
+    stashCheckInIntent();
+    clearCheckInFromUrl();
+  }, []);
 
   // ── Desktop breakpoint listener
   useEffect(() => {
@@ -397,19 +413,45 @@ export default function App() {
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
     const onMessage = (e: MessageEvent) => {
-      if (!activeProfile) return;
       if (e.data?.type === 'SYNC_BADGE') {
+        if (!activeProfile) return;
         const count = getBadgeCount(activeProfile.id);
         updateAppBadge(count);
         swRef.current?.active?.postMessage({ type: 'BADGE', count });
       }
       if (e.data?.type === 'NOTIF_CLICKED') {
-        trackEvent(activeProfile.id, 'notif_clicked', { tag: String(e.data.tag ?? '') });
+        const openCheckIn = !!e.data.openCheckIn
+          || readCheckInIntentFromUrl(String(e.data.url || ''))
+          || /check-?in|nudge|morning|midday|evening|streak/i.test(String(e.data.tag ?? ''));
+        if (activeProfile) {
+          trackEvent(activeProfile.id, 'notif_clicked', { tag: String(e.data.tag ?? '') });
+        }
+        if (openCheckIn) {
+          stashCheckInIntent();
+          skipBootModalsRef.current = true;
+          setOnboardingModal(null);
+          setShowGettingStarted(false);
+          if (activeProfile) setShowCheckIn(true);
+        }
       }
     };
     navigator.serviceWorker.addEventListener('message', onMessage);
     return () => navigator.serviceWorker.removeEventListener('message', onMessage);
   }, [activeProfile?.id]);
+
+  // After profile is ready, honor pending check-in deep-link (email / notification).
+  useEffect(() => {
+    if (!activeProfile) return;
+    if (inviteBoot === 'pending') return;
+    if (showCheckIn) return;
+    if (!peekCheckInIntent()) return;
+    consumeStashedCheckInIntent();
+    clearCheckInFromUrl();
+    skipBootModalsRef.current = true;
+    setOnboardingModal(null);
+    setShowGettingStarted(false);
+    setShowCheckIn(true);
+  }, [activeProfile?.id, inviteBoot, showCheckIn]);
 
   // ── Install prompt
   useEffect(() => {
@@ -529,15 +571,29 @@ export default function App() {
     setShowGettingStarted(false);
     setGettingStartedResolved(false);
     setCreateIntent(null);
+    // Check-in deep-link / open overlay wins over Daily Summary / coach.
+    if (showCheckIn || skipBootModalsRef.current || peekCheckInIntent()) {
+      setOnboardingModal(null);
+      return;
+    }
     const t = window.setTimeout(() => {
+      if (skipBootModalsRef.current || showCheckIn) {
+        setOnboardingModal(null);
+        return;
+      }
       setOnboardingModal(peekOnboardingModal(profileId));
     }, 400);
     return () => window.clearTimeout(t);
-  }, [activeProfile?.id]);
+  }, [activeProfile?.id, showCheckIn]);
 
   // Getting-started empty-state modal - only after coach/summary/feedback queue is idle
   useEffect(() => {
     if (!activeProfile) return;
+    if (showCheckIn || skipBootModalsRef.current) {
+      setShowGettingStarted(false);
+      setGettingStartedResolved(true);
+      return;
+    }
     if (onboardingModal) {
       setShowGettingStarted(false);
       setGettingStartedResolved(false);
@@ -549,14 +605,14 @@ export default function App() {
       setGettingStartedResolved(true);
     }, 500);
     return () => window.clearTimeout(t);
-  }, [activeProfile?.id, onboardingModal]);
+  }, [activeProfile?.id, onboardingModal, showCheckIn]);
 
   // ── Feedback nudge when queue is idle (streak milestone or 9 p.m. - PD-05)
   useEffect(() => {
-    if (!activeProfile || onboardingModal) return;
+    if (!activeProfile || onboardingModal || showCheckIn || skipBootModalsRef.current) return;
     const profileId = activeProfile.id;
     const check = () => {
-      if (onboardingModal) return;
+      if (onboardingModal || showCheckIn || skipBootModalsRef.current) return;
       if (shouldShowFeedbackNudge(profileId)) setOnboardingModal('feedback');
     };
     const interval = window.setInterval(check, 60_000);
@@ -565,7 +621,7 @@ export default function App() {
       window.clearInterval(interval);
       window.removeEventListener('arbol-goals-updated', check);
     };
-  }, [activeProfile?.id, onboardingModal]);
+  }, [activeProfile?.id, onboardingModal, showCheckIn]);
   useEffect(() => {
     const bump = () => setSummaryDataVersion(v => v + 1);
     window.addEventListener(DASHBOARD_REFRESH_EVENT, bump);
@@ -938,6 +994,8 @@ export default function App() {
               profile={activeProfile}
               onClose={() => {
                 setShowCheckIn(false);
+                // Keep skipBootModalsRef so closing deep-link check-in does not immediately
+                // re-open Daily Summary for the same boot cycle.
                 try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
               }}
             />

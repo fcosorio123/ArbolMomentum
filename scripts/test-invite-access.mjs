@@ -36,7 +36,8 @@ assert('buildInviteUrl uses ?invite=', /invite=\$\{encodeURIComponent\(token\)\}
 assert('invite TTL is 30 days', /30 \* 24 \* 60 \* 60 \* 1000/.test(tokens));
 
 const templates = read('supabase/functions/server/emailTemplates.ts');
-assert('welcome CTA accepts inviteUrl', /ctaHtml\("Access your account", link\)/.test(templates));
+assert('welcome CTA accepts inviteUrl', /ctaHtml\("Access your account", checkInLink\)/.test(templates) || /ctaHtml\("Access your account", link\)/.test(templates));
+assert('welcome CTA deep-links into check-in', /withCheckIn|checkInLink/.test(templates));
 assert('welcome subject is invite-focused', /You're invited to Arbol Momentum/.test(templates));
 
 const send = read('supabase/functions/server/emailSend.ts');

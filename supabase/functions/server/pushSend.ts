@@ -65,7 +65,7 @@ export async function sendPushToProfile(
         body: payload.body,
         tag: payload.tag,
         badgeCount: payload.badgeCount ?? 0,
-        url: payload.url ?? "/",
+        url: payload.url ?? "./?checkin=1",
       }),
     );
     return { ok: true };
@@ -156,6 +156,7 @@ export async function runPushNudgesForProfile(profileId: string): Promise<{ sent
       title: slot.title,
       body: slot.body,
       tag: slot.tag,
+      url: "./?checkin=1",
     });
     if (result.ok) {
       await markPushSentToday(profileId, slot.tag, dateKey);

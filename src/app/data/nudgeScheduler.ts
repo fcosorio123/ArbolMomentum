@@ -19,6 +19,7 @@ import {
   markNudgeFiredToday,
 } from './deviceAnalytics';
 import { showNotification } from './notifications';
+import { checkInNotificationUrl } from './checkInDeepLink';
 import { areNotificationsEnabled } from './appSettings';
 import { getEmailSettings } from './emailSettings';
 import { requestEmailSend } from './emailNudges';
@@ -290,7 +291,7 @@ export async function processDueNudges({
       }
 
       if (browserOk) {
-        await showNotification(swReg, title, body, notif.tag);
+        await showNotification(swReg, title, body, notif.tag, { url: checkInNotificationUrl() });
         trackEvent(profile.id, 'notif_sent', { tag: notif.tag });
         saveDeviceRecord(profile.id, { lastNotifSent: Date.now() });
       }
