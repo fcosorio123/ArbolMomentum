@@ -55,6 +55,13 @@ export function applyTaskStatusUpdate(params: ApplyTaskStatusUpdateParams): Repo
   if (params.note !== undefined) {
     saveTaskNote(params.profileId, params.taskId, dateKey, params.note);
   }
+  if (params.status === 'done') {
+    try {
+      import('./taskDeferral').then(({ consumeDeferralOnComplete }) => {
+        consumeDeferralOnComplete(params.profileId, params.taskId);
+      }).catch(() => {});
+    } catch { /* ignore */ }
+  }
   try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch { /* ignore */ }
   try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch { /* ignore */ }
   dispatchFeedbackUpdated();

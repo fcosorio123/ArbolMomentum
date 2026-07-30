@@ -237,6 +237,8 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
   sentTo?: string[];
 }> {
   const settings = await getEmailSettings();
+  const appEnv = (Deno.env.get("APP_ENV") || Deno.env.get("ARBOL_APP_ENV") || "").toLowerCase();
+  const stagingMode = appEnv === "staging" || Deno.env.get("STAGING_EMAIL_MODE") === "1";
 
   if (payload.type !== "test" && !settings.enabled && !payload.force) {
     return { ok: false, skipped: true, reason: "global_disabled" };
@@ -268,6 +270,18 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
       } else if (payload.recipient && isValidEmail(payload.recipient)) {
         targets = [payload.recipient.trim().toLowerCase()];
       }
+    }
+  }
+
+  // Staging safety: never email real students — allowlist only (testRecipient + STAGING_EMAIL_ALLOWLIST).
+  if (stagingMode && payload.type !== "test") {
+    const allow = new Set([
+      ...(settings.testRecipient ? [settings.testRecipient.trim().toLowerCase()] : []),
+      ...parseRecipientList(Deno.env.get("STAGING_EMAIL_ALLOWLIST") || ""),
+    ].filter((e) => isValidEmail(e)));
+    targets = targets.filter((t) => allow.has(t));
+    if (targets.length === 0) {
+      return { ok: false, skipped: true, reason: "staging_recipient_blocked" };
     }
   }
 
@@ -306,6 +320,7 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
     }
   }
 
+  const nid = `n_${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`;
   const content = buildEmailContent(payload.type, {
     profileName,
     firstName,
@@ -317,6 +332,10 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
     streak,
     topTasks,
     inviteUrl,
+    nid,
+    cta: payload.type === "smart_nudge" || payload.type === "welcome" || payload.type === "test"
+      ? "cta.open_checkin"
+      : undefined,
   });
 
   const replyTo = settings.replyTo?.trim() || undefined;
@@ -357,6 +376,10 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
       type: payload.type,
       dedupe,
       sentTo,
+      nid: content.nid,
+      cta: content.cta,
+      channel: "email",
+      appEnv: stagingMode ? "staging" : "production",
     });
   }
 
@@ -364,6 +387,7 @@ export async function sendEmail(payload: SendEmailPayload): Promise<{
     ok: true,
     resendId: lastId,
     sentTo,
+    nid: content.nid,
     reason: failures.length > 0 ? `partial:${failures.join("|")}` : undefined,
   };
 }

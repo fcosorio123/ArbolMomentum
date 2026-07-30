@@ -58,6 +58,15 @@ import {
   peekCheckInIntent,
   consumeStashedCheckInIntent,
 } from './data/checkInDeepLink';
+import {
+  captureAttributionFromUrl,
+  clearAttributionFromUrl,
+  peekAttributionSession,
+  CTA_IDS,
+} from './data/notificationIdentity';
+import { trackEngagementEvent } from './data/engagementEvents';
+import { fetchEngagementControls, applyStagingQaDefaults } from './data/engagementControls';
+import { getAppEnv, isStagingVersion } from './data/environment';
 import { C } from './data/colors';
 
 type Tab = 'home' | 'goals' | 'tasks' | 'week' | 'month' | 'calendar' | 'reminders' | 'profile';
@@ -172,11 +181,18 @@ export default function App() {
   /** When true, skip coach/summary/feedback auto-open for this profile session (check-in deep link). */
   const skipBootModalsRef = useRef(false);
 
-  // Capture check-in deep-link early so access gate / invite redeem can still honor it.
+  // Capture check-in + attribution deep-link early so access gate / invite redeem can still honor it.
   useEffect(() => {
-    if (!readCheckInIntentFromUrl()) return;
-    stashCheckInIntent();
-    clearCheckInFromUrl();
+    applyStagingQaDefaults();
+    fetchEngagementControls().catch(() => {});
+    const attr = captureAttributionFromUrl();
+    if (readCheckInIntentFromUrl()) {
+      stashCheckInIntent();
+      clearCheckInFromUrl();
+    }
+    if (attr) {
+      clearAttributionFromUrl();
+    }
   }, []);
 
   // ── Desktop breakpoint listener
@@ -422,9 +438,28 @@ export default function App() {
       if (e.data?.type === 'NOTIF_CLICKED') {
         const openCheckIn = !!e.data.openCheckIn
           || readCheckInIntentFromUrl(String(e.data.url || ''))
-          || /check-?in|nudge|morning|midday|evening|streak/i.test(String(e.data.tag ?? ''));
+          || /check-?in|nudge|morning|midday|evening|streak|defer-/i.test(String(e.data.tag ?? ''));
+        const nid = typeof e.data.nid === 'string' ? e.data.nid : undefined;
+        if (nid) {
+          captureAttributionFromUrl(String(e.data.url || `/?checkin=1&nid=${nid}&cta=${CTA_IDS.open_checkin}`));
+        } else if (e.data.url) {
+          captureAttributionFromUrl(String(e.data.url));
+        }
         if (activeProfile) {
-          trackEvent(activeProfile.id, 'notif_clicked', { tag: String(e.data.tag ?? '') });
+          trackEvent(activeProfile.id, 'notif_clicked', { tag: String(e.data.tag ?? ''), nid: nid || '' });
+          trackEngagementEvent(activeProfile.id, 'notification_cta_clicked', {
+            nid,
+            cta: CTA_IDS.open_checkin,
+            channel: 'browser',
+            notifType: String(e.data.tag ?? ''),
+            dest: 'checkin',
+            authState: 'authenticated',
+          }, { stageKey: 'cta_clicked' });
+          trackEngagementEvent(activeProfile.id, 'notification_app_opened', {
+            nid,
+            channel: 'browser',
+            dest: 'checkin',
+          }, { stageKey: 'app_opened' });
         }
         if (openCheckIn) {
           stashCheckInIntent();
@@ -451,6 +486,22 @@ export default function App() {
     setOnboardingModal(null);
     setShowGettingStarted(false);
     setShowCheckIn(true);
+    const attr = peekAttributionSession();
+    trackEngagementEvent(activeProfile.id, 'notification_destination_loaded', {
+      nid: attr?.nid,
+      cta: attr?.cta || CTA_IDS.open_checkin,
+      dest: 'checkin',
+      channel: 'deep_link',
+      authState: 'authenticated',
+    }, { stageKey: 'destination_loaded' });
+    trackEngagementEvent(activeProfile.id, 'notification_workflow_opened', {
+      nid: attr?.nid,
+      dest: 'checkin',
+    }, { stageKey: 'workflow_opened' });
+    trackEngagementEvent(activeProfile.id, 'checkin_started_from_notification', {
+      nid: attr?.nid,
+      dest: 'checkin',
+    }, { stageKey: 'checkin_started' });
   }, [activeProfile?.id, inviteBoot, showCheckIn]);
 
   // ── Install prompt
@@ -944,6 +995,22 @@ export default function App() {
   return (
     <ConfigProvider theme={arbolTheme}>
       <AntdApp message={{ maxCount: 3, duration: 2.5 }}>
+        {isStagingVersion() && (
+          <div
+            role="status"
+            style={{
+              background: '#7A3E00',
+              color: '#FFF8F0',
+              textAlign: 'center',
+              fontSize: 12,
+              fontWeight: 700,
+              padding: '6px 10px',
+              letterSpacing: 0.3,
+            }}
+          >
+            STAGING · {getAppEnv()} · test data only — not production
+          </div>
+        )}
         {isDesktop ? (
           // ── Desktop: sidebar nav + centered content card
           <div style={{ display: 'flex', minHeight: '100dvh', background: C.bgAlt, fontFamily: 'system-ui, -apple-system, sans-serif' }}>

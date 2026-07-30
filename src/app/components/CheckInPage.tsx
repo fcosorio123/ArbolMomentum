@@ -11,6 +11,10 @@ import { applyTaskStatusUpdate } from '../data/taskStatusPipeline';
 import { getTodayTaskRows } from '../data/dashboardSnapshot';
 import { C, accentColorForId, GOAL_ACCENT_COLORS } from '../data/colors';
 import type { Profile } from '../data/profiles';
+import { DeferTaskModal } from './DeferTaskModal';
+import { isTaskDeferralUiEnabled } from '../data/engagementControls';
+import { peekAttributionSession } from '../data/notificationIdentity';
+import { trackEngagementEvent, trackMeaningfulActionRollup } from '../data/engagementEvents';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 function goalAccent(id: string) {
@@ -130,7 +134,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
   });
 
   const [screen, setScreen] = useState<Screen>('landing');
-  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [deferOpen, setDeferOpen] = useState(false);  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const sessionTasksRef = useRef<FlatTask[]>([]);
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const checkInRecordedRef = useRef(false);
@@ -176,6 +180,13 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
     try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
     import('../data/dashboardSnapshot').then(({ dispatchDashboardRefresh }) => dispatchDashboardRefresh());
     import('../data/cloudBackup').then(({ scheduleSave }) => scheduleSave(profile.id));
+
+    const attr = peekAttributionSession();
+    trackEngagementEvent(profile.id, 'checkin_completed_from_notification', {
+      nid: attr?.nid,
+      dest: 'checkin',
+    }, { force: true, stageKey: 'checkin_completed' });
+    trackMeaningfulActionRollup(profile.id, 'execution', 'checkin_completed', { nid: attr?.nid });
 
     import('../data/emailSettings').then(({ isEmailTypeEnabled }) => {
       if (!isEmailTypeEnabled('checkInConfirmationEnabled')) return;
@@ -517,9 +528,23 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
 
         {/* Bottom navigation */}
         <div style={{
-          display: 'flex', gap: 10, marginTop: 24,
+          display: 'flex', flexDirection: 'column', gap: 10, marginTop: 24,
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         }}>
+          {isTaskDeferralUiEnabled(profile.id) && (
+            <button
+              type="button"
+              onClick={() => setDeferOpen(true)}
+              style={{
+                width: '100%', minHeight: 44, borderRadius: 12,
+                background: C.bgAlt, border: `1px solid ${C.border}`,
+                color: C.headline, fontWeight: 600, fontSize: 14, cursor: 'pointer',
+              }}
+            >
+              Work on this later
+            </button>
+          )}
+          <div style={{ display: 'flex', gap: 10 }}>
           {!isFirst && (
             <button onClick={goPrev} style={{
               width: 44, height: 44, borderRadius: 12, flexShrink: 0,
@@ -553,6 +578,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
               <span style={{ fontSize: 11, opacity: 0.75 }}>({remainingUnanswered} left)</span>
             )}
           </button>
+          </div>
         </div>
       </div>
     );
@@ -729,6 +755,22 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
         {screen === 'processing' && renderProcessing()}
         {screen === 'success' && renderSuccess()}
       </div>
+
+      {currentTask && (
+        <DeferTaskModal
+          open={deferOpen}
+          profileId={profile.id}
+          taskId={currentTask.id}
+          taskLabel={currentTask.label}
+          sourceNid={peekAttributionSession()?.nid}
+          onClose={() => setDeferOpen(false)}
+          onDeferred={(hint) => {
+            if (hint) message.info(hint);
+            setAnsweredIds(prev => new Set([...prev, currentTask.id]));
+            scheduleAdvance();
+          }}
+        />
+      )}
     </div>
   );
 }

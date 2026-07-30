@@ -48,7 +48,7 @@ assert('NOTIF_CLICKED can open check-in', /NOTIF_CLICKED[\s\S]{0,400}openCheckIn
 const sw = read('public/sw.js');
 assert('SW default check-in entry URL', /\?checkin=1/.test(sw));
 assert('SW posts openCheckIn on click', /openCheckIn/.test(sw));
-assert('SW cache bumped for update', /arbol-v7/.test(sw));
+assert('SW cache bumped for update', /arbol-v[789]|arbol-v1[0-9]/.test(sw));
 
 const nudge = read('src/app/data/nudgeScheduler.ts');
 assert('browser nudges pass check-in URL', /checkInNotificationUrl/.test(nudge));

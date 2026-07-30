@@ -30,6 +30,7 @@
     "test:voice": "npx tsx scripts/test-voice-extract.ts",
     "test:invite": "node scripts/test-invite-access.mjs",
     "test:checkin-deeplink": "node scripts/test-checkin-deeplink.mjs && npx tsx scripts/test-checkin-deeplink-unit.ts",
+    "test:adaptive-r1": "npx tsx scripts/test-adaptive-engagement-r1.ts",
     "backfill:momentum-starter": "node scripts/backfill-momentum-starter-seed.mjs",
     "test:surgical-ux": "npm run test:seed-deletion && npm run test:today-hierarchy && npm run test:feedback-interest && npm run test:task-focus",
     "test:progress-pipeline": "npm run test:task-progress && npm run test:task-demotion && npm run test:task-focus"

@@ -35,6 +35,7 @@ import {
 import { dispatchDashboardRefresh } from './dashboardSnapshot';
 import { getCustomProfileMeta } from './customProfiles';
 import { isCustomProfileId, normalizeRosterMeta, type RosterProfileMeta } from './profileRoster';
+import { exportDeferralsForBackup, restoreDeferralsFromBackup, mergeDeferralMaps } from './taskDeferral';
 
 function getAllDeletedGoalIds(profileId: string): Set<string> {
   const dead = new Set(getDeletedUserGoalIds(profileId));
@@ -265,6 +266,7 @@ function collectLocalData(profileId: string): Record<string, unknown> {
     streakDays,
     taskNotes,
     taskBlocked,
+    taskDeferrals: exportDeferralsForBackup(profileId),
     goalProgressLogs,
     checkInDays,
     feedbackEntries,
@@ -504,6 +506,7 @@ function mergeCloudActivityUnion(profileId: string, cloud: Record<string, unknow
   if (unionMergeStringMap(cloud.streakDays, preferBooleanish)) changed = true;
   if (unionMergeStringMap(cloud.taskNotes, (a, b) => (b && b.length >= (a?.length ?? 0) ? b : a) || '')) changed = true;
   if (unionMergeStringMap(cloud.taskBlocked, preferBooleanish)) changed = true;
+  if (restoreDeferralsFromBackup(profileId, cloud.taskDeferrals)) changed = true;
   if (unionMergeStringMap(cloud.goalProgressLogs, (a, b) => b || a || '')) changed = true;
   if (unionMergeStringMap(cloud.checkInDays, preferBooleanish)) changed = true;
   if (unionMergeStringMap(cloud.feedbackEntries, (a, b) => b || a || '')) changed = true;
@@ -921,6 +924,10 @@ async function buildUnionPayload(profileId: string): Promise<Record<string, unkn
   local.streakDays = mergeStringMaps(local.streakDays, cloud.streakDays, preferBooleanish);
   local.taskNotes = mergeStringMaps(local.taskNotes, cloud.taskNotes, (a, b) => (b && b.length >= (a?.length ?? 0) ? b : a) || '');
   local.taskBlocked = mergeStringMaps(local.taskBlocked, cloud.taskBlocked, preferBooleanish);
+  local.taskDeferrals = mergeDeferralMaps(
+    (local.taskDeferrals && typeof local.taskDeferrals === 'object' ? local.taskDeferrals : {}) as Record<string, import('./taskDeferral').TaskDeferral>,
+    (cloud.taskDeferrals && typeof cloud.taskDeferrals === 'object' ? cloud.taskDeferrals : {}) as Record<string, import('./taskDeferral').TaskDeferral>,
+  );
   local.goalProgressLogs = mergeStringMaps(local.goalProgressLogs, cloud.goalProgressLogs, (a, b) => b || a || '');
   local.checkInDays = mergeStringMaps(local.checkInDays, cloud.checkInDays, preferBooleanish);
   local.feedbackEntries = mergeStringMaps(local.feedbackEntries, cloud.feedbackEntries, (a, b) => b || a || '');

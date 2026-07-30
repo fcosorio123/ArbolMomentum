@@ -1,4 +1,4 @@
-const CACHE_NAME = 'arbol-v7';
+const CACHE_NAME = 'arbol-v8';
 
 self.addEventListener('install', () => { self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
@@ -45,13 +45,23 @@ function isCheckInUrl(url) {
 }
 
 function showArbolNotification(title, body, tag, extra = {}) {
+  const data = {
+    url: extra.url || appEntryUrl(),
+    tag: tag || 'arbol',
+    nid: extra.nid || null,
+    openCheckIn: extra.openCheckIn,
+  };
+  try {
+    const u = new URL(data.url, self.location.href);
+    if (!data.nid && u.searchParams.get('nid')) data.nid = u.searchParams.get('nid');
+  } catch { /* ignore */ }
   return self.registration.showNotification(title, {
     body,
     tag: tag || 'arbol',
     renotify: false,
     icon: assetUrl('icon-192.svg'),
     badge: assetUrl('icon-72.svg'),
-    data: { url: extra.url || appEntryUrl(), tag: tag || 'arbol' },
+    data,
     ...extra,
   });
 }
@@ -81,12 +91,16 @@ self.addEventListener('notificationclick', e => {
   e.notification.close();
   const url = e.notification.data?.url || checkInEntryUrl();
   const tag = e.notification.data?.tag || 'arbol';
-  const openCheckIn = isCheckInUrl(url) || /check-?in|nudge|morning|midday|evening|streak/i.test(String(tag));
+  let nid = e.notification.data?.nid || null;
+  try {
+    if (!nid) nid = new URL(url, self.location.href).searchParams.get('nid');
+  } catch { /* ignore */ }
+  const openCheckIn = isCheckInUrl(url) || /check-?in|nudge|morning|midday|evening|streak|defer-/i.test(String(tag));
 
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
       for (const client of clientList) {
-        client.postMessage({ type: 'NOTIF_CLICKED', tag, url, openCheckIn: !!openCheckIn });
+        client.postMessage({ type: 'NOTIF_CLICKED', tag, url, openCheckIn: !!openCheckIn, nid });
         if (openCheckIn && typeof client.navigate === 'function') {
           return client.navigate(url).then((c) => (c && 'focus' in c ? c.focus() : client.focus())).catch(() => client.focus());
         }

@@ -53,7 +53,30 @@ export type EventType =
   | 'focus_task_resumed'
   | 'focus_task_completed'
   | 'focus_task_simplify_clicked'
-  | 'task_overflow_opened';
+  | 'task_overflow_opened'
+  | 'notification_scheduled'
+  | 'notification_sent'
+  | 'notification_delivered'
+  | 'notification_cta_clicked'
+  | 'notification_app_opened'
+  | 'notification_destination_loaded'
+  | 'notification_destination_failed'
+  | 'notification_workflow_opened'
+  | 'checkin_started_from_notification'
+  | 'checkin_completed_from_notification'
+  | 'task_opened_from_notification'
+  | 'task_started_from_notification'
+  | 'task_progressed_from_notification'
+  | 'task_completed_from_notification'
+  | 'task_deferred'
+  | 'task_defer_reason_selected'
+  | 'task_reminder_time_selected'
+  | 'task_reminder_changed'
+  | 'task_reminder_cancelled'
+  | 'task_reopened_after_defer'
+  | 'task_completed_after_defer'
+  | 'task_deferred_repeatedly'
+  | 'meaningful_action';
 
 export interface DeviceRecord {
   profileId: string;

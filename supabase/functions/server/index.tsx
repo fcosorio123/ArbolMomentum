@@ -135,6 +135,29 @@ app.post("/app-settings", async (c) => {
   }
 });
 
+// Adaptive Engagement feature controls
+app.get("/engagement-controls", async (c) => {
+  try {
+    const data = await kv.get("arbol-engagement-controls");
+    if (!data) return c.json({ ok: true, data: null });
+    return c.json({ ok: true, data });
+  } catch (err) {
+    console.log("[EngagementControls] Error fetching:", err);
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+app.post("/engagement-controls", async (c) => {
+  try {
+    const payload = await c.req.json();
+    await kv.set("arbol-engagement-controls", payload);
+    return c.json({ ok: true });
+  } catch (err) {
+    console.log("[EngagementControls] Error saving:", err);
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
 // Live Check-In Feedback settings
 app.get("/live-check-in-settings", async (c) => {
   try {

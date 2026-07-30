@@ -1,0 +1,47 @@
+name: Deploy staging frontend to GitHub Pages
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify protected paths
+        run: node scripts/verify-protected-paths.mjs
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build for staging GitHub Pages
+        run: npm run build:pages
+        env:
+          VITE_BASE_PATH: /ArbolMomentum/staging/
+          VITE_PUBLISHED: 'true'
+          VITE_APP_ENV: staging
+          VITE_ENABLE_AI_ASSIST_CREATION: 'true'
+
+      - name: Publish to gh-pages staging folder
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: staging
+          keep_files: true
+          cname: false

@@ -58,6 +58,9 @@ export async function sendPushToProfile(
   webpush.setVapidDetails(keys.subject, keys.publicKey, keys.privateKey);
 
   try {
+    const nid = `n_${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`;
+    const url = payload.url
+      ?? `./?checkin=1&nid=${nid}&cta=${encodeURIComponent("cta.open_checkin")}&dest=checkin`;
     await webpush.sendNotification(
       record.subscription as webpush.PushSubscription,
       JSON.stringify({
@@ -65,7 +68,8 @@ export async function sendPushToProfile(
         body: payload.body,
         tag: payload.tag,
         badgeCount: payload.badgeCount ?? 0,
-        url: payload.url ?? "./?checkin=1",
+        url,
+        nid,
       }),
     );
     return { ok: true };

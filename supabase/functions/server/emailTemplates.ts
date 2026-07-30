@@ -24,6 +24,10 @@ export interface TemplateContext {
   topTasks?: Array<{ label: string; goalTitle?: string }>;
   /** Deep-link that opens the recipient's account (welcome / invite). */
   inviteUrl?: string;
+  /** Opaque notification instance id (no PII). */
+  nid?: string;
+  /** Stable CTA id. */
+  cta?: string;
 }
 
 function appLink(): string {
@@ -41,6 +45,26 @@ function withCheckIn(href: string): string {
   }
 }
 
+/** Append opaque nid + cta (+ optional dest) — never PII. */
+export function withAttribution(
+  href: string,
+  opts: { nid?: string; cta?: string; dest?: string },
+): string {
+  if (!opts.nid) return href;
+  try {
+    const url = new URL(href);
+    url.searchParams.set("nid", opts.nid);
+    if (opts.cta) url.searchParams.set("cta", opts.cta);
+    if (opts.dest) url.searchParams.set("dest", opts.dest);
+    return url.toString();
+  } catch {
+    const parts = [`nid=${encodeURIComponent(opts.nid)}`];
+    if (opts.cta) parts.push(`cta=${encodeURIComponent(opts.cta)}`);
+    if (opts.dest) parts.push(`dest=${encodeURIComponent(opts.dest)}`);
+    return href.includes("?") ? `${href}&${parts.join("&")}` : `${href.replace(/\/?$/, "/")}?${parts.join("&")}`;
+  }
+}
+
 function ctaHtml(label = "Open Arbol Momentum", href?: string): string {
   const url = href || appLink();
   return `<p style="margin:24px 0;"><a href="${url}" style="background:#094067;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">${label}</a></p>`;
@@ -50,13 +74,27 @@ function wrapHtml(content: string): string {
   return `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;color:#094067;line-height:1.5;max-width:560px;margin:0 auto;padding:24px;">${content}<p style="color:#888;font-size:12px;margin-top:32px;">Arbol Momentum - build daily habits, one task at a time.</p></body></html>`;
 }
 
+function mintFallbackNid(): string {
+  return `n_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function buildEmailContent(
   type: EmailType,
   ctx: TemplateContext,
-): { subject: string; html: string; text: string } {
+): { subject: string; html: string; text: string; nid: string; cta: string } {
   const name = ctx.firstName || ctx.profileName?.split(" ")[0] || "there";
   const link = ctx.inviteUrl || appLink();
-  const checkInLink = withCheckIn(link);
+  const nid = ctx.nid || mintFallbackNid();
+  const checkInCta = ctx.cta || "cta.open_checkin";
+  const checkInLink = withAttribution(withCheckIn(link), {
+    nid,
+    cta: checkInCta,
+    dest: "checkin",
+  });
+  const openAppLink = withAttribution(link, { nid, cta: "cta.open_app", dest: "home" });
+  const tasksLink = withAttribution(link, { nid, cta: "cta.open_tasks", dest: "tasks" });
+  const goalsLink = withAttribution(link, { nid, cta: "cta.open_goals", dest: "goals" });
+  const dashLink = withAttribution(link, { nid, cta: "cta.open_dashboard", dest: "dashboard" });
 
   switch (type) {
     case "welcome":
@@ -69,6 +107,8 @@ export function buildEmailContent(
           ${ctaHtml("Access your account", checkInLink)}
         `),
         text: `Welcome, ${name}! Your Arbol Momentum account is ready. Access your account: ${checkInLink}`,
+        nid,
+        cta: checkInCta,
       };
 
     case "smart_nudge": {
@@ -91,6 +131,8 @@ export function buildEmailContent(
           ${ctaHtml("Open today's check-in", checkInLink)}
         `),
         text: `${subject}\n\n${body}${taskText ? `\n\n${taskText}` : ""}${ctx.streak ? `\n\nStreak: ${ctx.streak} days` : ""}\n\nOpen today's check-in: ${checkInLink}`,
+        nid,
+        cta: checkInCta,
       };
     }
 
@@ -100,9 +142,11 @@ export function buildEmailContent(
         html: wrapHtml(`
           <h2 style="margin:0 0 12px;">Nice work, ${name}!</h2>
           <p>${ctx.taskLabel ? `You completed <strong>${ctx.taskLabel}</strong>.` : "You completed a task."} Keep the streak going.</p>
-          ${ctaHtml("See what's next")}
+          ${ctaHtml("See what's next", openAppLink)}
         `),
-        text: `Nice work, ${name}! ${ctx.taskLabel ? `You completed ${ctx.taskLabel}.` : "You completed a task."} Open the app: ${link}`,
+        text: `Nice work, ${name}! ${ctx.taskLabel ? `You completed ${ctx.taskLabel}.` : "You completed a task."} Open the app: ${openAppLink}`,
+        nid,
+        cta: "cta.open_app",
       };
 
     case "check_in_confirmation":
@@ -111,9 +155,11 @@ export function buildEmailContent(
         html: wrapHtml(`
           <h2 style="margin:0 0 12px;">Check-in done, ${name}!</h2>
           <p>Thanks for updating your progress today. Consistency is how momentum builds.</p>
-          ${ctaHtml("Back to your dashboard")}
+          ${ctaHtml("Back to your dashboard", dashLink)}
         `),
-        text: `Check-in done, ${name}! Thanks for updating your progress today. Open the app: ${link}`,
+        text: `Check-in done, ${name}! Thanks for updating your progress today. Open the app: ${dashLink}`,
+        nid,
+        cta: "cta.open_dashboard",
       };
 
     case "task_created":
@@ -122,9 +168,11 @@ export function buildEmailContent(
         html: wrapHtml(`
           <h2 style="margin:0 0 12px;">New task for you, ${name}</h2>
           <p>${ctx.taskLabel ? `<strong>${ctx.taskLabel}</strong> was added to your list.` : "A new task was added to your list."}</p>
-          ${ctaHtml("View tasks")}
+          ${ctaHtml("View tasks", tasksLink)}
         `),
-        text: `New task for you, ${name}. ${ctx.taskLabel ?? "A new task was added."} Open the app: ${link}`,
+        text: `New task for you, ${name}. ${ctx.taskLabel ?? "A new task was added."} Open the app: ${tasksLink}`,
+        nid,
+        cta: "cta.open_tasks",
       };
 
     case "goal_updated":
@@ -133,9 +181,11 @@ export function buildEmailContent(
         html: wrapHtml(`
           <h2 style="margin:0 0 12px;">Goal progress, ${name}</h2>
           <p>${ctx.body || (ctx.title ? `Your goal "${ctx.title}" was updated.` : "A goal was materially updated.")}</p>
-          ${ctaHtml("View goals")}
+          ${ctaHtml("View goals", goalsLink)}
         `),
-        text: `Goal progress, ${name}. ${ctx.body || ctx.title || "Goal updated."} Open the app: ${link}`,
+        text: `Goal progress, ${name}. ${ctx.body || ctx.title || "Goal updated."} Open the app: ${goalsLink}`,
+        nid,
+        cta: "cta.open_goals",
       };
 
     case "profile_archived":
@@ -146,6 +196,8 @@ export function buildEmailContent(
           <p>${ctx.profileName ? `The profile for <strong>${ctx.profileName}</strong> has been archived.` : "A profile has been archived."} Historical data is preserved.</p>
         `),
         text: `Profile archived. ${ctx.profileName ?? ""}`,
+        nid,
+        cta: "cta.open_app",
       };
 
     case "test":
@@ -154,16 +206,20 @@ export function buildEmailContent(
         html: wrapHtml(`
           <h2 style="margin:0 0 12px;">Test email</h2>
           <p>This is a test message from the Arbol Momentum admin settings. Email delivery is working.</p>
-          ${ctaHtml("Open app")}
+          ${ctaHtml("Open app", checkInLink)}
         `),
-        text: `This is a test message from Arbol Momentum admin settings. Open the app: ${link}`,
+        text: `This is a test message from Arbol Momentum admin settings. Open the app: ${checkInLink}`,
+        nid,
+        cta: checkInCta,
       };
 
     default:
       return {
         subject: "Arbol Momentum",
-        html: wrapHtml(`<p>Hello from Arbol Momentum.</p>${ctaHtml()}`),
-        text: `Hello from Arbol Momentum. Open the app: ${link}`,
+        html: wrapHtml(`<p>Hello from Arbol Momentum.</p>${ctaHtml("Open app", openAppLink)}`),
+        text: `Hello from Arbol Momentum. Open the app: ${openAppLink}`,
+        nid,
+        cta: "cta.open_app",
       };
   }
 }

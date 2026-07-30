@@ -34,6 +34,9 @@ import {
   fetchVisitCountForAdmin,
 } from '../data/supabaseSync';
 import { getUserTasks, type UserTask } from '../data/userTasks';
+import { EngagementControlsPanel } from './EngagementControlsPanel';
+import { isAdminNotifFunnelEnabled } from '../data/engagementControls';
+import { aggregateNotificationFunnel } from '../data/notificationFunnel';
 import { C } from '../data/colors';
 import {
   fetchAppSettings, saveAppSettings, getAppNotificationSettings,
@@ -460,6 +463,36 @@ function AnalyticsTab() {
   const [todayVisits, setTodayVisits] = useState(0);
   const [backup, setBackup] = useState<Record<string, unknown> | null>(null);
   const [engagementRefreshKey, setEngagementRefreshKey] = useState(0);
+  const [funnelEvents, setFunnelEvents] = useState<Array<{ event: string; profileId?: string; profile_id?: string; data?: Record<string, unknown>; metadata?: Record<string, unknown> }>>([]);
+
+  useEffect(() => {
+    if (!isAdminNotifFunnelEnabled()) {
+      setFunnelEvents([]);
+      return;
+    }
+    const local = getAllEventLogs().map(e => ({
+      event: e.event,
+      profileId: e.profileId,
+      data: e.data as Record<string, unknown> | undefined,
+    }));
+    setFunnelEvents(local);
+    if (isPublishedVersion()) {
+      fetchAllEventLogs(500).then((rows) => {
+        if (Array.isArray(rows) && rows.length) {
+          setFunnelEvents(rows.map((r: { event: string; profile_id?: string; metadata?: Record<string, unknown> }) => ({
+            event: r.event,
+            profile_id: r.profile_id,
+            metadata: r.metadata,
+          })));
+        }
+      }).catch(() => {});
+    }
+  }, [engagementRefreshKey, selectedId]);
+
+  const funnel = useMemo(() => {
+    if (!isAdminNotifFunnelEnabled()) return null;
+    return aggregateNotificationFunnel(funnelEvents, { profileId: selectedId || undefined });
+  }, [funnelEvents, selectedId]);
 
   const profile = getOperativeProfiles().find(p => p.id === selectedId)!;
   const adminToday = getTodayKey();
@@ -990,6 +1023,36 @@ function AnalyticsTab() {
                 {summaryMetrics.trend >= 0 ? '↑' : '↓'} {Math.abs(Math.round(summaryMetrics.trend))}%
               </div>
               <div style={{ fontSize: 9, color: C.secondary, marginTop: 2 }}>Trend</div>
+            </div>
+          </div>
+        )}
+
+        {funnel && (
+          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, marginBottom: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: C.headline, marginBottom: 4 }}>Notification performance</div>
+            <div style={{ fontSize: 11, color: C.secondary, marginBottom: 10 }}>
+              Filter: <strong style={{ color: C.headline }}>Profile</strong> (not school). Entry / Recovery / Execution are separate — deferral is not completion.
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: 11 }}>
+              {([
+                ['Entry', funnel.entry],
+                ['Recovery', funnel.recovery],
+                ['Execution', funnel.execution],
+              ] as const).map(([title, bucket]) => (
+                <div key={title} style={{ background: C.bgAlt, borderRadius: 8, padding: 8 }}>
+                  <div style={{ fontWeight: 700, color: C.headline, marginBottom: 6 }}>{title}</div>
+                  {Object.keys(bucket).length === 0 && <div style={{ color: C.secondary }}>No events</div>}
+                  {Object.entries(bucket).map(([k, v]) => (
+                    <div key={k} style={{ color: C.body, display: 'flex', justifyContent: 'space-between', gap: 4 }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.replace(/_/g, ' ')}</span>
+                      <strong>{v}</strong>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: C.secondary, marginTop: 8 }}>
+              Unique profiles clicked: {funnel.uniqueProfilesClicked} · Unique nids: {funnel.uniqueNids}
             </div>
           </div>
         )}
@@ -2143,6 +2206,8 @@ function SettingsTab() {
         style={{ color: C.onPrimary, width: '100%', background: C.primary, border: 'none', borderRadius: 12, height: 44, fontWeight: 600, marginBottom: 24 }}>
         {saved ? 'Browser settings saved ✓' : 'Save browser settings'}
       </Button>
+
+      <EngagementControlsPanel />
 
       <div style={{ ...labelStyle, marginBottom: 10 }}>Live Check-In Feedback</div>
 

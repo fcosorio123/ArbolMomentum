@@ -20,6 +20,9 @@ import {
 } from './deviceAnalytics';
 import { showNotification } from './notifications';
 import { checkInNotificationUrl } from './checkInDeepLink';
+import { checkInNotificationUrlWithAttr, mintNotificationId, CTA_IDS } from './notificationIdentity';
+import { trackEngagementEvent } from './engagementEvents';
+import { isAttributionCollectEnabled } from './engagementControls';
 import { areNotificationsEnabled } from './appSettings';
 import { getEmailSettings } from './emailSettings';
 import { requestEmailSend } from './emailNudges';
@@ -291,8 +294,19 @@ export async function processDueNudges({
       }
 
       if (browserOk) {
-        await showNotification(swReg, title, body, notif.tag, { url: checkInNotificationUrl() });
-        trackEvent(profile.id, 'notif_sent', { tag: notif.tag });
+        const nid = mintNotificationId();
+        const url = isAttributionCollectEnabled(profile.id)
+          ? checkInNotificationUrlWithAttr(undefined, { nid, cta: CTA_IDS.open_checkin })
+          : checkInNotificationUrl();
+        await showNotification(swReg, title, body, notif.tag, { url });
+        trackEvent(profile.id, 'notif_sent', { tag: notif.tag, nid });
+        trackEngagementEvent(profile.id, 'notification_sent', {
+          nid,
+          cta: CTA_IDS.open_checkin,
+          channel: 'browser',
+          notifType: notif.tag,
+          dest: 'checkin',
+        }, { stageKey: 'sent' });
         saveDeviceRecord(profile.id, { lastNotifSent: Date.now() });
       }
 

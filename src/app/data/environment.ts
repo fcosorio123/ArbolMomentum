@@ -8,14 +8,55 @@ export const LEGACY_FIGMA_PUBLISHED_ORIGIN = 'https://sound-press-69397091.figma
 /** GitHub Pages production URL (deployed from main via GitHub Actions) */
 export const GITHUB_PAGES_ORIGIN = 'https://fcosorio123.github.io';
 export const GITHUB_PAGES_BASE_PATH = '/ArbolMomentum';
+export const GITHUB_PAGES_STAGING_BASE_PATH = '/ArbolMomentum/staging';
 
 /** Canonical production URL - always GitHub Pages (auto-deploys on push to main) */
 export const CANONICAL_PRODUCTION_URL = `${GITHUB_PAGES_ORIGIN}${GITHUB_PAGES_BASE_PATH}`;
 
+/** Staging frontend URL (deployed from staging branch via GitHub Actions) */
+export const CANONICAL_STAGING_URL = `${GITHUB_PAGES_ORIGIN}${GITHUB_PAGES_STAGING_BASE_PATH}`;
+
 /** @deprecated Use CANONICAL_PRODUCTION_URL */
 export const PUBLISHED_URL = CANONICAL_PRODUCTION_URL;
 
+export type AppEnv = 'production' | 'staging' | 'development';
+
+/**
+ * Build-time / runtime app environment.
+ * Staging is never treated as production for student notification routing.
+ */
+export function getAppEnv(): AppEnv {
+  const baked = String(import.meta.env?.VITE_APP_ENV || '').toLowerCase();
+  if (baked === 'staging' || baked === 'production' || baked === 'development') {
+    return baked;
+  }
+  if (typeof window !== 'undefined') {
+    const { origin, pathname } = window.location;
+    if (
+      origin === GITHUB_PAGES_ORIGIN &&
+      (pathname === GITHUB_PAGES_STAGING_BASE_PATH ||
+        pathname.startsWith(`${GITHUB_PAGES_STAGING_BASE_PATH}/`))
+    ) {
+      return 'staging';
+    }
+  }
+  if (isPublishedVersion()) return 'production';
+  return 'development';
+}
+
+export function isStagingVersion(): boolean {
+  return getAppEnv() === 'staging';
+}
+
 export function getCanonicalProductionUrl(): string {
+  return CANONICAL_PRODUCTION_URL;
+}
+
+export function getCanonicalAppUrl(): string {
+  const env = getAppEnv();
+  if (env === 'staging') return CANONICAL_STAGING_URL;
+  if (env === 'production') return CANONICAL_PRODUCTION_URL;
+  if (typeof window !== 'undefined') return window.location.origin;
   return CANONICAL_PRODUCTION_URL;
 }
 
@@ -28,10 +69,21 @@ export const DATA_COLLECTION_START_DATE = '2026-05-14'; // May 14, 2026
 export function isPublishedVersion(): boolean {
   if (typeof window === 'undefined') return false;
 
-  // Baked in at build time for GitHub Pages deploys
-  if (import.meta.env?.VITE_PUBLISHED === 'true') return true;
+  // Staging builds set VITE_PUBLISHED=true for cloud sync but are NOT production.
+  const bakedEnv = String(import.meta.env?.VITE_APP_ENV || '').toLowerCase();
+  if (bakedEnv === 'staging') return false;
 
   const { origin, pathname } = window.location;
+  if (
+    origin === GITHUB_PAGES_ORIGIN &&
+    (pathname === GITHUB_PAGES_STAGING_BASE_PATH ||
+      pathname.startsWith(`${GITHUB_PAGES_STAGING_BASE_PATH}/`))
+  ) {
+    return false;
+  }
+
+  // Baked in at build time for GitHub Pages production deploys
+  if (import.meta.env?.VITE_PUBLISHED === 'true' && bakedEnv !== 'staging') return true;
 
   if (origin === LEGACY_FIGMA_PUBLISHED_ORIGIN) return true;
 
@@ -64,15 +116,19 @@ export function isAiAssistCreationEnabled(): boolean {
 /**
  * Get the environment name for logging/debugging
  */
-export function getEnvironment(): 'published' | 'development' {
+export function getEnvironment(): 'published' | 'staging' | 'development' {
+  const appEnv = getAppEnv();
+  if (appEnv === 'staging') return 'staging';
   return isPublishedVersion() ? 'published' : 'development';
 }
 
 /**
- * Check if data should be collected (published version only, from May 14 onwards)
+ * Check if data should be collected (published or staging, from May 14 onwards).
+ * Staging events must include app_env=staging metadata (see engagementEvents).
  */
 export function shouldCollectData(): boolean {
-  if (!isPublishedVersion()) return false;
+  const env = getAppEnv();
+  if (env !== 'production' && env !== 'staging') return false;
 
   const now = new Date();
   const collectionStart = new Date(DATA_COLLECTION_START_DATE);
@@ -82,17 +138,18 @@ export function shouldCollectData(): boolean {
 
 /**
  * Get a prefixed localStorage key based on environment
- * Published data has no prefix, development data has 'dev-' prefix
+ * Production: unprefixed. Staging: staging-. Development: dev-.
  */
 export function getStorageKey(baseKey: string): string {
   const env = getEnvironment();
 
-  // Published version uses unprefixed keys for centralized data
   if (env === 'published') {
     return baseKey;
   }
+  if (env === 'staging') {
+    return `staging-${baseKey}`;
+  }
 
-  // Development uses prefixed keys to avoid pollution
   return `dev-${baseKey}`;
 }
 
@@ -139,10 +196,13 @@ export function markDataMigrated(): void {
 export function getEnvironmentInfo() {
   return {
     environment: getEnvironment(),
+    appEnv: getAppEnv(),
     isPublished: isPublishedVersion(),
+    isStaging: isStagingVersion(),
     shouldCollect: shouldCollectData(),
     origin: typeof window !== 'undefined' ? window.location.origin : 'unknown',
     publishedUrl: PUBLISHED_URL,
+    stagingUrl: CANONICAL_STAGING_URL,
     collectionStartDate: DATA_COLLECTION_START_DATE,
   };
 }

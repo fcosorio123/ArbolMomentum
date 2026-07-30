@@ -22,6 +22,9 @@ import {
   type UserTask, type Recurrence, type TaskResource,
 } from '../data/userTasks';
 import { attachResourcesToNewTask, resourcesForDisplay, seedMissingTaskResources } from '../data/taskResources';
+import { DeferTaskModal } from './DeferTaskModal';
+import { isTaskDeferralUiEnabled } from '../data/engagementControls';
+import { peekAttributionSession } from '../data/notificationIdentity';
 import {
   buildAllTasksInventory,
   filterInventoryTasks,
@@ -141,6 +144,7 @@ function TaskOverflowMenu({
   onDelete,
   onSimplify,
   includeSimplify,
+  onDeferLater,
   onOpened,
 }: {
   onEdit?: () => void;
@@ -149,6 +153,7 @@ function TaskOverflowMenu({
   onDelete: () => void;
   onSimplify?: () => void;
   includeSimplify?: boolean;
+  onDeferLater?: () => void;
   onOpened?: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -171,6 +176,9 @@ function TaskOverflowMenu({
   }, [open]);
 
   const items: Array<{ key: string; label: string; onClick: () => void; danger?: boolean }> = [];
+  if (onDeferLater) {
+    items.push({ key: 'defer', label: 'Work on this later', onClick: onDeferLater });
+  }
   if (includeSimplify && onSimplify) {
     items.push({ key: 'simplify', label: 'Simplify', onClick: onSimplify });
   }
@@ -266,7 +274,7 @@ function TaskItem({
   task, catColor, status, remark, onOpenUpdate, onDelete, onEdit, onSimplify, onArchive, onRestore, statusLocked,
   profileId, profileName, calendarDateKey, statusHint,
   selectionMode, selected, onToggleSelect,
-  focusLabel, onOverflowOpened,
+  focusLabel, onOverflowOpened, onDeferLater,
 }: {
   task: UserTask_; catColor: string; status: TaskStatus | null; remark?: string;
   onOpenUpdate: () => void; onDelete: () => void;
@@ -274,6 +282,7 @@ function TaskItem({
   onSimplify?: () => void;
   onArchive?: () => void;
   onRestore?: () => void;
+  onDeferLater?: () => void;
   statusLocked?: boolean;
   profileId: string;
   profileName: string;
@@ -587,6 +596,7 @@ function TaskItem({
             onDelete={onDelete}
             onSimplify={onSimplify}
             includeSimplify={simplifyOverflow}
+            onDeferLater={onDeferLater}
             onOpened={onOverflowOpened}
           />
         ) : (
@@ -755,6 +765,7 @@ function goalAccentColor(goalId: string) {
 function GoalGroup({
   goal, tasks, statuses, notes, onOpenUpdate, onDelete, timeFilter,
   onEditTask, onAddSuggestedTask, onSimplifyTask, onArchiveTask, onRestoreTask,
+  onDeferTask,
   defaultExpanded, deemphasized, profileId, profileName, calendarDateKey,
   selectionMode, selectedTaskIds, onToggleTaskSelect, showExploreSuggestions = true,
   emptyMessage = 'No tasks yet for this goal today.',
@@ -773,6 +784,7 @@ function GoalGroup({
   onSimplifyTask?: (t: UserTask_, goal: PersonalGoal) => void;
   onArchiveTask?: (t: UserTask_) => void;
   onRestoreTask?: (t: UserTask_) => void;
+  onDeferTask?: (t: UserTask_) => void;
   defaultExpanded?: boolean;
   deemphasized?: boolean;
   profileId: string;
@@ -948,6 +960,13 @@ function GoalGroup({
               }
               onArchive={task.isUserCreated && onArchiveTask && !task.archivedAt ? () => onArchiveTask(task) : undefined}
               onRestore={task.isUserCreated && onRestoreTask && task.archivedAt ? () => onRestoreTask(task) : undefined}
+              onDeferLater={
+                onDeferTask
+                && (statuses[task.id] ?? null) !== 'done'
+                && (statuses[task.id] ?? null) !== 'skipped'
+                  ? () => onDeferTask(task)
+                  : undefined
+              }
               focusLabel={hierarchyOn
                 ? (task.id === focusTaskId ? focusLabel ?? null : null)
                 : undefined}
@@ -1087,6 +1106,7 @@ export function TaskList({
   const [aiAssistOpen, setAiAssistOpen] = useState(false);
   const aiAssistEnabled = isAiAssistCreationEnabled();
   const [simplifyTarget, setSimplifyTarget] = useState<{ task: UserTask_; goal?: PersonalGoal } | null>(null);
+  const [deferTarget, setDeferTarget] = useState<{ id: string; label: string } | null>(null);
   const { capture: captureScroll, restore: restoreScroll, allowProgrammaticScroll } = useScrollPositionLock([
     statuses, notes, taskUpdateContext, momentumEntry,
   ]);
@@ -1826,6 +1846,9 @@ export function TaskList({
             }}
             onArchiveTask={handleArchiveTask}
             onRestoreTask={handleRestoreTask}
+            onDeferTask={isTaskDeferralUiEnabled(profile.id)
+              ? (t) => setDeferTarget({ id: t.id, label: t.label })
+              : undefined}
             showExploreSuggestions={opts.showExplore && !hideExploreSuggestions}
             emptyMessage={opts.emptyMessage}
             getStatusHint={opts.getStatusHint}
@@ -2272,6 +2295,23 @@ export function TaskList({
           goalWhy={simplifyTarget.goal?.deepWhy}
           profileId={profile.id}
           onConfirm={handleSimplifyConfirm}
+        />
+      )}
+
+      {deferTarget && (
+        <DeferTaskModal
+          open={!!deferTarget}
+          profileId={profile.id}
+          taskId={deferTarget.id}
+          taskLabel={deferTarget.label}
+          sourceNid={peekAttributionSession()?.nid}
+          onClose={() => setDeferTarget(null)}
+          onDeferred={(hint) => { if (hint) message.info(hint); }}
+          onRequestSimplify={() => {
+            const t = userTasks.find(u => u.id === deferTarget.id)
+              || ({ id: deferTarget.id, label: deferTarget.label } as UserTask_);
+            setSimplifyTarget({ task: t as UserTask_ });
+          }}
         />
       )}
 
