@@ -4,10 +4,11 @@
  */
 
 import { useState } from 'react';
-import { Modal, Button, Radio, Space, Typography } from 'antd';
+import { Modal, Button, Radio, Space, Typography, message } from 'antd';
 import { C } from '../data/colors';
 import {
   deferTask,
+  getDeferralSuccessMessage,
   type DeferResumePreset,
   type DeferReasonCode,
   DEFER_REASON_NEXT_ACTION,
@@ -64,6 +65,7 @@ export function DeferTaskModal({
   const [whenLocal, setWhenLocal] = useState('');
   const [reason, setReason] = useState<DeferReasonCode | undefined>();
   const [step, setStep] = useState<'when' | 'reason'>('when');
+  const [submitting, setSubmitting] = useState(false);
   const captureReason = isDeferralReasonCaptureEnabled(profileId);
   const hyp = getEngagementControls().hypotheses;
 
@@ -72,47 +74,65 @@ export function DeferTaskModal({
     setWhenLocal('');
     setReason(undefined);
     setStep('when');
+    setSubmitting(false);
   };
 
   const finish = (withReason?: DeferReasonCode) => {
-    const datetimeMs = preset === 'datetime' && whenLocal
-      ? new Date(whenLocal).getTime()
-      : undefined;
-    const record = deferTask({
-      profileId,
-      taskId,
-      taskLabel,
-      resumePreset: preset,
-      datetimeMs: datetimeMs && !Number.isNaN(datetimeMs) ? datetimeMs : undefined,
-      reason: withReason,
-      sourceNid,
-    });
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const datetimeMs = preset === 'datetime' && whenLocal
+        ? new Date(whenLocal).getTime()
+        : undefined;
+      const record = deferTask({
+        profileId,
+        taskId,
+        taskLabel,
+        resumePreset: preset,
+        datetimeMs: datetimeMs && !Number.isNaN(datetimeMs) ? datetimeMs : undefined,
+        reason: withReason,
+        sourceNid,
+      });
 
-    let hint: string | undefined;
-    if (withReason) {
-      const next = DEFER_REASON_NEXT_ACTION[withReason];
-      if (next === 'blocked') {
-        setTaskBlockedFlag(profileId, taskId, getTodayKey(), true);
-        hint = 'Marked as waiting for today. We will check back later.';
-      } else if (next === 'simplify') {
-        hint = 'Try breaking this into a smaller step.';
-        onRequestSimplify?.();
-      } else if (next === 'support') {
-        hint = 'Reach out to a trusted person or advisor if you need help.';
-      } else if (next === 'reminder') {
-        hint = 'Reminder set for when you want to return.';
+      message.success({
+        content: getDeferralSuccessMessage({
+          resumeAt: record.resumeAt,
+          reminderScheduled: !!record.reminderId,
+        }),
+        duration: 3,
+      });
+
+      let hint: string | undefined;
+      if (withReason) {
+        const next = DEFER_REASON_NEXT_ACTION[withReason];
+        if (next === 'blocked') {
+          setTaskBlockedFlag(profileId, taskId, getTodayKey(), true);
+          hint = 'Marked as waiting for today. We will check back later.';
+        } else if (next === 'simplify') {
+          hint = 'Try breaking this into a smaller step.';
+          onRequestSimplify?.();
+        } else if (next === 'support') {
+          hint = 'Reach out to a trusted person or advisor if you need help.';
+        }
+        // 'reminder' is already covered by the success toast above.
       }
-    }
 
-    if (record.deferCountInWindow >= hyp.repeatedDeferralCount) {
-      hint = (hint ? `${hint} ` : '')
-        + 'You have deferred this several times — consider Simplify or asking for help.';
-      onRequestSimplify?.();
-    }
+      if (record.deferCountInWindow >= hyp.repeatedDeferralCount) {
+        hint = (hint ? `${hint} ` : '')
+          + 'You have deferred this several times — consider Simplify or asking for help.';
+        onRequestSimplify?.();
+      }
 
-    reset();
-    onDeferred?.(hint);
-    onClose();
+      reset();
+      onDeferred?.(hint);
+      onClose();
+    } catch {
+      setSubmitting(false);
+      message.error({
+        content: 'Could not save. Your selections are still here — try again.',
+        duration: 4,
+      });
+    }
   };
 
   const onConfirmWhen = () => {
@@ -128,9 +148,10 @@ export function DeferTaskModal({
     <Modal
       open={open}
       title="Work on this later"
-      onCancel={() => { reset(); onClose(); }}
+      onCancel={() => { if (submitting) return; reset(); onClose(); }}
       footer={null}
       destroyOnHidden
+      maskClosable={!submitting}
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
     >
       <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
@@ -142,6 +163,7 @@ export function DeferTaskModal({
           <Radio.Group
             value={preset}
             onChange={(e) => setPreset(e.target.value)}
+            disabled={submitting}
             style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
           >
             {PRESETS.map((p) => (
@@ -153,6 +175,7 @@ export function DeferTaskModal({
               type="datetime-local"
               value={whenLocal}
               onChange={(e) => setWhenLocal(e.target.value)}
+              disabled={submitting}
               style={{
                 width: '100%',
                 minHeight: 44,
@@ -167,10 +190,11 @@ export function DeferTaskModal({
             type="primary"
             block
             onClick={onConfirmWhen}
-            disabled={preset === 'datetime' && !whenLocal}
+            loading={submitting}
+            disabled={submitting || (preset === 'datetime' && !whenLocal)}
             style={{ minHeight: 44 }}
           >
-            {captureReason ? 'Continue' : 'Save reminder'}
+            {captureReason ? 'Continue' : 'Save'}
           </Button>
         </Space>
       )}
@@ -181,16 +205,24 @@ export function DeferTaskModal({
           <Radio.Group
             value={reason}
             onChange={(e) => setReason(e.target.value)}
+            disabled={submitting}
             style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
           >
             {REASONS.map((r) => (
               <Radio key={r.id} value={r.id}>{r.label}</Radio>
             ))}
           </Radio.Group>
-          <Button type="primary" block onClick={() => finish(reason)} style={{ minHeight: 44 }}>
+          <Button
+            type="primary"
+            block
+            onClick={() => finish(reason)}
+            loading={submitting}
+            disabled={submitting}
+            style={{ minHeight: 44 }}
+          >
             Save
           </Button>
-          <Button block onClick={() => finish()} style={{ minHeight: 44 }}>
+          <Button block onClick={() => finish()} disabled={submitting} style={{ minHeight: 44 }}>
             Skip reason
           </Button>
         </Space>

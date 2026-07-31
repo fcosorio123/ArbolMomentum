@@ -618,7 +618,16 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
 
   // ── Success ──────────────────────────────────────────────────────────
   const renderSuccess = () => (
-    <div style={{ padding: '24px 20px 100px', position: 'relative', overflow: 'hidden' }}>
+    <div
+      data-testid="checkin-success"
+      style={{
+        padding: '24px 20px max(28px, calc(env(safe-area-inset-bottom, 0px) + 20px))',
+        position: 'relative',
+        flexShrink: 0,
+        width: '100%',
+        boxSizing: 'border-box',
+      }}
+    >
       <ConfettiBlast />
       <div style={{ textAlign: 'center', marginBottom: 28, paddingTop: 16 }}>
         <div style={{ fontSize: 56, marginBottom: 14 }}>🎉</div>
@@ -654,8 +663,8 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {successStats.goalProgress.map(gp => (
             <div key={gp.title}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                <span style={{ fontSize: 13, color: C.body, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 8 }}>{gp.title}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 5 }}>
+                <span style={{ fontSize: 13, color: C.body, flex: 1, minWidth: 0, overflowWrap: 'anywhere', lineHeight: 1.35 }}>{gp.title}</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: gp.accent, flexShrink: 0 }}>{gp.pct}%</span>
               </div>
               <Progress percent={gp.pct} showInfo={false} size={['100%', 6]} strokeColor={gp.accent} railColor={C.bgAlt} />
@@ -664,18 +673,32 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
         </div>
       </div>
 
-      {/* Badges */}
+      {/* Badges — full list; page scroll (not nested) owns overflow */}
       {earnedBadges.length > 0 && (
-        <div style={{ background: '#E9A10010', border: '1.5px solid #E9A10030', borderRadius: 18, padding: '18px', marginBottom: 16 }}>
+        <div
+          data-testid="checkin-achievements"
+          style={{ background: '#E9A10010', border: '1.5px solid #E9A10030', borderRadius: 18, padding: '18px', marginBottom: 16 }}
+        >
           <div style={{ fontSize: 12, fontWeight: 700, color: '#E9A100', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>
             🏅 Achievement{earnedBadges.length > 1 ? 's' : ''} Earned
           </div>
-          {earnedBadges.slice(0, 3).map(badge => (
-            <div key={badge.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: C.bgCard, borderRadius: 12, padding: '10px 12px', marginBottom: 8, border: `1px solid ${C.border}` }}>
-              <span style={{ fontSize: 28, flexShrink: 0 }}>{badge.icon}</span>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: C.headline }}>{badge.label}</div>
-                <div style={{ fontSize: 11, color: C.secondary, marginTop: 2 }}>{badge.description}</div>
+          {earnedBadges.map(badge => (
+            <div
+              key={badge.id}
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: 12,
+                background: C.bgCard, borderRadius: 12, padding: '10px 12px', marginBottom: 8,
+                border: `1px solid ${C.border}`,
+              }}
+            >
+              <span style={{ fontSize: 28, flexShrink: 0, lineHeight: 1 }} aria-hidden>{badge.icon}</span>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.headline, overflowWrap: 'anywhere', lineHeight: 1.35 }}>
+                  {badge.name}
+                </div>
+                <div style={{ fontSize: 11, color: C.secondary, marginTop: 2, lineHeight: 1.45, overflowWrap: 'anywhere' }}>
+                  {badge.desc}
+                </div>
               </div>
             </div>
           ))}
@@ -686,12 +709,18 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
         Check-in completed in {minutesTaken} min
       </div>
 
-      <button onClick={onClose} style={{
-        width: '100%', padding: '16px', borderRadius: 16,
-        background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
-        border: 'none', color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer',
-        boxShadow: `0 8px 28px ${C.primary}40`,
-      }}>
+      <button
+        type="button"
+        data-testid="checkin-success-done"
+        onClick={onClose}
+        style={{
+          width: '100%', padding: '16px', borderRadius: 16,
+          background: `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`,
+          border: 'none', color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer',
+          boxShadow: `0 8px 28px ${C.primary}40`,
+          minHeight: 48,
+        }}
+      >
         Done - Back to Dashboard
       </button>
     </div>
@@ -748,8 +777,20 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
         )}
       </div>
 
-      {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+      {/* Content — minHeight:0 so overflowY forms a real scrollport inside the fixed shell */}
+      <div
+        data-testid="checkin-scroll"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {screen === 'landing' && renderLanding()}
         {screen === 'task' && renderTaskCard()}
         {screen === 'processing' && renderProcessing()}

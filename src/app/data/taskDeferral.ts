@@ -113,10 +113,10 @@ function scheduleDeferralReminder(
   taskId: string,
   resumeAt: number,
   taskLabel: string,
-): string {
+): string | undefined {
   const tag = `defer-${taskId}`;
   cancelReminderInSchedule(profileId, tag);
-  if (!isDeferralRemindersEnabled(profileId)) return tag;
+  if (!isDeferralRemindersEnabled(profileId)) return undefined;
   const notif: ScheduledNotif = {
     tag,
     title: 'Ready to continue?',
@@ -128,6 +128,17 @@ function scheduleDeferralReminder(
   sched.push(notif);
   saveSchedule(profileId, sched);
   return tag;
+}
+
+/** User-facing confirmation after a successful defer commit. */
+export function getDeferralSuccessMessage(opts: {
+  resumeAt: number | null;
+  reminderScheduled: boolean;
+}): string {
+  if (opts.reminderScheduled) {
+    return 'Task moved to later and reminder added.';
+  }
+  return 'Task moved to later.';
 }
 
 export function deferTask(opts: {
@@ -158,10 +169,10 @@ export function deferTask(opts: {
   }
 
   const resumeAt = computeResumeAt(resumePreset, datetimeMs);
+  if (!resumeAt) cancelReminderInSchedule(profileId, prev?.reminderId || `defer-${taskId}`);
   const reminderId = resumeAt
     ? scheduleDeferralReminder(profileId, taskId, resumeAt, taskLabel)
     : undefined;
-  if (!resumeAt) cancelReminderInSchedule(profileId, prev?.reminderId || `defer-${taskId}`);
 
   const record: TaskDeferral = {
     taskId,

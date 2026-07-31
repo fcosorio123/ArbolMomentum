@@ -1905,6 +1905,13 @@ export function TaskList({
                 }
                 onArchive={task.isUserCreated && !task.archivedAt ? () => handleArchiveTask(task) : undefined}
                 onRestore={task.isUserCreated && task.archivedAt ? () => handleRestoreTask(task) : undefined}
+                onDeferLater={
+                  isTaskDeferralUiEnabled(profile.id)
+                  && (statuses[task.id] ?? null) !== 'done'
+                  && (statuses[task.id] ?? null) !== 'skipped'
+                    ? () => setDeferTarget({ id: task.id, label: task.label })
+                    : undefined
+                }
                 focusLabel={opts.enableFocusHierarchy
                   ? (task.id === focusTaskId ? focusLabel : null)
                   : undefined}
@@ -2066,6 +2073,13 @@ export function TaskList({
                         : undefined
                     }
                     onArchive={() => handleArchiveTask(taskObj)}
+                    onDeferLater={
+                      isTaskDeferralUiEnabled(profile.id)
+                      && overdueStatus !== 'done'
+                      && overdueStatus !== 'skipped'
+                        ? () => setDeferTarget({ id: taskObj.id, label: taskObj.label })
+                        : undefined
+                    }
                   />
                 );
               })}

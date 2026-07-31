@@ -15,7 +15,7 @@ import {
   categoryOfEvent,
   scrubSensitiveMeta,
 } from '../src/app/data/notificationFunnel.ts';
-import { mergeDeferralMaps, computeResumeAt, type TaskDeferral } from '../src/app/data/taskDeferral.ts';
+import { mergeDeferralMaps, computeResumeAt, getDeferralSuccessMessage, type TaskDeferral } from '../src/app/data/taskDeferral.ts';
 import { withAttribution } from '../supabase/functions/server/emailTemplates.ts';
 
 // ── Identity
@@ -81,5 +81,18 @@ assert.equal(mergeDeferralMaps({ t1: newer }, { t1: older }).t1.resumePreset, 'w
 
 assert.equal(computeResumeAt('unsure'), null);
 assert.ok((computeResumeAt('tomorrow') ?? 0) > Date.now());
+
+assert.equal(
+  getDeferralSuccessMessage({ resumeAt: null, reminderScheduled: false }),
+  'Task moved to later.',
+);
+assert.equal(
+  getDeferralSuccessMessage({ resumeAt: Date.now() + 1000, reminderScheduled: true }),
+  'Task moved to later and reminder added.',
+);
+assert.equal(
+  getDeferralSuccessMessage({ resumeAt: Date.now() + 1000, reminderScheduled: false }),
+  'Task moved to later.',
+);
 
 console.log('test-adaptive-engagement-r1: ok');
