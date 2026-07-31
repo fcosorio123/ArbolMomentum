@@ -489,21 +489,19 @@ export function Dashboard({
                     : 'Task updates from Today count toward your day. Optional check-in is still available.'}
                 </div>
               </div>
+              {/* One CTA: check-in when pending; otherwise Tasks (reachable elsewhere too, but needed here when check-in is done). */}
               <div style={bannerActionsRow}>
-                {!checkedIn && onStartCheckIn && (
+                {!checkedIn && onStartCheckIn ? (
                   <button type="button" onClick={onStartCheckIn} style={{
                     ...bannerBtnBase,
                     background: C.streakText, border: 'none', color: '#fff',
                   }}>Start Check-in</button>
-                )}
-                {onNavigateTasks && (
+                ) : onNavigateTasks ? (
                   <button type="button" onClick={onNavigateTasks} style={{
                     ...bannerBtnBase,
-                    background: checkedIn ? C.streakText : 'transparent',
-                    border: checkedIn ? 'none' : `1.5px solid ${C.streakText}`,
-                    color: checkedIn ? '#fff' : C.streakText,
+                    background: C.streakText, border: 'none', color: '#fff',
                   }}>View Tasks</button>
-                )}
+                ) : null}
               </div>
             </div>
           );
