@@ -17,6 +17,7 @@ import { useDashboardRefresh } from '../hooks/useDashboardRefresh';
 import { pickDoNowTask } from '../data/dashboardSnapshot';
 import { C } from '../data/colors';
 import { MIN_TOUCH, touchPrimaryButton } from '../styles/touchTargets';
+import type { CSSProperties } from 'react';
 
 interface Props {
   profile: Profile;
@@ -421,16 +422,35 @@ export function Dashboard({
       <>
       {/* ── Check-in Banner - red / yellow / green */}
       {(() => {
+        const bannerBtnBase: CSSProperties = {
+          ...touchPrimaryButton,
+          minHeight: MIN_TOUCH,
+          borderRadius: 10,
+          padding: '10px 14px',
+          fontWeight: 700,
+          fontSize: 13,
+          flex: '1 1 140px',
+          whiteSpace: 'nowrap',
+          WebkitTapHighlightColor: 'transparent',
+        };
+        const bannerActionsRow: CSSProperties = {
+          display: 'flex',
+          gap: 8,
+          flex: '1 1 100%',
+          width: '100%',
+          flexWrap: 'wrap',
+        };
+
         if (bannerState === 'red') {
           const count = checkInGoals.length;
           return (
             <div data-tour-id="home-banner" style={{
               background: '#A72D1A10', border: '1.5px solid #A72D1A30',
               borderRadius: 18, padding: '14px 16px', marginBottom: 16,
-              display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+              display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap',
             }}>
-              <span style={{ fontSize: 22, flexShrink: 0 }}>🔴</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1.2 }}>🔴</span>
+              <div style={{ flex: '1 1 160px', minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 800, color: '#A72D1A', marginBottom: 2 }}>
                   {count > 0 ? `${count} goal${count !== 1 ? 's' : ''} need check-in` : "You haven't checked in today"}
                 </div>
@@ -439,11 +459,12 @@ export function Dashboard({
                 </div>
               </div>
               {onStartCheckIn && (
-                <button onClick={onStartCheckIn} style={{
-                  background: '#A72D1A', border: 'none', borderRadius: 10,
-                  padding: '8px 12px', color: '#fff', fontWeight: 700, fontSize: 12,
-                  cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
-                }}>Start Check-in</button>
+                <div style={bannerActionsRow}>
+                  <button type="button" onClick={onStartCheckIn} style={{
+                    ...bannerBtnBase,
+                    background: '#A72D1A', border: 'none', color: '#fff',
+                  }}>Start Check-in</button>
+                </div>
               )}
             </div>
           );
@@ -453,10 +474,10 @@ export function Dashboard({
             <div data-tour-id="home-banner" style={{
               background: C.warningBg, border: `1.5px solid ${C.streak}55`,
               borderRadius: 18, padding: '14px 16px', marginBottom: 16,
-              display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+              display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap',
             }}>
-              <span style={{ fontSize: 22, flexShrink: 0 }}>🟡</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1.2 }}>🟡</span>
+              <div style={{ flex: '1 1 160px', minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 800, color: C.streakText, marginBottom: 2 }}>
                   {checkedIn
                     ? "You've checked in, but still have tasks to complete"
@@ -468,13 +489,22 @@ export function Dashboard({
                     : 'Task updates from Today count toward your day. Optional check-in is still available.'}
                 </div>
               </div>
-              {onNavigateTasks && (
-                <button onClick={onNavigateTasks} style={{
-                  background: C.streakText, border: 'none', borderRadius: 10,
-                  padding: '8px 12px', color: '#fff', fontWeight: 700, fontSize: 12,
-                  cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
-                }}>View Tasks</button>
-              )}
+              <div style={bannerActionsRow}>
+                {!checkedIn && onStartCheckIn && (
+                  <button type="button" onClick={onStartCheckIn} style={{
+                    ...bannerBtnBase,
+                    background: C.streakText, border: 'none', color: '#fff',
+                  }}>Start Check-in</button>
+                )}
+                {onNavigateTasks && (
+                  <button type="button" onClick={onNavigateTasks} style={{
+                    ...bannerBtnBase,
+                    background: checkedIn ? C.streakText : 'transparent',
+                    border: checkedIn ? 'none' : `1.5px solid ${C.streakText}`,
+                    color: checkedIn ? '#fff' : C.streakText,
+                  }}>View Tasks</button>
+                )}
+              </div>
             </div>
           );
         }
@@ -483,19 +513,33 @@ export function Dashboard({
           <div data-tour-id="home-banner" style={{
             background: '#29823B0e', border: '1.5px solid #29823B30',
             borderRadius: 18, padding: '12px 16px', marginBottom: 16,
-            display: 'flex', alignItems: 'center', gap: 10,
+            display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap',
           }}>
-            <span style={{ fontSize: 20, flexShrink: 0 }}>🟢</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#29823B', marginBottom: 1 }}>You're checked in and all done!</div>
-              <div style={{ fontSize: 11, color: C.body }}>Great work - everything for today is complete.</div>
+            <span style={{ fontSize: 20, flexShrink: 0, lineHeight: 1.2 }}>🟢</span>
+            <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#29823B', marginBottom: 1 }}>
+                {checkedIn ? "You're checked in and all done!" : 'All tasks done for today!'}
+              </div>
+              <div style={{ fontSize: 11, color: C.body, lineHeight: 1.4 }}>
+                {checkedIn
+                  ? 'Great work - everything for today is complete.'
+                  : 'Optional check-in is still available if you want to reflect.'}
+              </div>
             </div>
-            {onNavigateGoals && (
-              <button onClick={onNavigateGoals} style={{
-                background: 'none', border: '1px solid #29823B40', borderRadius: 8,
-                padding: '5px 10px', color: '#29823B', fontSize: 11, fontWeight: 700, cursor: 'pointer',
-              }}>View Progress</button>
-            )}
+            <div style={bannerActionsRow}>
+              {!checkedIn && onStartCheckIn && (
+                <button type="button" onClick={onStartCheckIn} style={{
+                  ...bannerBtnBase,
+                  background: '#29823B', border: 'none', color: '#fff',
+                }}>Start Check-in</button>
+              )}
+              {onNavigateGoals && (
+                <button type="button" onClick={onNavigateGoals} style={{
+                  ...bannerBtnBase,
+                  background: 'none', border: '1px solid #29823B40', color: '#29823B',
+                }}>View Progress</button>
+              )}
+            </div>
           </div>
         );
       })()}

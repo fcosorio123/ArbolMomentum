@@ -1085,6 +1085,11 @@ export default function App() {
               advanceOnboarding('summary');
               setActiveTab('tasks');
             }}
+            onStartCheckIn={() => {
+              if (activeProfile) markSummaryShownToday(activeProfile.id);
+              advanceOnboarding('summary');
+              setShowCheckIn(true);
+            }}
           />
 
           {/* Feedback modal */}

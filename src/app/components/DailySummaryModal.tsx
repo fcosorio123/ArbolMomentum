@@ -10,6 +10,8 @@ interface Props {
   profile: Profile;
   onClose: () => void;
   onStartTasks: () => void;
+  /** Opens the daily check-in flow (when formal check-in is still pending). */
+  onStartCheckIn?: () => void;
   /** Bump when tasks/goals change so modal re-reads latest data */
   dataVersion?: number;
 }
@@ -93,7 +95,7 @@ function statusSummary(snapshot: ReturnType<typeof getDashboardSnapshot>) {
   return parts.join(' · ') || '0 not started';
 }
 
-export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVersion = 0 }: Props) {
+export function DailySummaryModal({ open, profile, onClose, onStartTasks, onStartCheckIn, dataVersion = 0 }: Props) {
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [expandedGoals, setExpandedGoals] = useState<Set<string>>(new Set());
 
@@ -419,24 +421,48 @@ export function DailySummaryModal({ open, profile, onClose, onStartTasks, dataVe
             <span style={{ fontSize: 13, color: C.secondary }}>Don't show this again</span>
           </label>
 
+          {!checkedIn && onStartCheckIn && (
+            <button
+              type="button"
+              onClick={() => { handleClose(); onStartCheckIn(); }}
+              style={{
+                width: '100%', minHeight: 48, padding: '14px', borderRadius: 14, border: 'none', cursor: 'pointer',
+                background: `linear-gradient(135deg, ${C.headline}, ${C.primaryPressed})`,
+                color: '#fff', fontSize: 15, fontWeight: 700, marginBottom: 10,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              Start Check-in
+              <ArrowRightOutlined />
+            </button>
+          )}
           <button
+            type="button"
             onClick={() => { handleClose(); onStartTasks(); }}
             style={{
-              width: '100%', padding: '14px', borderRadius: 14, border: 'none', cursor: 'pointer',
-              background: `linear-gradient(135deg, ${C.headline}, ${C.primaryPressed})`,
-              color: '#fff', fontSize: 15, fontWeight: 700, marginBottom: 10,
+              width: '100%', minHeight: 48, padding: '14px', borderRadius: 14, cursor: 'pointer',
+              background: !checkedIn && onStartCheckIn
+                ? 'transparent'
+                : `linear-gradient(135deg, ${C.headline}, ${C.primaryPressed})`,
+              border: !checkedIn && onStartCheckIn ? `1.5px solid ${C.borderStrong}` : 'none',
+              color: !checkedIn && onStartCheckIn ? C.headline : '#fff',
+              fontSize: 15, fontWeight: 700, marginBottom: 10,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              WebkitTapHighlightColor: 'transparent',
             }}
           >
             {pct === 100 ? 'View Progress' : pct > 0 ? 'Continue Tasks' : 'Start Tasks'}
             <ArrowRightOutlined />
           </button>
           <button
+            type="button"
             onClick={handleClose}
             style={{
-              width: '100%', padding: '12px', borderRadius: 14,
+              width: '100%', minHeight: 44, padding: '12px', borderRadius: 14,
               border: `1px solid ${C.border}`, background: 'none', cursor: 'pointer',
               color: C.body, fontSize: 14,
+              WebkitTapHighlightColor: 'transparent',
             }}
           >
             Close
