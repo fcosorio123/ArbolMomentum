@@ -729,7 +729,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
         width={400}
         zIndex={1100}
         styles={{
-          content: {
+          container: {
             borderRadius: 24, padding: 0, overflow: 'hidden',
             maxWidth: 'calc(100vw - 24px)',
             width: 'min(400px, calc(100vw - 24px))',

@@ -152,6 +152,7 @@ export function DeferTaskModal({
       footer={null}
       destroyOnHidden
       maskClosable={!submitting}
+      zIndex={1200}
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
     >
       <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
