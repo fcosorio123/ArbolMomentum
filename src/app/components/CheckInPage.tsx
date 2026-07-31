@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Progress, message } from 'antd';
+import { Modal, Progress, message } from 'antd';
 import { CloseOutlined, CheckOutlined, RightOutlined, LeftOutlined } from '@ant-design/icons';
 import { getPersonalGoals, type PersonalGoal } from '../data/personalGoals';
 import {
@@ -309,12 +309,12 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
     const onTrack = allTasks.filter(t => t.preExisting !== null);
     const goalsNeedingCount = new Set(needsCheckIn.map(t => t.goalId)).size;
     return (
-      <div style={{ padding: '24px 20px 100px' }}>
-        <div style={{ marginBottom: 24 }}>
+      <div style={{ padding: '20px 16px 16px' }}>
+        <div style={{ marginBottom: 20 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.primary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
             Daily Check-in
           </div>
-          <h2 style={{ margin: '0 0 6px', fontSize: 22, fontWeight: 800, color: C.headline }}>
+          <h2 style={{ margin: '0 0 6px', fontSize: 20, fontWeight: 800, color: C.headline }}>
             How's your progress today?
           </h2>
           <p style={{ margin: 0, color: C.body, fontSize: 13, lineHeight: 1.5 }}>
@@ -325,7 +325,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
         {/* Overall progress */}
         <div style={{
           background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 16,
-          padding: '14px 18px', marginBottom: 22, boxShadow: C.shadow,
+          padding: '14px 18px', marginBottom: 16, boxShadow: C.shadow,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ fontSize: 13, color: C.body }}>{answeredCount} of {totalTasks} tasks reviewed</span>
@@ -367,7 +367,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
 
         {/* On track preview */}
         {onTrack.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
+          <div style={{ marginBottom: 8 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: C.secondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
               Already answered
             </div>
@@ -395,24 +395,6 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
             )}
           </div>
         )}
-
-        {/* CTA */}
-        <button
-          onClick={startTaskFlow}
-          style={{
-            position: 'fixed', bottom: 'max(24px, calc(env(safe-area-inset-bottom, 0px) + 12px))', left: '50%', transform: 'translateX(-50%)',
-            width: 'calc(100% - 40px)', maxWidth: 390,
-            background: needsCount > 0
-              ? `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`
-              : '#29823B',
-            border: 'none', borderRadius: 16, padding: '16px',
-            color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer',
-            boxShadow: `0 8px 28px ${C.primary}45`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          }}
-        >
-          {needsCount > 0 ? <>Start Check-in <RightOutlined /></> : <>Review All Tasks <RightOutlined /></>}
-        </button>
       </div>
     );
   };
@@ -436,7 +418,7 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
     ];
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: '20px 20px 24px', minHeight: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: '16px 16px 20px', minHeight: 0 }}>
 
         {/* Goal context chip */}
         <div style={{
@@ -726,76 +708,139 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
     </div>
   );
 
-  // ── Shell ─────────────────────────────────────────────────────────────
+  // ── Shell (Today-style centered modal card) ───────────────────────────
   const topBarTitle =
     screen === 'landing' ? 'Check-in' :
     screen === 'task' ? `${taskIdx + 1} / ${sessionTasks.length}` :
     screen === 'processing' ? 'Saving…' : '✓ Complete';
 
+  const modalMaxH = 'min(90dvh, calc(100dvh - 24px))';
+
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 1100, background: C.bg,
-      display: 'flex', flexDirection: 'column',
-      paddingTop: 'env(safe-area-inset-top, 0px)',
-      paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-    }}>
+    <>
+      <Modal
+        open
+        onCancel={() => { if (screen !== 'processing') onClose(); }}
+        footer={null}
+        centered
+        closable={false}
+        destroyOnHidden
+        maskClosable={screen !== 'processing'}
+        width={400}
+        zIndex={1100}
+        styles={{
+          content: {
+            borderRadius: 24, padding: 0, overflow: 'hidden',
+            maxWidth: 'calc(100vw - 24px)',
+            width: 'min(400px, calc(100vw - 24px))',
+            margin: '0 auto',
+            maxHeight: modalMaxH,
+            display: 'flex',
+            flexDirection: 'column',
+            background: C.bg,
+          },
+          body: {
+            padding: 0, flex: 1, minHeight: 0, overflow: 'hidden',
+            display: 'flex', flexDirection: 'column',
+          },
+          mask: { backdropFilter: 'blur(6px)', background: 'rgba(39,39,42,0.3)' },
+        }}
+      >
+        <div
+          data-testid="checkin-modal"
+          style={{
+            display: 'flex', flexDirection: 'column',
+            maxHeight: modalMaxH, overflow: 'hidden', background: C.bg,
+          }}
+        >
+          {/* Top bar */}
+          <div style={{
+            zIndex: 10, background: C.bg,
+            borderBottom: `1px solid ${C.border}`,
+            display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px',
+            flexShrink: 0,
+          }}>
+            {screen === 'task' && (
+              <button type="button" onClick={() => setScreen('landing')} style={{
+                background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 10,
+                width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: C.body, fontSize: 14, flexShrink: 0,
+              }}>←</button>
+            )}
 
-      {/* Top bar */}
-      <div style={{
-        zIndex: 10, background: C.bg,
-        borderBottom: `1px solid ${C.border}`,
-        display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px',
-        flexShrink: 0,
-      }}>
-        {screen === 'task' && (
-          <button onClick={() => setScreen('landing')} style={{
-            background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 10,
-            width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', color: C.body, fontSize: 14, flexShrink: 0,
-          }}>←</button>
-        )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.headline }}>{topBarTitle}</div>
+              {screen === 'task' && (
+                <div style={{ marginTop: 6 }}>
+                  <Progress
+                    percent={sessionTasks.length > 0 ? Math.round(((taskIdx + 1) / sessionTasks.length) * 100) : 0}
+                    showInfo={false} size={['100%', 4]}
+                    strokeColor={currentTask?.accentColor ?? C.primary} railColor={C.bgAlt}
+                  />
+                </div>
+              )}
+            </div>
 
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: C.headline }}>{topBarTitle}</div>
-          {screen === 'task' && (
-            <div style={{ marginTop: 6 }}>
-              <Progress
-                percent={sessionTasks.length > 0 ? Math.round(((taskIdx + 1) / sessionTasks.length) * 100) : 0}
-                showInfo={false} size={['100%', 4]}
-                strokeColor={currentTask?.accentColor ?? C.primary} railColor={C.bgAlt}
-              />
+            {screen !== 'processing' && (
+              <button type="button" onClick={onClose} style={{
+                background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 10,
+                width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: C.secondary, fontSize: 13, flexShrink: 0,
+              }} title="Close"><CloseOutlined /></button>
+            )}
+          </div>
+
+          {/* Scrollable body — single scroll owner inside the card */}
+          <div
+            data-testid="checkin-scroll"
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            {screen === 'landing' && renderLanding()}
+            {screen === 'task' && renderTaskCard()}
+            {screen === 'processing' && renderProcessing()}
+            {screen === 'success' && renderSuccess()}
+          </div>
+
+          {/* Landing CTA pinned like Today summary footer */}
+          {screen === 'landing' && (
+            <div style={{
+              flexShrink: 0,
+              padding: '12px 16px max(16px, env(safe-area-inset-bottom, 0px))',
+              borderTop: `1px solid ${C.border}`,
+              background: C.bg,
+            }}>
+              <button
+                type="button"
+                onClick={startTaskFlow}
+                disabled={totalTasks === 0}
+                style={{
+                  width: '100%',
+                  minHeight: 48,
+                  background: needsCount > 0
+                    ? `linear-gradient(135deg, ${C.primary}, ${C.primaryPressed})`
+                    : '#29823B',
+                  border: 'none', borderRadius: 14, padding: '14px',
+                  color: '#fff', fontWeight: 800, fontSize: 15, cursor: totalTasks === 0 ? 'default' : 'pointer',
+                  opacity: totalTasks === 0 ? 0.5 : 1,
+                  boxShadow: `0 8px 28px ${C.primary}45`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                {needsCount > 0 ? <>Start Check-in <RightOutlined /></> : <>Review All Tasks <RightOutlined /></>}
+              </button>
             </div>
           )}
         </div>
-
-        {screen !== 'processing' && (
-          <button onClick={onClose} style={{
-            background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 10,
-            width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', color: C.secondary, fontSize: 13, flexShrink: 0,
-          }} title="Close"><CloseOutlined /></button>
-        )}
-      </div>
-
-      {/* Content — minHeight:0 so overflowY forms a real scrollport inside the fixed shell */}
-      <div
-        data-testid="checkin-scroll"
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          WebkitOverflowScrolling: 'touch',
-          overscrollBehavior: 'contain',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {screen === 'landing' && renderLanding()}
-        {screen === 'task' && renderTaskCard()}
-        {screen === 'processing' && renderProcessing()}
-        {screen === 'success' && renderSuccess()}
-      </div>
+      </Modal>
 
       {currentTask && (
         <DeferTaskModal
@@ -812,6 +857,6 @@ export function CheckInPage({ profile, onClose }: { profile: Profile; onClose: (
           }}
         />
       )}
-    </div>
+    </>
   );
 }
