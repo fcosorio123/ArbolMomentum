@@ -39,6 +39,9 @@ assert('deleteUserGoal clears task goal links', personalGoals.includes('clearTas
 assert('resetGoalProgress uses arbol-gtask prefix', personalGoals.includes('arbol-gtask-${profileId}-${goalId}-'));
 assert('TaskList shows goals when no tasks (GT-06)', /isEmpty\s*=\s*categories\.length\s*===\s*0\s*&&\s*userTasks\.length\s*===\s*0\s*&&\s*goals\.length\s*===\s*0/.test(taskList));
 assert('empty goal group has Add task CTA', taskList.includes('No tasks yet for this goal today'));
+assert('GoalsPage has Add Task on goal cards', goalsPage.includes('data-testid="goal-add-task"'));
+assert('GoalsPage empty goal CTA', goalsPage.includes('goal-add-first-task'));
+assert('GoalsPage opens ManageTaskModal for goal context', goalsPage.includes('ManageTaskModal'));
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Progress, Modal, Button } from 'antd';
+import { Progress, Modal, Button, message } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, ArrowRightOutlined } from '@ant-design/icons';
 import { PageTour, TOUR_KEYS, tourStorageKey, areToursDismissedForProfile, resetLiveToursForProfile } from './AppTour';
 import { HelpTourMenu } from './HelpTourMenu';
@@ -9,18 +9,25 @@ import {
   isMonetaryGoal, type PersonalGoal,
 } from '../data/personalGoals';
 import {
-  getTaskCategoriesForProfile, getTaskStatus, isTaskActiveForDate, getTodayKey,
+  getTodayKey,
 } from '../data/profiles';
 import { getGoalTaskBreakdown, getGoalWeekProgressPercent, getGoalWeekBreakdown } from '../data/goalProgressUtils';
-import { getUserTasks, createUserTask, orphanUserTasksForGoal, deleteUserTask, isTaskScheduledForDate } from '../data/userTasks';
+import { getUserTasks, createUserTask, orphanUserTasksForGoal, deleteUserTask, type UserTask } from '../data/userTasks';
 import { attachResourcesToNewTask } from '../data/taskResources';
 import { ManageGoalModal } from './ManageGoalModal';
+import { ManageTaskModal } from './ManageTaskModal';
 import { AiAssistCreationModal } from './AiAssistCreationModal';
 import { isAiAssistCreationEnabled } from '../data/environment';
 import { trackEvent } from '../data/deviceAnalytics';
 import { ONBOARDING_TOUR_VERSION } from '../data/productOnboarding';
 import { C, accentColorForId } from '../data/colors';
+import { MIN_TOUCH, touchPrimaryButton } from '../styles/touchTargets';
 import type { Profile } from '../data/profiles';
+
+/** Linked user tasks for a goal (excludes archived). Used for empty-state CTA. */
+function countLinkedUserTasks(profileId: string, goalId: string): number {
+  return getUserTasks(profileId).filter(t => !t.archivedAt && t.goalId === goalId).length;
+}
 
 function goalAccent(goalId: string) {
   return accentColorForId(goalId);
@@ -154,6 +161,8 @@ export function GoalsPage({
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const [aiAssistOpen, setAiAssistOpen] = useState(false);
+  const [addTaskGoalId, setAddTaskGoalId] = useState<string | undefined>(undefined);
+  const [manageTaskOpen, setManageTaskOpen] = useState(false);
   const aiAssistEnabled = isAiAssistCreationEnabled();
 
   const loadGoals = useCallback(() => {
@@ -199,10 +208,15 @@ export function GoalsPage({
   const handleSaveGoal = (data: { title: string; deepWhy: string }) => {
     if (editingGoal) {
       updateUserGoal(profile.id, editingGoal.id, { title: data.title, deepWhy: data.deepWhy });
+      const editedId = editingGoal.id;
       setManageGoalOpen(false);
       setEditingGoal(null);
       loadGoals();
       try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
+      message.success('Goal updated');
+      // Keep the user in goal context: open Add Task so they can attach work immediately.
+      setAddTaskGoalId(editedId);
+      setManageTaskOpen(true);
     } else {
       const newGoal = createUserGoal(profile.id, { title: data.title, deepWhy: data.deepWhy });
       setManageGoalOpen(false);
@@ -215,6 +229,28 @@ export function GoalsPage({
       setSuggestionTasks(suggestTasksForGoal(newGoal));
       setAddedSuggestions(new Set());
     }
+  };
+
+  const openAddTaskForGoal = (goalId: string) => {
+    setAddTaskGoalId(goalId);
+    setManageTaskOpen(true);
+  };
+
+  const handleSaveTaskFromGoal = (
+    data: Omit<UserTask, 'id' | 'profileId' | 'createdAt'> & { applyTo?: 'this' | 'all'; pendingNewGoal?: boolean },
+  ) => {
+    const { applyTo: _applyTo, pendingNewGoal: _pending, ...rest } = data;
+    const goalId = rest.goalId || addTaskGoalId;
+    const created = createUserTask(profile.id, { ...rest, goalId, type: rest.type ?? 'goal' });
+    const gTitle = goals.find(g => g.id === goalId)?.title
+      ?? getPersonalGoals(profile.id).find(g => g.id === goalId)?.title;
+    void attachResourcesToNewTask(profile.id, created.id, created.label, gTitle);
+    setManageTaskOpen(false);
+    setAddTaskGoalId(undefined);
+    loadGoals();
+    try { window.dispatchEvent(new CustomEvent('arbol-tasks-updated')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('arbol-goals-updated')); } catch {}
+    message.success(`Task added${gTitle ? ` to "${gTitle}"` : ''}`);
   };
 
   const handleDeleteGoal = () => {
@@ -376,6 +412,7 @@ export function GoalsPage({
                   isFirst={idx === 0}
                   onEdit={() => { setEditingGoal(goal); setManageGoalOpen(true); }}
                   onDelete={() => { setGoalDeleteTaskMode('detach'); setDeleteTarget(goal); }}
+                  onAddTask={() => openAddTaskForGoal(goal.id)}
                 />
               </div>
             </div>
@@ -410,6 +447,15 @@ export function GoalsPage({
         goal={editingGoal}
         onSave={handleSaveGoal}
         onCancel={() => { setManageGoalOpen(false); setEditingGoal(null); }}
+      />
+
+      <ManageTaskModal
+        open={manageTaskOpen}
+        profileId={profile.id}
+        defaultGoalId={addTaskGoalId}
+        goals={goals}
+        onSave={handleSaveTaskFromGoal}
+        onCancel={() => { setManageTaskOpen(false); setAddTaskGoalId(undefined); }}
       />
 
       <AiAssistCreationModal
@@ -669,12 +715,13 @@ function BreakdownPills({ b, accent }: { b: TaskBreakdown; accent: string }) {
 }
 
 function GoalCard({
-  goal, profileId, onEdit, onDelete, isFirst, refreshTick: _refreshTick,
+  goal, profileId, onEdit, onDelete, onAddTask, isFirst, refreshTick: _refreshTick,
 }: {
   goal: PersonalGoal;
   profileId: string;
   onEdit: () => void;
   onDelete: () => void;
+  onAddTask: () => void;
   isFirst?: boolean;
   refreshTick?: number;
 }) {
@@ -687,6 +734,8 @@ function GoalCard({
   const weekBreakdown = getGoalWeekBreakdown(profileId, goal.id, todayKey);
   const weekPct = getGoalWeekProgressPercent(profileId, goal, todayKey);
   const weekDays = getWeekDays();
+  const linkedCount = countLinkedUserTasks(profileId, goal.id);
+  const hasNoTasks = linkedCount === 0 && todayBreakdown.total === 0 && weekBreakdown.total === 0;
 
   const toggleDay = (dateKey: string) => {
     setOpenDays(prev => {
@@ -700,6 +749,7 @@ function GoalCard({
   return (
     <div
       {...(isFirst ? { 'data-tour-id': 'goals-goal-card' } : {})}
+      data-testid="goal-card"
       style={{
         background: C.bgCard,
         border: `1.5px solid ${accentColor}30`,
@@ -731,14 +781,14 @@ function GoalCard({
             )}
           </div>
           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-            <button onClick={onEdit} style={{
+            <button type="button" onClick={onEdit} style={{
               background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 8,
-              width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: MIN_TOUCH, height: MIN_TOUCH, display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', color: C.secondary, fontSize: 13,
             }} title="Edit goal"><EditOutlined /></button>
-            <button onClick={onDelete} style={{
+            <button type="button" onClick={onDelete} style={{
               background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 8,
-              width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: MIN_TOUCH, height: MIN_TOUCH, display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', color: C.secondary, fontSize: 13,
             }} title="Delete goal"><DeleteOutlined /></button>
           </div>
@@ -756,6 +806,45 @@ function GoalCard({
             <div style={{ fontSize: 13, color: C.body, fontStyle: 'italic', lineHeight: 1.5 }}>
               "{goal.deepWhy}"
             </div>
+          </div>
+        )}
+
+        {/* Empty state — next step is clear */}
+        {hasNoTasks && (
+          <div
+            data-testid="goal-empty-add-task"
+            style={{
+              background: `${accentColor}0c`, border: `1.5px dashed ${accentColor}45`,
+              borderRadius: 12, padding: '14px 14px', marginBottom: 12,
+            }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.headline, marginBottom: 4 }}>
+              No tasks yet
+            </div>
+            <div style={{ fontSize: 12, color: C.body, lineHeight: 1.45, marginBottom: 12 }}>
+              Add a task to start working toward this goal.
+            </div>
+            <button
+              type="button"
+              onClick={onAddTask}
+              data-testid="goal-add-first-task"
+              style={{
+                ...touchPrimaryButton,
+                width: '100%',
+                background: `linear-gradient(135deg, ${accentColor}, ${C.primaryPressed})`,
+                border: 'none',
+                color: '#fff',
+                fontWeight: 800,
+                fontSize: 14,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <PlusOutlined /> Add Your First Task
+            </button>
           </div>
         )}
 
@@ -788,6 +877,7 @@ function GoalCard({
 
         {/* Weekly breakdown - collapsible */}
         <button
+          type="button"
           onClick={() => setWeekOpen(o => !o)}
           style={{
             width: '100%', background: 'none', border: `1px solid ${accentColor}25`,
@@ -817,6 +907,7 @@ function GoalCard({
                   overflow: 'hidden',
                 }}>
                   <button
+                    type="button"
                     onClick={() => toggleDay(day.dateKey)}
                     style={{
                       width: '100%', background: 'none', border: 'none',
@@ -857,6 +948,32 @@ function GoalCard({
               );
             })}
           </div>
+        )}
+
+        {/* Always-available Add Task — primary path after editing a goal */}
+        {!hasNoTasks && (
+          <button
+            type="button"
+            onClick={onAddTask}
+            data-testid="goal-add-task"
+            style={{
+              ...touchPrimaryButton,
+              width: '100%',
+              marginTop: 12,
+              background: C.bgAlt,
+              border: `1.5px solid ${accentColor}55`,
+              color: accentColor,
+              fontWeight: 800,
+              fontSize: 14,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <PlusOutlined /> Add Task
+          </button>
         )}
 
       </div>
